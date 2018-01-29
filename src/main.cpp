@@ -20,15 +20,15 @@ int main( int argc, char** argv ){
     char dataSetPath[300];
     char filename1[300];
     char filename2[300];
-
+    int calling;
     // Change the file path according to where your dataset is saved before running
     // Get the file names of the first two images
-    std::sprintf(filename1, "/home/fabio/catkin_ws/src/uw_slam/src/data/kitti/odometry/00/image_2/%06d.png", 60);
-    std::sprintf(filename2, "/home/fabio/catkin_ws/src/uw_slam/src/data/kitti/odometry/00/image_2/%06d.png", 61);
+    std::sprintf(filename1, "/home/fabio/Documents/datasets/kitti/odometry/00/image_2/%06d.png", 60);
+    std::sprintf(filename2, "/home/fabio/Documents/datasets/kitti/odometry/00/image_2/%06d.png", 61);
     
     // Read the first two images from the dataset
-    // cv::Mat img_1_color = cv::imread("/home/fabio/Documents/Tesis/SfM-Toy-Library-master/dataset/crazyhorse/P1000968.JPG");
-    // cv::Mat img_2_color = cv::imread("/home/fabio/Documents/Tesis/SfM-Toy-Library-master/dataset/crazyhorse/P1000971.JPG");
+    // cv::Mat img_1_color = cv::imread("/home/fabio/Documents/datasets/crazyhorse/P1000968.JPG");
+    // cv::Mat img_2_color = cv::imread("/home/fabio/Documents/datasets/crazyhorse/P1000971.JPG");
     cv::Mat img_1_color = cv::imread(filename1);
     cv::Mat img_2_color = cv::imread(filename2);
 
