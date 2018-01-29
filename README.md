@@ -18,13 +18,12 @@ UW-SLAM is a free and open hardware licensed under the [GPL-3.0 License](https:/
 
 ## Getting Started
 
-This repository provides all you need to simulate and execute UW-SLAM. You can use to directly compile the code as follows:
+This repository provides all you need to simulate and execute UW-SLAM.
 ```bash
-cd <uw-slam_directory>
-mkdir build
-cd build
-cmake ..
-make
+cd <catkin_ws_directory>
+git clone https://github.com/MecatronicaUSB/uw-slam.git
+catkin_make
+rosrun uw-slam uw-slam
 ```
 
 ## Software Details
