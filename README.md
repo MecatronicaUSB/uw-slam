@@ -1,2 +1,2 @@
 # uw-slam
-Main repository for underwater SLAM own implementation
+Main repository for underwater SLAM implementation
