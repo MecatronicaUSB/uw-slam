@@ -1,6 +1,6 @@
 # Monocular Underwater SLAM
 
-Implementation of Monocular Simultaneous Localization and Mapping (SLAM) for underwater vehicles. Using OpenCV 3.2 and ROS Kinect.
+Implementation of Monocular Simultaneous Localization and Mapping (SLAM) for underwater vehicles. Using OpenCV 3.2 and ROS Kinect. Expected to implement GPU support.
 
 UW-SLAM is a free and open hardware licensed under the [GPL-3.0 License](https://en.wikipedia.org/wiki/GNU_General_Public_License).
 
@@ -12,7 +12,7 @@ UW-SLAM is a free and open hardware licensed under the [GPL-3.0 License](https:/
 
 ## Requirements
 
-- [OpenCV 3.0+](http://opencv.org) and extra modules.
+- [OpenCV 3.2+](http://opencv.org) and extra modules.
 - [ROS Kinetic](http://wiki.ros.org/kinetic/Installation).
 
 ## Getting Started
