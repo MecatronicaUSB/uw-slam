@@ -2,7 +2,7 @@
 
 Implementation of Monocular Simultaneous Localization and Mapping (SLAM) for underwater vehicles. Using OpenCV 3.2 and ROS Kinect.
 
-UW-SLAM is a free and open hardware licensed under the [GPL-3.0 License](https://en.wikipedia.org/wiki/GNU_General_Public_License)
+UW-SLAM is a free and open hardware licensed under the [GPL-3.0 License](https://en.wikipedia.org/wiki/GNU_General_Public_License).
 
 ## Table of Contents
 - [Requirements](#requirements)
@@ -12,9 +12,8 @@ UW-SLAM is a free and open hardware licensed under the [GPL-3.0 License](https:/
 
 ## Requirements
 
-- *OpenCV 3.0+*
-- *OpenCV extra modules 3.0+*
-- [*ROS Kinetic*](http://wiki.ros.org/kinetic/Installation)
+- [OpenCV 3.0+](http://opencv.org) and extra modules.
+- [ROS Kinetic](http://wiki.ros.org/kinetic/Installation).
 
 ## Getting Started
 
@@ -33,13 +32,14 @@ rosrun uw-slam uw-slam
 
 ## Directory Layout
 
-#### README.md
+#### /src
 
-This file.
+Core files of uw-slam.
 
-#### main
+#### /include
 
-Main script for simulation .
+Libraries files of uw-slam.
+
 
 ## License
 
