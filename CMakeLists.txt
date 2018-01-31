@@ -207,7 +207,6 @@ include_directories(
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
-add_executable(uw_slam src/main.cpp)
+add_executable(feature_detector src/feature_detector.cpp)
 
-
-target_link_libraries(uw_slam ${OpenCV_LIBS} ${catkin_LIBRARIES})
+target_link_libraries(feature_detector ${OpenCV_LIBS} ${catkin_LIBRARIES})
