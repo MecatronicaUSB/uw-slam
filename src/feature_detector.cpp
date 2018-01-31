@@ -8,9 +8,24 @@
 
 #include "feature_detector.h"
 
+
 int main( int argc, char** argv ){
-    std::vector<std::string> imagesPath;
-    std::vector<std::string> file_names;
+
+    // Detecting CUDA Device
+    int nCuda = cuda::getCudaEnabledDeviceCount();
+    cuda::DeviceInfo deviceInfo;
+    if (nCuda > 0){
+        cout << "CUDA enabled devices detected: " << deviceInfo.name() << endl;
+        cuda::setDevice(0);
+    }
+    else {
+        cout << "No CUDA device detected" << endl;
+        return -1;
+    }
+    cout << "***************************************" << endl;
+
+    // Parser Section
+    std::vector<std::string> image_names;
     std::string videoPath;
 
     try{
@@ -37,28 +52,60 @@ int main( int argc, char** argv ){
     }
     if (inputImages && !inputVideo && !directory) {
         for (const auto ch: args::get(inputImages)){
-            imagesPath.push_back(ch);
-            std::cout << "input images strings: " << ch << std::endl;
+            image_names.push_back(ch);
+            cout << "Input image: " << ch << endl;
         }
     }
     else if (inputVideo && !inputImages && !directory){
         videoPath = args::get(inputVideo);
+        cout << "Input video: " << videoPath << endl;
     }
     else if (directory && !inputImages && !inputVideo){
-        file_names = read_filenames(args::get(directory));
+        image_names = read_filenames(args::get(directory));
+        cout << "Directory of images: " << args::get(directory) << endl;
     }else{
         cout<< "Only one method of input argument is permited"<< endl;
         std::cerr << "Use -h, --help command to see usage" << std::endl;
         return -1;
     }
 
-    cv::Mat img_1, img_2;
-    cv::Mat R_f, t_f;
+    // Creating indexes for current and next image
+    int currImg = 0, nextImg = 1;
+    GpuMat img[image_names.size()];
+
+    // Read current and next image
+    Mat currImgRes, nextImgRes;
+    currImgRes = imread(image_names[currImg]);
+    nextImgRes = imread(image_names[nextImg]);
+
+    // Checking for errors
+    if (!currImgRes.data){
+        std::cout << "Error reading the image: " << currImg + 1 << std::endl; return -1;
+    }
+    if (!nextImgRes.data){
+        std::cout << "Error reading the image: " << nextImg + 1 << std::endl; return -1;
+    }
+
+    // Resizing the images to 640 x 480
+    resize(currImgRes, currImgRes, Size(640 , 480), 0 ,0, CV_INTER_LINEAR);
+    resize(nextImgRes, nextImgRes, Size(640 , 480), 0 ,0, CV_INTER_LINEAR);
+
+    // Uploading the images to GpuMat
+    img[currImg].upload(currImgRes);
+    img[nextImg].upload(nextImgRes);
+
+    imshow("Prueba 1", Mat(img[currImg]));
+    imshow("Prueba 2", Mat(img[nextImg]));
+    waitKey(0);
+    // Resize the images
+    Mat img_1, img_2;
 
     char dataSetPath[300];
     char filename1[300];
     char filename2[300];
     int calling;
+
+
     // Change the file path according to where your dataset is saved before running
     // Get the file names of the first two images
     std::sprintf(filename1, "/home/fabio/Documents/datasets/kitti/odometry/00/image_2/%06d.png", 60);
@@ -251,12 +298,13 @@ int main( int argc, char** argv ){
 
 vector<string> read_filenames(string dir_ent){
     vector<string> file_names;
+    string directory;
     DIR *dir;
     struct dirent *ent;
 
     if ((dir = opendir(dir_ent.c_str())) != NULL) {
         while ((ent = readdir (dir)) != NULL) {
-            file_names.push_back(string(ent->d_name));
+            file_names.push_back(dir_ent + string(ent->d_name));
         }
         closedir (dir);
     } else {
@@ -276,6 +324,7 @@ int getDistance(Point2f a, Point2f b){
 
 // Function to get Corners and Edges homogeneously in the images
 void getCornerEdges(Mat img_1, Mat img_2, vector<Point2f>& points1, vector<Point2f>& points2){
+
     // Patameters for Shi-Tomasi algorithm
     double qualityLevel = 0.98;
     double minDistance = 30;
@@ -369,8 +418,8 @@ void featureDetectionTracking(Mat img_1, Mat img_2, vector<Point2f>& points1, ve
         vector<KeyPoint> keypoints_1, keypoints_2;
         vector<DMatch> matches, ok_matches;
         
-        Ptr<FeatureDetector> orb_detector = ORB::create(4000);
-        Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("BruteForce-Hamming");
+        Ptr<FeatureDetector> orb_detector = cv::ORB::create(4000);
+        Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("BruteForce-Hamming");
         
         // Feature Detection
         orb_detector->detectAndCompute(img_1, Mat(), keypoints_1, descriptors_1);

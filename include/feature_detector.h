@@ -1,3 +1,4 @@
+// OpenCV libraries. May need review for the final release
 #include "opencv2/core/core.hpp"
 #include "opencv2/video/tracking.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
@@ -7,6 +8,7 @@
 #include "opencv2/opencv_modules.hpp"
 #include "opencv2/calib3d/calib3d.hpp"
 
+// Basic C and C++ libraries
 #include <stdio.h>
 #include <iostream>
 #include <ctype.h>
@@ -23,7 +25,12 @@
 // Include args library
 #include "args.hxx"
 
-// ROS Libraries
+// CUDA libraries
+#include <opencv2/cudafilters.hpp>
+#include "opencv2/cudafeatures2d.hpp"
+#include "opencv2/xfeatures2d/cuda.hpp"
+
+// ROS libraries
 #include <ros/ros.h>
 #include <visualization_msgs/Marker.h>
 #include <image_transport/image_transport.h>
@@ -32,6 +39,8 @@
 using namespace cv;
 using namespace cv::xfeatures2d;
 using namespace std;
+using namespace cv::cuda;
+
 
 // Structure for feature detector/tracking statistics
 struct Stats{
