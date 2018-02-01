@@ -90,13 +90,15 @@ int main( int argc, char** argv ){
     int currImg = 0, nextImg = 1;
     GpuMat img[image_names.size()];
 
-    // Obtaining camera matrix from calibration XML file
+    // Obtaining camera matrix from calibration XML file - (Parameters: focal and )
     // (Default: /include/calibration.xml. Must be called cameraMatrix within the file
-    Mat cameraMatrix = readCameraMatrix(dir_calibration);
-    if(cameraMatrix.empty()){
+    Mat cameraMat = readCameraMat(dir_calibration);
+    if(cameraMat.empty()){
         std::cout << "Error reading calibration xml file." << endl;
         return -1;
     }
+    double focal = cameraMat.at<double>(0,0);
+    Point2d pp = Point2d(cameraMat.at<double>(0,2), cameraMat.at<double>(1,2));
 
     // Read current and next image
     Mat currImgRes, nextImgRes;
@@ -128,8 +130,8 @@ int main( int argc, char** argv ){
     GpuMat descriptorsGPU[2];
     GpuMat matchesGPU;
     vector< vector< DMatch> > matches;
-    vector<KeyPoint> keypoints[2];
-    vector<float> descriptors[2];
+    array<vector<KeyPoint>,2> keypoints;
+    array<vector<float>,2> descriptors;
     int nfeatures[2], nmatches;
 
     // SURF as feature detector (Default detector)
@@ -170,6 +172,10 @@ int main( int argc, char** argv ){
     // Apply grid filtering of matches found (for homogenous sparse of features)
     goodMatches = gridFiltering(goodMatches, keypoints[0]);
 
+    // Obtain good keypoints from goodMatches
+    array<vector<KeyPoint>,2> goodKeypoints;
+    goodKeypoints = getGoodKeypoints(goodMatches, keypoints);
+
     // Show results of feature detection (optional)
     if(feature_stats){
         Mat img_matches;
@@ -184,101 +190,31 @@ int main( int argc, char** argv ){
         waitKey(0);     
     }
 
-    // Pose estimation section
-
-
-    // Resize the images
-    Mat img_1, img_2;
-
-    char dataSetPath[300];
-    char filename1[300];
-    char filename2[300];
-    int calling;
-
-
-    // Change the file path according to where your dataset is saved before running
-    // Get the file names of the first two images
-    std::sprintf(filename1, "/home/fabio/Documents/datasets/kitti/odometry/00/image_2/%06d.png", 60);
-    std::sprintf(filename2, "/home/fabio/Documents/datasets/kitti/odometry/00/image_2/%06d.png", 61);
-    
-    // Read the first two images from the dataset
-    // cv::Mat img_1_color = cv::imread("/home/fabio/Documents/datasets/crazyhorse/P1000968.JPG");
-    // cv::Mat img_2_color = cv::imread("/home/fabio/Documents/datasets/crazyhorse/P1000971.JPG");
-    cv::Mat img_1_color = cv::imread(filename1);
-    cv::Mat img_2_color = cv::imread(filename2);
-
-    // Check for errors
-    if (!img_1_color.data || !img_2_color.data){
-        std::cout << "(!) Error reading images " << std::endl; return -1;
-    }
-
-    // Resize the images
-    // resize(img_1_color, img_1_color, cv::Size(1240,376), 0, 0, cv::INTER_CUBIC);
-    // resize(img_2_color, img_2_color, cv::Size(1240,376), 0, 0, cv::INTER_CUBIC);
-
-    // Convert the two images to grayscale
-    cv::cvtColor(img_1_color, img_1, cv::COLOR_BGR2GRAY);
-    cv::cvtColor(img_2_color, img_2, cv::COLOR_BGR2GRAY);
-
-    // Start clock variable for time measurement
-    // int start_s = clock();  
-
-    // Initialize stats of feature detector
-    struct Stats stats = _initStats("SHI_T");
-
-    // Feature detection and tracking
-    vector<Point2f> points1, points2;
-    vector<uchar> status;
-    //getCornerEdges(img_1, img_2, points1, points2);
-    featureDetectionTracking(img_1,img_2, points1, points2, status, "FAST");
-    // Stop clock variable
-    // int stop_s = clock();
-    // stats.exec_time = calculateTime(start_s, stop_s);
+    // Pose Estimation Section
+    // Transform keypoints to Point2f vectors of coordinates 
+    array<vector<Point2f>,2> points;
+    KeyPoint::convert(goodKeypoints[0], points[0], vector<int>());
+    KeyPoint::convert(goodKeypoints[1], points[1], vector<int>());
 
     // Obtain Essential Matrix with the Five-Point Algorithm (David Nister, 2004)
     Mat EssentialMat, mask;
-    double focal = 7.188560000000e+02; 
-    Point2d pp = Point2d(6.071928000000e+02, 1.852157000000e+02);
-    Mat K = (Mat_<double>(3,3) << focal, 0, 6.071928000000e+02, 0, focal,  1.852157000000e+02, 0, 0, 1);
+    EssentialMat = findEssentialMat(points[0], points[1], focal, pp, cv::RANSAC, 0.999, 3.0, mask);
+    // TODO print inliers and outliers 
 
-    EssentialMat = findEssentialMat(points1, points2, focal, pp, cv::RANSAC, 0.999, 3.0, mask);
-    //std::cout << EssentialMat << endl;
-    // TODO
-    // Show number of inliers/outliers found by findEssentialMat()
-    // printLiers(mask);
-
-    // Obtain Rotation matrix and translation vector
-    Mat R, t;
-    int inliers2;
-    inliers2 = recoverPose(EssentialMat, points1, points2, R, t, focal, pp, mask);
-    // std::cout << "ROTATION MATRIX" << endl;
-    // std::cout << R << endl;
-    // std::cout << "TRANSLATION VECTOR" << endl;
-    // std::cout << t << endl;
-    // std::cout << "Inliers: " << inliers2 << endl;
+    // Obtain Pose from Essential Matrix (Rotation Matrix and Translation Vector)
+    Mat rotationMat, translationMat;
+    int inliers2 = recoverPose(EssentialMat, points[0], points[1], rotationMat, 
+                                translationMat, focal, pp, mask);
 
     // Obtain projection matrices
-    Mat I3 = Mat::eye(3, 3, CV_64F);
-    Mat v0 = Mat(3,1,CV_64F, double(0));
-    Mat P1, P2;
-
-    hconcat(I3, v0, P1);
-    hconcat(R, t, P2);
-
-    P1 = K * P1;
-    P2 = K * P2;
-    // P1 = K * [I3 | 0]
-    // P2 = K2 * [R | t]
+    Mat P1 = getProjectionMat(cameraMat, Mat(), Mat(), true);
+    Mat P2 = getProjectionMat(cameraMat, rotationMat, translationMat, false);
 
     // Compute depth of 3D points using triangulation
     Mat mapPoints;
-    triangulatePoints(P1, P2, points1, points2, mapPoints);
+    triangulatePoints(P1, P2, points[0], points[1], mapPoints);
 
-    // Show features detected/tracked and stats information
-    Mat imgShow = img_1_color.clone();
-    //showFeatures(imgShow, points1, points2);
-    //imshow("Output",imgShow);
-    /*
+    // ROS Kinetic section
     ros::init(argc, argv, "uw_slam");
     ros::NodeHandle n;
     ros::Rate r(1);
@@ -287,7 +223,7 @@ int main( int argc, char** argv ){
     ros::NodeHandle nh;
     image_transport::ImageTransport it(nh);
     image_transport::Publisher img_pub = it.advertise("camera/image",1);
-    sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", imgShow).toImageMsg();
+    sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", currImgRes).toImageMsg();
 
     // Set our initial shape type to be a cube
     uint32_t shape = visualization_msgs::Marker::CUBE;
@@ -381,7 +317,7 @@ int main( int argc, char** argv ){
 
             //r.sleep();
         }
-    //}*/
+    //}
     return 0;
     
 }
@@ -407,14 +343,14 @@ vector<string> read_filenames(string dir_ent){
     return file_names;
 }
 
-Mat readCameraMatrix(std::string dir_calibrarionFile){
-    Mat cameraMatrix;
+Mat readCameraMat(std::string dir_calibrarionFile){
+    Mat cameraMat;
     cv::FileStorage opencv_file(dir_calibrarionFile, cv::FileStorage::READ);
     if (opencv_file.isOpened()){
-        opencv_file["cameraMatrix"] >> cameraMatrix;
+        opencv_file["cameraMatrix"] >> cameraMat;
         opencv_file.release();
     }
-    return cameraMatrix;
+    return cameraMat;
 }
 
 vector<DMatch> getGoodMatches(vector< vector< DMatch> > matches){
@@ -427,6 +363,18 @@ vector<DMatch> getGoodMatches(vector< vector< DMatch> > matches){
         }
     }
     return goodMatches;
+}
+
+array<vector<KeyPoint>,2> getGoodKeypoints(vector<DMatch> goodMatches, array< vector< KeyPoint>, 2 > keypoints){
+    array<vector<KeyPoint>,2> goodKeypoints;
+    int key1_index, key2_index;
+    for(int i=0; i < goodMatches.size(); i++){
+        key1_index = goodMatches[i].queryIdx;
+        key2_index = goodMatches[i].trainIdx;
+        goodKeypoints[0].push_back(keypoints[0][key1_index]);
+        goodKeypoints[1].push_back(keypoints[1][key2_index]);
+    }
+    return goodKeypoints;
 }
 
 vector<DMatch> gridFiltering(vector<DMatch> goodMatches, vector<KeyPoint> keypoints){
@@ -458,6 +406,25 @@ vector<DMatch> gridFiltering(vector<DMatch> goodMatches, vector<KeyPoint> keypoi
     return grid_matches;
 }
 
+Mat getProjectionMat(Mat cameraMat, Mat rotationMat, Mat translationMat, bool initialProjection){
+    // P1 = K * [I3 | 0]
+    // P2 = K * [R | t]
+    Mat projectionMat;
+    // Initialize first projection matrix 
+    if(initialProjection){
+        Mat I3 = Mat::eye(3, 3, CV_64F);
+        Mat v0 = Mat(3,1,CV_64F, double(0));
+        hconcat(I3, v0, projectionMat);
+        projectionMat = cameraMat * projectionMat;
+
+        return projectionMat;
+    }
+    hconcat(rotationMat, translationMat, projectionMat);
+    projectionMat = cameraMat * projectionMat;
+
+    return projectionMat;
+}
+
 // Print the stats of a feature detector and descriptor
 void showFeatureStats(std::string detectorName, int nfeatures[2], int nmatches){
     std::cout << "***************************************" << endl;
@@ -467,270 +434,8 @@ void showFeatureStats(std::string detectorName, int nfeatures[2], int nmatches){
     std::cout << "Number matches: " << nmatches << std::endl;
 }
 
-int getDistance(Point2f a, Point2f b){
-    return sqrt(pow(b.y-a.y,2)+pow(b.x-a.x,2));
-}
-
-// Function to get Corners and Edges homogeneously in the images
-void getCornerEdges(Mat img_1, Mat img_2, vector<Point2f>& points1, vector<Point2f>& points2){
-
-    // Patameters for Shi-Tomasi algorithm
-    double qualityLevel = 0.98;
-    double minDistance = 30;
-    int maxCorners = 1;
-    int blockSize = 20;
-    bool useHarrisDetector = false;
-    double k = 0.04;
-    
-    // Patch Size of each cell of the image
-    int pS = 32;
-    for(int x = 0; x < img_1.size().width - pS; x = x + pS){
-        for(int y = 0; y < img_1.size().height- pS; y = y + pS){
-            vector<Point2f> points_aux;
-            Rect ROI(x,y,pS,pS);
-            Mat img_aux = img_1(ROI);
-            // imshow("HEY", img_aux);
-            // waitKey();
-            goodFeaturesToTrack(img_aux, points_aux, maxCorners, qualityLevel,  minDistance, Mat(), blockSize, useHarrisDetector, k);
-
-            if(points_aux.size()==0){
-                
-            }else{
-                points_aux[0].x += x;
-                points_aux[0].y += y; 
-                points1.push_back(points_aux[0]);
-            }
-        }
-    }
-    // Feature Tracking
-    vector<float> err;
-    vector<uchar> status;
-    Size winSize = Size(21,21);
-    TermCriteria termcrit = TermCriteria(TermCriteria::COUNT+TermCriteria::EPS, 30, 0.01);
-    calcOpticalFlowPyrLK(img_1, img_2, points1, points2, status, err, winSize, 3, termcrit, 0, 0.001);
-
-    // Deleting points that the tracking failed or those who have gone outside the frame
-    int indexCorrection = 0;
-    int dThreshold = 60; 
-    for(int i=0; i<status.size(); i++){
-        Point2f pt1 = points1.at(i - indexCorrection);
-        Point2f pt2 = points2.at(i - indexCorrection);
-        int d = getDistance(pt1,pt2);
-        if((status.at(i) == 0)||(pt2.x<0)||(pt2.y<0)||(d > dThreshold)){
-            status.at(i) = 0;
-            points1.erase (points1.begin() + (i - indexCorrection));
-            points2.erase (points2.begin() + (i - indexCorrection));
-            indexCorrection++;
-        }
-    }
-}
-
-// Function to detect and track features on two images (FAST | ORB | SURF | AKAZE) 
-void featureDetectionTracking(Mat img_1, Mat img_2, vector<Point2f>& points1, vector<Point2f>& points2, vector<uchar>& status, std::string descriptor){
-    if(descriptor=="FAST"){
-        vector<KeyPoint> keypoints_1;
-        int fast_threshold = 20;
-        bool nonmaxSuppression = true;
-
-        // Feature Detection
-        FAST(img_1, keypoints_1, fast_threshold, nonmaxSuppression);
-        KeyPoint::convert(keypoints_1, points1, vector<int>());
-
-        // Saving the number of features detected
-        //stats->n_features = points1.size();
-
-        // Feature Tracking
-        vector<float> err;
-        Size winSize = Size(21,21);
-        TermCriteria termcrit = TermCriteria(TermCriteria::COUNT+TermCriteria::EPS, 30, 0.01);
-        calcOpticalFlowPyrLK(img_1, img_2, points1, points2, status, err, winSize, 3, termcrit, 0, 0.001);
-
-        // Deleting points that the tracking failed or those who have gone outside the frame
-        int indexCorrection = 0;
-        for(int i=0; i<status.size(); i++){
-            Point2f pt = points2.at(i - indexCorrection);
-            if((status.at(i) == 0)||(pt.x<0)||(pt.y<0)){
-                if((pt.x<0)||(pt.y<0)){
-                    status.at(i) = 0;
-                }
-                points1.erase (points1.begin() + (i - indexCorrection));
-                points2.erase (points2.begin() + (i - indexCorrection));
-                indexCorrection++;
-            }
-        }
-        // Saving the number of features tracked succesfully
-        //stats->ok_features = points1.size();
-    }
-
-    if(descriptor=="ORB"){
-        Mat descriptors_1, descriptors_2;
-        vector<KeyPoint> keypoints_1, keypoints_2;
-        vector<DMatch> matches, ok_matches;
-        
-        Ptr<FeatureDetector> orb_detector = cv::ORB::create(4000);
-        Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("BruteForce-Hamming");
-        
-        // Feature Detection
-        orb_detector->detectAndCompute(img_1, Mat(), keypoints_1, descriptors_1);
-        orb_detector->detectAndCompute(img_2, Mat(), keypoints_2, descriptors_2);
-        
-        // Feature Tracking
-        matcher->match (descriptors_1, descriptors_2, matches);
-
-        // Deleting points that are too seperated
-        double min_dist = 1000, max_dist = 0;
-        for(int i=0; i<descriptors_1.rows; i++){
-            double dist = matches[i].distance;
-            if(dist < min_dist) min_dist = dist;
-            if(dist > max_dist) max_dist = dist;
-        }
-        for(int i=0; i < descriptors_1.rows; i++){
-            if(matches[i].distance <= max(2*min_dist, 30.0)){
-                ok_matches.push_back(matches[i]);
-            }
-        }
-
-        // Obtaining the coordinates of the ok_points
-        int key1_index;
-        int key2_index;
-        for(int i=0; i<ok_matches.size(); i++){
-            key1_index = ok_matches[i].queryIdx;
-            key2_index = ok_matches[i].trainIdx;
-            points1.push_back(keypoints_1[key1_index].pt);
-            points2.push_back(keypoints_2[key2_index].pt);
-        }
-
-        // Uncomment to show an alternative image of the ok_points found between the two frames
-        // Mat img_match, img_okmatch;
-        // drawMatches(img_1, keypoints_1, img_2, keypoints_2, matches, img_match);
-        // drawMatches(img_1, keypoints_1, img_2, keypoints_2, ok_matches, img_okmatch);  
-        // imshow("Matches", img_match);
-        // imshow("OK Matches", img_okmatch);
-        // waitKey(0);
-        
-        // Saving the number of features and ok_features detected
-        //stats->n_features = matches.size();
-        //stats->ok_features = ok_matches.size();
-    }
-
-    if(descriptor == "SURF"){
-        int minHessian = 400;
-        Mat descriptors_1, descriptors_2;
-        vector<KeyPoint> keypoints_1, keypoints_2;
-        vector<DMatch> matches, ok_matches;
-        
-        Ptr<SURF> surf_detector = SURF::create();
-        surf_detector->setHessianThreshold(minHessian);
-
-        Ptr<SurfDescriptorExtractor> surf_descriptor = SURF::create();
-        FlannBasedMatcher matcher;
-
-        // Feature Detection
-        surf_detector->detectAndCompute(img_1, Mat(), keypoints_1, descriptors_1);
-        surf_detector->detectAndCompute(img_2, Mat(), keypoints_2, descriptors_2);
-        
-        // Feature Tracking
-        matcher.match (descriptors_1, descriptors_2, matches);
-
-        // Deleting points that are too seperated
-        double min_dist = 100, max_dist = 0;
-        for(int i=0; i<descriptors_1.rows; i++){
-            double dist = matches[i].distance;
-            if(dist < min_dist) min_dist = dist;
-            if(dist > max_dist) max_dist = dist;
-        }
-        for(int i=0; i < descriptors_1.rows; i++){
-            if(matches[i].distance <= max(2*min_dist, 0.08)){
-                ok_matches.push_back(matches[i]);
-            }
-        }
-
-        // Obtaining the coordinates of the ok_points
-        int key1_index;
-        int key2_index;
-        for(int i=0; i<ok_matches.size(); i++){
-            key1_index = ok_matches[i].queryIdx;
-            key2_index = ok_matches[i].trainIdx;
-            points1.push_back(keypoints_1[key1_index].pt);
-            points2.push_back(keypoints_2[key2_index].pt);
-        }
-        
-        // Saving the number of features and ok_features detected
-        //stats->n_features = matches.size();
-        //stats->ok_features = ok_matches.size();
-    }
-
-    if(descriptor == "AKAZE"){
-        Mat descriptors_1, descriptors_2;
-        vector<KeyPoint> matched1, matched2, keypoints_1, keypoints_2, inliers1, inliers2;
-        vector< vector<DMatch> > matches;
-        vector<DMatch> ok_matches;
-        
-        Ptr<AKAZE> akaze = AKAZE::create();
-        BFMatcher matcher(NORM_HAMMING);
-        
-        // Feature Detection
-        akaze->detectAndCompute(img_1, Mat(), keypoints_1, descriptors_1);
-        akaze->detectAndCompute(img_2, Mat(), keypoints_2, descriptors_2);
-
-        // Feature Tracking
-        matcher.knnMatch(descriptors_1, descriptors_2, matches, 2);
-
-        // Deleting points that are too seperated
-        const float inlier_threshold = 120.0f;
-        const float nn_match_ratio = 0.8f;
-        for(size_t i = 0; i < matches.size(); i++) {
-            DMatch first = matches[i][0];
-            float dist1 = matches[i][0].distance;
-            float dist2 = matches[i][1].distance;
-
-            if(dist1 < nn_match_ratio * dist2) {
-                matched1.push_back(keypoints_1[first.queryIdx]);
-                matched2.push_back(keypoints_2[first.trainIdx]);
-            }
-        }
-        for(unsigned i = 0; i < matched1.size(); i++) {
-            Mat col = Mat::ones(3, 1, CV_64F);
-            col.at<double>(0) = matched1[i].pt.x;
-            col.at<double>(1) = matched1[i].pt.y;
-
-            col /= col.at<double>(2);
-            double dist = sqrt( pow(col.at<double>(0) - matched2[i].pt.x, 2) +
-                                pow(col.at<double>(1) - matched2[i].pt.y, 2));
-            if(dist < inlier_threshold) {
-                int new_i = static_cast<int>(inliers1.size());
-                inliers1.push_back(matched1[i]);
-                inliers2.push_back(matched2[i]);
-                ok_matches.push_back(DMatch(new_i, new_i, 0));
-            }
-        }   
-
-        // Obtaining the coordinates of the ok_points
-        int key1_index;
-        int key2_index;
-        for(int i=0; i<ok_matches.size(); i++){
-            key1_index = ok_matches[i].queryIdx;
-            key2_index = ok_matches[i].trainIdx;
-            points1.push_back(inliers1[key1_index].pt);
-            points2.push_back(inliers2[key2_index].pt);
-        }
-
-        // Uncomment to show an alternative image of the ok_points found between the two frames
-        // Mat img_match, img_okmatch;
-        // drawMatches(img_1, keypoints_1, img_2, keypoints_2, matches, img_match);
-        // drawMatches(img_1, keypoints_1, img_2, keypoints_2, ok_matches, img_okmatch);  
-        // imshow("Matches", img_match);
-        // imshow("OK Matches", img_okmatch);
-        // waitKey(0);
-        
-        // Saving the number of features and ok_features detected
-        //stats->n_features = matches.size();
-        //stats->ok_features = ok_matches.size();
-    }
-}
-
 // Print the features tracked in an image
-void showFeatures(Mat imgShow, vector<Point2f>& points1, vector<Point2f>& points2){
+void showMovementFeatures(Mat imgShow, vector<Point2f>& points1, vector<Point2f>& points2){
     for(int i=0; i<points1.size(); i++){
         Point2f a = points1.at(i);
         Point2f b = points2.at(i);
@@ -754,13 +459,3 @@ void printLiers(Mat mask){
     std::cout << "Outliers: "<< outliers << endl;
     std::cout << "Total: "<< inliers + outliers << endl;
 }
-
-
-// Calculates the time in (ms) using the output of two clock() variables
-int calculateTime(int start, int stop){
-    return (stop - start)/double(CLOCKS_PER_SEC)*1000;
-}
-
-
-
-

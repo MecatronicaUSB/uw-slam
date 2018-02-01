@@ -64,7 +64,6 @@ struct Stats _initStats(std::string descriptor){
 args::ArgumentParser parser("Feature Detection Module.", "Author: Fabio Morales.");
 args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
 
-
 args::ValueFlagList<std::string> inputImages(parser, "NameImages", "Names of input images. Must specify two file names (one per flag)", {'i'});
 args::ValueFlag<std::string> inputVideo(parser, "NameVideo", "Video input name", {'v'});
 args::ValueFlag<std::string> dir_dataset(parser, "directory", "Directory of dataset files", {'d'});
@@ -73,21 +72,14 @@ args::ValueFlag<int> feature_detector(parser, "feature detector", "Choose featur
 args::Flag feature_stats(parser, "show detector stats", "Show results of feature detector algorithm", {'o'});
 args::ValueFlag<std::string> output(parser, "OutPut", "Output", {'d'});
 
-int getDistance(Point2f a, Point2f b);
 
+// Function declarations
 vector<string> read_filenames(string dir_ent);
 
-Mat readCameraMatrix(std::string dir_calibrarionFile);
-
-// Function to get Corners and Edges homogeneously in the images
-void getCornerEdges(Mat img_1, Mat img_2, vector<Point2f>& points1, vector<Point2f>& points2);
-
-// Function to detect and track features on two images (FAST | ORB | SURF | AKAZE) 
-void featureDetectionTracking(Mat img_1, Mat img_2, vector<Point2f>& points1, 
-                        vector<Point2f>& points2, vector<uchar>& status, std::string descriptor);
+Mat readCameraMat(std::string dir_calibrarionFile);
 
 // Print the features tracked in an image
-void showFeatures(Mat imgShow, vector<Point2f>& points1, vector<Point2f>& points2);
+void showMovementFeatures(Mat imgShow, vector<Point2f>& points1, vector<Point2f>& points2);
 
 // TODO
 // Print the number of inliers and outliers found by findEssentialMat()
@@ -101,4 +93,8 @@ int calculateTime(int start, int stop);
 
 vector<DMatch> getGoodMatches(vector< vector< DMatch> > matches);
 
+array<vector<KeyPoint>,2> getGoodKeypoints(vector<DMatch> goodMatches, array< vector< KeyPoint>, 2 > keypoints);
+
 vector<DMatch> gridFiltering(vector<DMatch> goodMatches, vector<KeyPoint> keypoints);
+
+Mat getProjectionMat(Mat cameraMat, Mat rotationMat, Mat translationMat, bool initialProjection);
