@@ -67,14 +67,17 @@ args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
 
 args::ValueFlagList<std::string> inputImages(parser, "NameImages", "Names of input images. Must specify two file names (one per flag)", {'i'});
 args::ValueFlag<std::string> inputVideo(parser, "NameVideo", "Video input name", {'v'});
-args::ValueFlag<std::string> directory(parser, "directory", "Directory of dataset files", {'d'});
-args::ValueFlag<int> feature_detector(parser, "feature detector", "Choose feature detector to use. SURF = 0, ORB = 1",{'f'});
-args::ValueFlag<int> feature_stats(parser, "show detector stats", "Show selected detector stats", {"stats"});
+args::ValueFlag<std::string> dir_dataset(parser, "directory", "Directory of dataset files", {'d'});
+args::ValueFlag<std::string> parse_calibration(parser, "calibration", "Name of input XML calibration file", {"calibration"});
+args::ValueFlag<int> feature_detector(parser, "feature detector", "Choose feature detector to use. SURF = 0, ORB = 1. (Default = SURF)",{'f'});
+args::Flag feature_stats(parser, "show detector stats", "Show results of feature detector algorithm", {'o'});
 args::ValueFlag<std::string> output(parser, "OutPut", "Output", {'d'});
 
 int getDistance(Point2f a, Point2f b);
 
 vector<string> read_filenames(string dir_ent);
+
+Mat readCameraMatrix(std::string dir_calibrarionFile);
 
 // Function to get Corners and Edges homogeneously in the images
 void getCornerEdges(Mat img_1, Mat img_2, vector<Point2f>& points1, vector<Point2f>& points2);
@@ -97,3 +100,5 @@ void showFeatureStats(std::string detectorName, int nfeatures[2], int nmatches);
 int calculateTime(int start, int stop);
 
 vector<DMatch> getGoodMatches(vector< vector< DMatch> > matches);
+
+vector<DMatch> gridFiltering(vector<DMatch> goodMatches, vector<KeyPoint> keypoints);

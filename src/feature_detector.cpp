@@ -8,6 +8,7 @@
 
 #include "feature_detector.h"
 
+#define DIMENSION_PATCH         10
 #define DIMENSION_WIDTH         640
 #define DIMENSION_HEIGHT        480
 #define NEAREST_NEIGHBOR_RATIO  0.6
@@ -30,6 +31,7 @@ int main( int argc, char** argv ){
     // Parser Section
     std::vector<std::string> image_names;
     std::string videoPath;
+    std::string dir_calibration;
     std::string detectorName;
     int detector = -1;
 
@@ -50,24 +52,24 @@ int main( int argc, char** argv ){
         std::cerr << parser;
         return 1;
     }
-    if (!inputImages && !inputVideo && !directory) {
+    if (!inputImages && !inputVideo && !dir_dataset) {
         std::cout<< "Insuficient input data"<< endl;
         std::cerr << "Use -h, --help command to see usage" << std::endl;
         return -1;
     }
-    if (inputImages && !inputVideo && !directory) {
+    if (inputImages && !inputVideo && !dir_dataset) {
         for (const auto ch: args::get(inputImages)){
             image_names.push_back(ch);
             std::cout << "Input image: " << ch << endl;
         }
     }
-    else if (inputVideo && !inputImages && !directory){
+    else if (inputVideo && !inputImages && !dir_dataset){
         videoPath = args::get(inputVideo);
         std::cout << "Input video: " << videoPath << endl;
     }
-    else if (directory && !inputImages && !inputVideo){
-        image_names = read_filenames(args::get(directory));
-        std::cout << "Directory of images: " << args::get(directory) << endl;
+    else if (dir_dataset && !inputImages && !inputVideo){
+        image_names = read_filenames(args::get(dir_dataset));
+        std::cout << "Directory of images: " << args::get(dir_dataset) << endl;
     }else{
         std::cout<< "Only one method of input argument is permited"<< endl;
         std::cerr << "Use -h, --help command to see usage" << std::endl;
@@ -76,10 +78,25 @@ int main( int argc, char** argv ){
     if(feature_detector){
         detector = args::get(feature_detector);
     }
+    if(parse_calibration){
+        dir_calibration = args::get(parse_calibration);
+        std::cout << "Directory of calibration xml file: " << args::get(parse_calibration) << endl;
+    }else{
+        dir_calibration = "./include/calibration.xml";
+    }
+    std::cout << endl;
 
     // Creating indexes for current and next image
     int currImg = 0, nextImg = 1;
     GpuMat img[image_names.size()];
+
+    // Obtaining camera matrix from calibration XML file
+    // (Default: /include/calibration.xml. Must be called cameraMatrix within the file
+    Mat cameraMatrix = readCameraMatrix(dir_calibration);
+    if(cameraMatrix.empty()){
+        std::cout << "Error reading calibration xml file." << endl;
+        return -1;
+    }
 
     // Read current and next image
     Mat currImgRes, nextImgRes;
@@ -115,8 +132,8 @@ int main( int argc, char** argv ){
     vector<float> descriptors[2];
     int nfeatures[2], nmatches;
 
-    // SURF as feature detector
-    if(detector == 0){
+    // SURF as feature detector (Default detector)
+    if(detector == 0 || detector == -1){
         detectorName = "SURF Detector";
 
         Ptr<cv::cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher();
@@ -139,32 +156,36 @@ int main( int argc, char** argv ){
 
         // Detecting kypoints and computing descriptors
         Ptr<cuda::ORB> orb = cv::cuda::ORB::create();
-        Ptr<cv::cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher(cv::NORM_HAMMING);
+        Ptr<cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher(cv::NORM_HAMMING);
         orb->detectAndCompute(img[currImg], noArray(), keypoints[0], descriptorsGPU[0]);
         orb->detectAndCompute(img[nextImg], noArray(), keypoints[1], descriptorsGPU[1]);
         // Matching descriptors
         matcher->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches, 2);
     }
-
-    // Obtain good matches
+    
+    // Obtain good matches (delete outliers)
     vector<DMatch> goodMatches;
     goodMatches = getGoodMatches(matches);
 
-    // Showing the results
-    Mat img_matches;
-    drawMatches(Mat(img[currImg]), keypoints[0], Mat(img[nextImg]), keypoints[1], 
-                    goodMatches, img_matches,Scalar::all(-1), Scalar::all(-1), 
-                    vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+    // Apply grid filtering of matches found (for homogenous sparse of features)
+    goodMatches = gridFiltering(goodMatches, keypoints[0]);
 
     // Show results of feature detection (optional)
     if(feature_stats){
+        Mat img_matches;
+        drawMatches(Mat(img[currImg]), keypoints[0], Mat(img[nextImg]), keypoints[1], 
+                        goodMatches, img_matches,Scalar::all(-1), Scalar::all(-1), 
+                        vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
         nfeatures[0] = keypoints[0].size();
         nfeatures[1] = keypoints[1].size();
         nmatches = goodMatches.size();
         showFeatureStats(detectorName,nfeatures,nmatches);
         imshow(detectorName, img_matches);
-        cv::waitKey(0);     
+        waitKey(0);     
     }
+
+    // Pose estimation section
+
 
     // Resize the images
     Mat img_1, img_2;
@@ -221,7 +242,7 @@ int main( int argc, char** argv ){
     Mat K = (Mat_<double>(3,3) << focal, 0, 6.071928000000e+02, 0, focal,  1.852157000000e+02, 0, 0, 1);
 
     EssentialMat = findEssentialMat(points1, points2, focal, pp, cv::RANSAC, 0.999, 3.0, mask);
-    std::cout << EssentialMat << endl;
+    //std::cout << EssentialMat << endl;
     // TODO
     // Show number of inliers/outliers found by findEssentialMat()
     // printLiers(mask);
@@ -255,9 +276,9 @@ int main( int argc, char** argv ){
 
     // Show features detected/tracked and stats information
     Mat imgShow = img_1_color.clone();
-    showFeatures(imgShow, points1, points2);
+    //showFeatures(imgShow, points1, points2);
     //imshow("Output",imgShow);
-
+    /*
     ros::init(argc, argv, "uw_slam");
     ros::NodeHandle n;
     ros::Rate r(1);
@@ -360,14 +381,13 @@ int main( int argc, char** argv ){
 
             //r.sleep();
         }
-    //}
+    //}*/
     return 0;
     
 }
 
 vector<string> read_filenames(string dir_ent){
     vector<string> file_names;
-    string directory;
     DIR *dir;
     struct dirent *ent;
 
@@ -376,15 +396,25 @@ vector<string> read_filenames(string dir_ent){
             file_names.push_back(dir_ent + string(ent->d_name));
         }
         closedir (dir);
-    } else {
-    // If the directory could not be opened
-    std::cout << "Directory could not be opened" <<endl;
+    }else{
+        // If the directory could not be opened
+        std::cout << "Directory could not be opened" <<endl;
     }
     // Sorting the vector of strings so it is alphabetically ordered
     sort(file_names.begin(), file_names.end());
     file_names.erase(file_names.begin(), file_names.begin()+2);
 
     return file_names;
+}
+
+Mat readCameraMatrix(std::string dir_calibrarionFile){
+    Mat cameraMatrix;
+    cv::FileStorage opencv_file(dir_calibrarionFile, cv::FileStorage::READ);
+    if (opencv_file.isOpened()){
+        opencv_file["cameraMatrix"] >> cameraMatrix;
+        opencv_file.release();
+    }
+    return cameraMatrix;
 }
 
 vector<DMatch> getGoodMatches(vector< vector< DMatch> > matches){
@@ -397,6 +427,35 @@ vector<DMatch> getGoodMatches(vector< vector< DMatch> > matches){
         }
     }
     return goodMatches;
+}
+
+vector<DMatch> gridFiltering(vector<DMatch> goodMatches, vector<KeyPoint> keypoints){
+    // Dimension of patch of the grid
+    int stepx = DIMENSION_WIDTH / DIMENSION_PATCH; 
+    int stepy = DIMENSION_HEIGHT / DIMENSION_PATCH;
+    int best_distance = 100;
+
+    vector<DMatch> grid_matches;
+    DMatch best_match;
+    for(int i=0; i<DIMENSION_PATCH; i++){
+        for(int j=0; j<DIMENSION_PATCH; j++){
+            best_distance = 100;
+            for (auto m: goodMatches) {
+                //-- Get the keypoints from the good matches
+                if(keypoints[m.queryIdx].pt.x >= stepx*i && keypoints[m.queryIdx].pt.x < stepx*(i+1) &&
+                keypoints[m.queryIdx].pt.y >= stepy*j && keypoints[m.queryIdx].pt.y < stepy*(j+1)){
+                    if(m.distance < best_distance){
+                        best_distance = m.distance;
+                        best_match = m;
+                    }
+                    goodMatches.erase(goodMatches.begin() + m.queryIdx);  
+                }
+            }
+            if(best_distance != 100)
+                grid_matches.push_back(best_match);
+        }
+    }
+    return grid_matches;
 }
 
 // Print the stats of a feature detector and descriptor
