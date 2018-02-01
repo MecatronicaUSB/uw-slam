@@ -8,6 +8,9 @@
 
 #include "feature_detector.h"
 
+#define DIMENSION_WIDTH         640
+#define DIMENSION_HEIGHT        480
+#define NEAREST_NEIGHBOR_RATIO  0.6
 
 int main( int argc, char** argv ){
 
@@ -15,18 +18,20 @@ int main( int argc, char** argv ){
     int nCuda = cuda::getCudaEnabledDeviceCount();
     cuda::DeviceInfo deviceInfo;
     if (nCuda > 0){
-        cout << "CUDA enabled devices detected: " << deviceInfo.name() << endl;
+        std::cout << "CUDA enabled devices detected: " << deviceInfo.name() << endl;
         cuda::setDevice(0);
     }
     else {
-        cout << "No CUDA device detected" << endl;
+        std::cout << "No CUDA device detected" << endl;
         return -1;
     }
-    cout << "***************************************" << endl;
+    std::cout << "***************************************" << endl;
 
     // Parser Section
     std::vector<std::string> image_names;
     std::string videoPath;
+    std::string detectorName;
+    int detector = -1;
 
     try{
         parser.ParseCLI(argc, argv);
@@ -46,27 +51,30 @@ int main( int argc, char** argv ){
         return 1;
     }
     if (!inputImages && !inputVideo && !directory) {
-        cout<< "Insuficient input data"<< endl;
+        std::cout<< "Insuficient input data"<< endl;
         std::cerr << "Use -h, --help command to see usage" << std::endl;
         return -1;
     }
     if (inputImages && !inputVideo && !directory) {
         for (const auto ch: args::get(inputImages)){
             image_names.push_back(ch);
-            cout << "Input image: " << ch << endl;
+            std::cout << "Input image: " << ch << endl;
         }
     }
     else if (inputVideo && !inputImages && !directory){
         videoPath = args::get(inputVideo);
-        cout << "Input video: " << videoPath << endl;
+        std::cout << "Input video: " << videoPath << endl;
     }
     else if (directory && !inputImages && !inputVideo){
         image_names = read_filenames(args::get(directory));
-        cout << "Directory of images: " << args::get(directory) << endl;
+        std::cout << "Directory of images: " << args::get(directory) << endl;
     }else{
-        cout<< "Only one method of input argument is permited"<< endl;
+        std::cout<< "Only one method of input argument is permited"<< endl;
         std::cerr << "Use -h, --help command to see usage" << std::endl;
         return -1;
+    }
+    if(feature_detector){
+        detector = args::get(feature_detector);
     }
 
     // Creating indexes for current and next image
@@ -87,16 +95,77 @@ int main( int argc, char** argv ){
     }
 
     // Resizing the images to 640 x 480
-    resize(currImgRes, currImgRes, Size(640 , 480), 0 ,0, CV_INTER_LINEAR);
-    resize(nextImgRes, nextImgRes, Size(640 , 480), 0 ,0, CV_INTER_LINEAR);
+    resize(currImgRes, currImgRes, Size(DIMENSION_WIDTH, DIMENSION_HEIGHT), 0 ,0, CV_INTER_LINEAR);
+    resize(nextImgRes, nextImgRes, Size(DIMENSION_WIDTH , DIMENSION_HEIGHT), 0 ,0, CV_INTER_LINEAR);
+
+    // Converting the images to GRAY
+    cvtColor(currImgRes,currImgRes,COLOR_BGR2GRAY);
+    cvtColor(nextImgRes,nextImgRes,COLOR_BGR2GRAY);
 
     // Uploading the images to GpuMat
     img[currImg].upload(currImgRes);
     img[nextImg].upload(nextImgRes);
 
-    imshow("Prueba 1", Mat(img[currImg]));
-    imshow("Prueba 2", Mat(img[nextImg]));
-    waitKey(0);
+    // Feature detection section
+    GpuMat keypointsGPU[2];
+    GpuMat descriptorsGPU[2];
+    GpuMat matchesGPU;
+    vector< vector< DMatch> > matches;
+    vector<KeyPoint> keypoints[2];
+    vector<float> descriptors[2];
+    int nfeatures[2], nmatches;
+
+    // SURF as feature detector
+    if(detector == 0){
+        detectorName = "SURF Detector";
+
+        Ptr<cv::cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher();
+        cv::cuda::SURF_CUDA surf;
+        Ptr<cv::cuda::Feature2DAsync> detector;
+        // Detecting keypoints and computing descriptors
+        surf(img[currImg], GpuMat(), keypointsGPU[0], descriptorsGPU[0]);
+        surf(img[nextImg], GpuMat(), keypointsGPU[1], descriptorsGPU[1]);
+        // Matching descriptors
+        matcher->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches, 2);
+        // Downloading results
+        surf.downloadKeypoints(keypointsGPU[0], keypoints[0]);
+        surf.downloadKeypoints(keypointsGPU[1], keypoints[1]);
+        surf.downloadDescriptors(descriptorsGPU[0], descriptors[0]); //REVISAR SU FUTURA UTILIDAD
+        surf.downloadDescriptors(descriptorsGPU[1], descriptors[1]); //REVISAR SU FUTURA UTILIDAD
+    }
+    // ORB as feature detector
+    if(detector == 1){
+        detectorName = "ORB Detector";
+
+        // Detecting kypoints and computing descriptors
+        Ptr<cuda::ORB> orb = cv::cuda::ORB::create();
+        Ptr<cv::cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher(cv::NORM_HAMMING);
+        orb->detectAndCompute(img[currImg], noArray(), keypoints[0], descriptorsGPU[0]);
+        orb->detectAndCompute(img[nextImg], noArray(), keypoints[1], descriptorsGPU[1]);
+        // Matching descriptors
+        matcher->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches, 2);
+    }
+
+    // Obtain good matches
+    vector<DMatch> goodMatches;
+    goodMatches = getGoodMatches(matches);
+
+    // Showing the results
+    Mat img_matches;
+    drawMatches(Mat(img[currImg]), keypoints[0], Mat(img[nextImg]), keypoints[1], 
+                    goodMatches, img_matches,Scalar::all(-1), Scalar::all(-1), 
+                    vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+
+    // Show results of feature detection (optional)
+    if(feature_stats){
+        nfeatures[0] = keypoints[0].size();
+        nfeatures[1] = keypoints[1].size();
+        nmatches = goodMatches.size();
+        showFeatureStats(detectorName,nfeatures,nmatches);
+        imshow(detectorName, img_matches);
+        cv::waitKey(0);     
+    }
+
     // Resize the images
     Mat img_1, img_2;
 
@@ -152,7 +221,7 @@ int main( int argc, char** argv ){
     Mat K = (Mat_<double>(3,3) << focal, 0, 6.071928000000e+02, 0, focal,  1.852157000000e+02, 0, 0, 1);
 
     EssentialMat = findEssentialMat(points1, points2, focal, pp, cv::RANSAC, 0.999, 3.0, mask);
-    cout << EssentialMat << endl;
+    std::cout << EssentialMat << endl;
     // TODO
     // Show number of inliers/outliers found by findEssentialMat()
     // printLiers(mask);
@@ -161,11 +230,11 @@ int main( int argc, char** argv ){
     Mat R, t;
     int inliers2;
     inliers2 = recoverPose(EssentialMat, points1, points2, R, t, focal, pp, mask);
-    // cout << "ROTATION MATRIX" << endl;
-    // cout << R << endl;
-    // cout << "TRANSLATION VECTOR" << endl;
-    // cout << t << endl;
-    // cout << "Inliers: " << inliers2 << endl;
+    // std::cout << "ROTATION MATRIX" << endl;
+    // std::cout << R << endl;
+    // std::cout << "TRANSLATION VECTOR" << endl;
+    // std::cout << t << endl;
+    // std::cout << "Inliers: " << inliers2 << endl;
 
     // Obtain projection matrices
     Mat I3 = Mat::eye(3, 3, CV_64F);
@@ -309,13 +378,34 @@ vector<string> read_filenames(string dir_ent){
         closedir (dir);
     } else {
     // If the directory could not be opened
-    cout << "Directory could not be opened" <<endl;
+    std::cout << "Directory could not be opened" <<endl;
     }
     // Sorting the vector of strings so it is alphabetically ordered
     sort(file_names.begin(), file_names.end());
     file_names.erase(file_names.begin(), file_names.begin()+2);
 
     return file_names;
+}
+
+vector<DMatch> getGoodMatches(vector< vector< DMatch> > matches){
+    vector<DMatch> goodMatches;
+    // Use Nearest-Neighbor Ratio to determine "good" matches
+    for (std::vector<std::vector<cv::DMatch> >::const_iterator it = matches.begin(); it != matches.end(); ++it) {
+        if (it->size() > 1 && (*it)[0].distance / (*it)[1].distance < NEAREST_NEIGHBOR_RATIO) {
+            DMatch m = (*it)[0];
+            goodMatches.push_back(m);       // save good matches here                           
+        }
+    }
+    return goodMatches;
+}
+
+// Print the stats of a feature detector and descriptor
+void showFeatureStats(std::string detectorName, int nfeatures[2], int nmatches){
+    std::cout << "***************************************" << endl;
+    std::cout << "Stats of feature detector: " << detectorName << std::endl;
+    std::cout << "Number of features found in current image: " << nfeatures[0] << std::endl;
+    std::cout << "Number of features found in next image: " << nfeatures[1] << std::endl;
+    std::cout << "Number matches: " << nmatches << std::endl;
 }
 
 int getDistance(Point2f a, Point2f b){
@@ -601,19 +691,11 @@ void printLiers(Mat mask){
     //         inliers += 1;
     //     }
     // }
-    cout << "Intliers: "<< inliers << endl;
-    cout << "Outliers: "<< outliers << endl;
-    cout << "Total: "<< inliers + outliers << endl;
+    std::cout << "Intliers: "<< inliers << endl;
+    std::cout << "Outliers: "<< outliers << endl;
+    std::cout << "Total: "<< inliers + outliers << endl;
 }
 
-// Print the stats of a feature detector and descriptor
-void printStats(struct Stats stats){
-    std::cout << "Stats of feature detection" << std::endl;
-    std::cout << "Name: " << stats.descriptor_name << std::endl;
-    std::cout << "Features found: " << stats.n_features << std::endl;
-    std::cout << "Features tracked: " << stats.ok_features << std::endl;
-    std::cout << "Execution time (ms): " << stats.exec_time << std::endl;
-}
 
 // Calculates the time in (ms) using the output of two clock() variables
 int calculateTime(int start, int stop){

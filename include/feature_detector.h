@@ -64,9 +64,12 @@ struct Stats _initStats(std::string descriptor){
 args::ArgumentParser parser("Feature Detection Module.", "Author: Fabio Morales.");
 args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
 
+
 args::ValueFlagList<std::string> inputImages(parser, "NameImages", "Names of input images. Must specify two file names (one per flag)", {'i'});
 args::ValueFlag<std::string> inputVideo(parser, "NameVideo", "Video input name", {'v'});
 args::ValueFlag<std::string> directory(parser, "directory", "Directory of dataset files", {'d'});
+args::ValueFlag<int> feature_detector(parser, "feature detector", "Choose feature detector to use. SURF = 0, ORB = 1",{'f'});
+args::ValueFlag<int> feature_stats(parser, "show detector stats", "Show selected detector stats", {"stats"});
 args::ValueFlag<std::string> output(parser, "OutPut", "Output", {'d'});
 
 int getDistance(Point2f a, Point2f b);
@@ -88,8 +91,9 @@ void showFeatures(Mat imgShow, vector<Point2f>& points1, vector<Point2f>& points
 void printLiers(Mat mask);
 
 // Print the stats of a feature detector and descriptor
-void printStats(struct Stats stats);
+void showFeatureStats(std::string detectorName, int nfeatures[2], int nmatches);
 
 // Calculates the time in (ms) using the output of two clock() variables
 int calculateTime(int start, int stop);
 
+vector<DMatch> getGoodMatches(vector< vector< DMatch> > matches);

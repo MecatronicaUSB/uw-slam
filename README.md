@@ -1,6 +1,6 @@
 # Monocular Underwater SLAM
 
-Implementation of Monocular Simultaneous Localization and Mapping (SLAM) for underwater vehicles. Using OpenCV 3.2 and ROS Kinect. Expected to implement GPU support.
+Implementation of Monocular Simultaneous Localization and Mapping (SLAM) for underwater vehicles. Using OpenCV 3.2, CUDA 8.0 and ROS Kinect.
 
 UW-SLAM is a free and open hardware licensed under the [GPL-3.0 License](https://en.wikipedia.org/wiki/GNU_General_Public_License).
 
@@ -12,7 +12,8 @@ UW-SLAM is a free and open hardware licensed under the [GPL-3.0 License](https:/
 
 ## Requirements
 
-- [OpenCV 3.2+](http://opencv.org) and extra modules.
+- [OpenCV 3.2](http://opencv.org) and extra modules.
+- [CUDA 8.0](https://developer.nvidia.com/cuda-toolkit-archive).
 - [ROS Kinetic](http://wiki.ros.org/kinetic/Installation).
 
 ## Getting Started
@@ -27,7 +28,7 @@ rosrun uw-slam uw-slam
 
 ## Software Details
 
-- Implementation done in C++.
+- Implementation done in C++ using GPU optimization.
 - Using Rviz as visualization tool.
 
 ## Directory Layout
