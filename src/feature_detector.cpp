@@ -91,16 +91,36 @@ int main( int argc, char** argv ){
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////
     // Initialization section
+
     // Creating indexes for current and next image
     int currImg = 0, nextImg = 1;
-    GpuMat img[image_names.size()];
+
+    // Loading first image
+    GpuMat currImgGPU;
+    Mat currImgRes;
+    currImgRes = imread(image_names[currImg]);
+
+    // Checking for error
+    if (!currImgRes.data){
+        std::cout << "Error loading first image." << std::endl; return -1;
+    }
+
+    // Resizing current image to 640 x 480
+    resize(currImgRes, currImgRes, Size(DIMENSION_WIDTH, DIMENSION_HEIGHT), 0 ,0, CV_INTER_LINEAR);
+
+    // Converting next image to GRAY
+    cvtColor(currImgRes,currImgRes,COLOR_BGR2GRAY);
+
+    // Uploading next image to GpuMat
+    currImgGPU.upload(currImgRes);  
 
     // Creating current and next Rotation and Translation Matrices
     Mat currRotationMat     = Mat::eye(3, 3, CV_64F);
     Mat currTranslationMat  = Mat(3, 1, CV_64F, double(0));
     Mat nextRotationMat, nextTranslationMat;
+    double x_pos = 0, y_pos = 0, z_pos = 0;
 
-    // Obtaining camera matrix from calibration XML file - (Parameters: focal and )
+    // Obtaining camera matrix from calibration XML file - (Parameters: focal and principal point)
     // (Default: /include/calibration.xml. Must be called cameraMatrix within the file
     Mat cameraMat = readCameraMat(dir_calibration);
     if(cameraMat.empty()){
@@ -111,82 +131,60 @@ int main( int argc, char** argv ){
     Point2d pp = Point2d(cameraMat.at<double>(0,2), cameraMat.at<double>(1,2));
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////
-    // ROS Kinetic section
+    // ROS Kinetic inicialization
     ros::init(argc, argv, "uw_slam");
     ros::NodeHandle n;
-    ros::Rate r(1);
+    ros::Rate r(3);
     ros::Publisher marker_pub = n.advertise<visualization_msgs::Marker>("visualization_marker", 100);
 
     ros::NodeHandle nh;
     image_transport::ImageTransport it(nh);
     image_transport::Publisher img_pub = it.advertise("camera/image",1);
     
-    // Set our initial shape type to be a cube
-    uint32_t shape = visualization_msgs::Marker::CUBE;
-
+    // Initialize parameters of marker
     visualization_msgs::Marker marker;
-
-    // Set the frame ID and timestamp.  See the TF tutorials for information on these.
-    marker.header.frame_id = "/main_uw";
+    marker.header.frame_id = "/main_uw";                // Set the frame ID and timestamp. See the TF tutorials for information on these.
     marker.header.stamp = ros::Time::now();
-
-    // Set the namespace and id for this marker.  This serves to create a unique ID
-    // Any marker sent with the same namespace and id will overwrite the old one
-    marker.ns = "uw_slam";
-
-    // Set the marker type.  Initially this is CUBE, and cycles between that and SPHERE, ARROW, and CYLINDER
-    marker.type = shape;
-
-    // Set the marker action.  Options are ADD, DELETE, and new in ROS Indigo: 3 (DELETEALL)
-    marker.action = visualization_msgs::Marker::ADD;
-
-    marker.pose.orientation.x = 0.0;
-    marker.pose.orientation.y = 0.0;
+    marker.ns = "uw_slam";                              // Set the namespace and id for this marker.  This serves to create a unique ID. Any marker sent with the same namespace and id will overwrite the old one
+    marker.type = visualization_msgs::Marker::CUBE;     // Set the marker type.  Initially this is CUBE, and cycles between that and SPHERE, ARROW, and CYLINDER
+    marker.action = visualization_msgs::Marker::ADD;    // Set the marker action.  Options are ADD, DELETE, and new in ROS Indigo: 3 (DELETEALL)
+    marker.pose.orientation.x = 0.0;                    // Orientation of marker
+    marker.pose.orientation.y = 0.0;    
     marker.pose.orientation.z = 0.0;
     marker.pose.orientation.w = 1.0;
-
-    // Set the scale of the marker -- 1x1x1 here means 1m on a side
-    marker.scale.x = 0.10;
+    marker.scale.x = 0.10;                              // Set the scale of the marker -- 1x1x1 here means 1m on a side
     marker.scale.y = 0.10;
     marker.scale.z = 0.10;
-    
-    // Set the color -- be sure to set alpha to something non-zero!
-    marker.color.r = 0.12f;
+    marker.color.r = 0.12f;                             // Set the color -- set alpha to something non-zero!
     marker.color.g = 0.56f;
     marker.color.b = 1.0f;
     marker.color.a = 1.0;
-    marker.lifetime = ros::Duration();
+    marker.lifetime = ros::Duration();                  // Life spam of marker  
 
+    // Loop while ROS core is active
     while(ros::ok()){
         ////////////////////////////////////////////////////////////////////////////////////////////////////
-        // Read current and next image
-        Mat currImgRes, nextImgRes;
-        currImgRes = imread(image_names[currImg]);
+        // Read next image
+        Mat nextImgRes;
         nextImgRes = imread(image_names[nextImg]);
-
-        // Checking for errors
-        if (!currImgRes.data){
-            std::cout << "***************************************" << endl;
-            std::cout << "Finished." << std::endl; return -1;
-        }
+        
+        // Checking end of dataset
         if (!nextImgRes.data){
             std::cout << "***************************************" << endl;
             std::cout << "Finished." << std::endl; return -1;
         }
-        // Update current image to ROS message
-        sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", currImgRes).toImageMsg();
-        
-        // Resizing the images to 640 x 480
-        resize(currImgRes, currImgRes, Size(DIMENSION_WIDTH, DIMENSION_HEIGHT), 0 ,0, CV_INTER_LINEAR);
+        // Update next image to ROS message
+        sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", nextImgRes).toImageMsg();
+
+        // Resizing next image to 640 x 480
         resize(nextImgRes, nextImgRes, Size(DIMENSION_WIDTH , DIMENSION_HEIGHT), 0 ,0, CV_INTER_LINEAR);
 
-        // Converting the images to GRAY
-        cvtColor(currImgRes,currImgRes,COLOR_BGR2GRAY);
+        // Converting next image to GRAY
         cvtColor(nextImgRes,nextImgRes,COLOR_BGR2GRAY);
 
-        // Uploading the images to GpuMat
-        img[currImg].upload(currImgRes);
-        img[nextImg].upload(nextImgRes);
+        // Uploading next image to GpuMat
+        GpuMat nextImgGPU;
+        nextImgGPU.upload(nextImgRes);
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////
         // Feature detection section
@@ -206,8 +204,8 @@ int main( int argc, char** argv ){
             cv::cuda::SURF_CUDA surf;
             Ptr<cv::cuda::Feature2DAsync> detector;
             // Detecting keypoints and computing descriptors
-            surf(img[currImg], GpuMat(), keypointsGPU[0], descriptorsGPU[0]);
-            surf(img[nextImg], GpuMat(), keypointsGPU[1], descriptorsGPU[1]);
+            surf(currImgGPU, GpuMat(), keypointsGPU[0], descriptorsGPU[0]);
+            surf(nextImgGPU, GpuMat(), keypointsGPU[1], descriptorsGPU[1]);
             // Matching descriptors
             matcher->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches, 2);
             // Downloading results
@@ -223,8 +221,8 @@ int main( int argc, char** argv ){
             // Detecting kypoints and computing descriptors
             Ptr<cuda::ORB> orb = cv::cuda::ORB::create();
             Ptr<cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher(cv::NORM_HAMMING);
-            orb->detectAndCompute(img[currImg], noArray(), keypoints[0], descriptorsGPU[0]);
-            orb->detectAndCompute(img[nextImg], noArray(), keypoints[1], descriptorsGPU[1]);
+            orb->detectAndCompute(currImgGPU, noArray(), keypoints[0], descriptorsGPU[0]);
+            orb->detectAndCompute(nextImgGPU, noArray(), keypoints[1], descriptorsGPU[1]);
             // Matching descriptors
             matcher->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches, 2);
         }
@@ -234,7 +232,7 @@ int main( int argc, char** argv ){
         goodMatches = getGoodMatches(matches);
 
         // Apply grid filtering of matches found (for homogenous sparse of features)
-        goodMatches = gridFiltering(goodMatches, keypoints[0]);
+        //goodMatches = gridFiltering(goodMatches, keypoints[0]);
 
         // Obtain good keypoints from goodMatches
         array<vector<KeyPoint>,2> goodKeypoints;
@@ -243,7 +241,7 @@ int main( int argc, char** argv ){
         // Show results of feature detection (optional)
         if(feature_stats){
             Mat img_matches;
-            drawMatches(Mat(img[currImg]), keypoints[0], Mat(img[nextImg]), keypoints[1], 
+            drawMatches(Mat(currImgGPU), keypoints[0], Mat(nextImgGPU), keypoints[1], 
                             goodMatches, img_matches,Scalar::all(-1), Scalar::all(-1), 
                             vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
             nfeatures[0] = keypoints[0].size();
@@ -273,7 +271,6 @@ int main( int argc, char** argv ){
         // Compute current Rotation and Translation
         nextTranslationMat.at<double>(0,2) = abs(nextTranslationMat.at<double>(0,2));
         currTranslationMat = currTranslationMat + (currRotationMat * nextTranslationMat);
-        cout << "Translation: " << currTranslationMat << endl;
 
         // Obtain projection matrices for the two perspectives
         Mat P1 = getProjectionMat(cameraMat, currRotationMat, currTranslationMat);
@@ -284,20 +281,21 @@ int main( int argc, char** argv ){
         triangulatePoints(P1, P2, points[0], points[1], mapPoints);
 
         marker.id = id;
+
         // Set the pose of the marker.  This is a full 6DOF pose relative to the frame/time specified in the header
-        marker.pose.position.x = currTranslationMat.at<float>(0,2);
-        marker.pose.position.y = currTranslationMat.at<float>(0,0);
-        marker.pose.position.z = currTranslationMat.at<float>(0,1);
-        // marker.pose.position.x /= 2;
-        // marker.pose.position.y /= 2;
-        // marker.pose.position.z /= 2;
+        cout << currTranslationMat << endl;
+        marker.pose.position.x += currTranslationMat.at<double>(2,0);
+        marker.pose.position.y += currTranslationMat.at<double>(0,0);
+        marker.pose.position.z += currTranslationMat.at<double>(1,0);
+
+        marker.pose.position.x /= 10;
+        marker.pose.position.y /= 10;
+        marker.pose.position.z /= 10;
 
 
-        while (marker_pub.getNumSubscribers() < 1 && img_pub.getNumSubscribers() < 1)
-        {
-            if (!ros::ok())
-            {
-            return 0;
+        while (marker_pub.getNumSubscribers() < 1 && img_pub.getNumSubscribers() < 1){
+            if (!ros::ok()){
+                return 0;
             }
             ROS_WARN_ONCE("Please create a subscriber to the marker/image");
             sleep(1);
@@ -305,29 +303,29 @@ int main( int argc, char** argv ){
 
         // Publish the marker
         marker_pub.publish(marker);
+        img_pub.publish(msg);
         ros::spinOnce();
         id += 1;
-        //r.sleep();
-
-        img_pub.publish(msg);
-
-        // Release memory
-        img[currImg].release();
-        keypointsGPU[0].release(), keypointsGPU[1].release();
-        currImgRes.release(), nextImgRes.release();
-        matchesGPU.release();
-        keypoints[0].~vector(), keypoints[1].~vector();
-        descriptors[0].~vector(), descriptors[1].~vector(); 
-        goodMatches.~vector();
-        goodKeypoints[0].~vector(), goodKeypoints[1].~vector();
+        r.sleep();
 
         // Updating values for next frame
         currImg += 1;
         nextImg += 1;
+        currImgRes = nextImgRes.clone();
+        currImgGPU = nextImgGPU.clone();
         currRotationMat    = nextRotationMat.clone();
         currTranslationMat = nextTranslationMat.clone();
 
-    
+        // // Release memory
+        // img[currImg].release();
+        // keypointsGPU[0].release(), keypointsGPU[1].release();
+        // currImgRes.release(), nextImgRes.release();
+        // matchesGPU.release();
+        // keypoints[0].~vector(), keypoints[1].~vector();
+        // descriptors[0].~vector(), descriptors[1].~vector(); 
+        // goodMatches.~vector();
+        // goodKeypoints[0].~vector(), goodKeypoints[1].~vector();
+        
     }
 
     // ////////////////////////////////////////////////////////////////////////////////////////////////////
