@@ -36,29 +36,11 @@
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 
+// Namespace
 using namespace cv;
 using namespace cv::xfeatures2d;
 using namespace std;
 using namespace cv::cuda;
-
-
-// Structure for feature detector/tracking statistics
-struct Stats{
-    std::string descriptor_name;
-    double exec_time;
-    int n_features;
-    int ok_features;
-};
-
-// Initialization of structure Stats
-struct Stats _initStats(std::string descriptor){
-    struct Stats stats;
-    stats.descriptor_name = descriptor;
-    stats.exec_time = 0;
-    stats.n_features = 0;
-    stats.ok_features = 0;
-    return stats;
-}
 
 // Args declarations
 args::ArgumentParser parser("Feature Detection Module.", "Author: Fabio Morales.");
@@ -71,7 +53,6 @@ args::ValueFlag<std::string> parse_calibration(parser, "calibration", "Name of i
 args::ValueFlag<int> feature_detector(parser, "feature detector", "Choose feature detector to use. SURF = 0, ORB = 1. (Default = SURF)",{'f'});
 args::Flag feature_stats(parser, "show detector stats", "Show results of feature detector algorithm", {'o'});
 args::ValueFlag<std::string> output(parser, "OutPut", "Output", {'d'});
-
 
 // Function declarations
 vector<string> read_filenames(string dir_ent);
@@ -97,4 +78,4 @@ array<vector<KeyPoint>,2> getGoodKeypoints(vector<DMatch> goodMatches, array< ve
 
 vector<DMatch> gridFiltering(vector<DMatch> goodMatches, vector<KeyPoint> keypoints);
 
-Mat getProjectionMat(Mat cameraMat, Mat rotationMat, Mat translationMat, bool initialProjection);
+Mat getProjectionMat(Mat cameraMat, Mat rotationMat, Mat translationMat);

@@ -14,6 +14,8 @@
 #define NEAREST_NEIGHBOR_RATIO  0.6
 
 int main( int argc, char** argv ){
+    // CAMBIAR DE POSICION. ID DE CADA UNO DE LOS MARKERS DE ROS
+    int id = 0;
 
     // Detecting CUDA Device
     int nCuda = cuda::getCudaEnabledDeviceCount();
@@ -28,6 +30,7 @@ int main( int argc, char** argv ){
     }
     std::cout << "***************************************" << endl;
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
     // Parser Section
     std::vector<std::string> image_names;
     std::string videoPath;
@@ -86,9 +89,16 @@ int main( int argc, char** argv ){
     }
     std::cout << endl;
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Initialization section
     // Creating indexes for current and next image
     int currImg = 0, nextImg = 1;
     GpuMat img[image_names.size()];
+
+    // Creating current and next Rotation and Translation Matrices
+    Mat currRotationMat     = Mat::eye(3, 3, CV_64F);
+    Mat currTranslationMat  = Mat(3, 1, CV_64F, double(0));
+    Mat nextRotationMat, nextTranslationMat;
 
     // Obtaining camera matrix from calibration XML file - (Parameters: focal and )
     // (Default: /include/calibration.xml. Must be called cameraMatrix within the file
@@ -100,120 +110,7 @@ int main( int argc, char** argv ){
     double focal = cameraMat.at<double>(0,0);
     Point2d pp = Point2d(cameraMat.at<double>(0,2), cameraMat.at<double>(1,2));
 
-    // Read current and next image
-    Mat currImgRes, nextImgRes;
-    currImgRes = imread(image_names[currImg]);
-    nextImgRes = imread(image_names[nextImg]);
-
-    // Checking for errors
-    if (!currImgRes.data){
-        std::cout << "Error reading the image: " << currImg + 1 << std::endl; return -1;
-    }
-    if (!nextImgRes.data){
-        std::cout << "Error reading the image: " << nextImg + 1 << std::endl; return -1;
-    }
-
-    // Resizing the images to 640 x 480
-    resize(currImgRes, currImgRes, Size(DIMENSION_WIDTH, DIMENSION_HEIGHT), 0 ,0, CV_INTER_LINEAR);
-    resize(nextImgRes, nextImgRes, Size(DIMENSION_WIDTH , DIMENSION_HEIGHT), 0 ,0, CV_INTER_LINEAR);
-
-    // Converting the images to GRAY
-    cvtColor(currImgRes,currImgRes,COLOR_BGR2GRAY);
-    cvtColor(nextImgRes,nextImgRes,COLOR_BGR2GRAY);
-
-    // Uploading the images to GpuMat
-    img[currImg].upload(currImgRes);
-    img[nextImg].upload(nextImgRes);
-
-    // Feature detection section
-    GpuMat keypointsGPU[2];
-    GpuMat descriptorsGPU[2];
-    GpuMat matchesGPU;
-    vector< vector< DMatch> > matches;
-    array<vector<KeyPoint>,2> keypoints;
-    array<vector<float>,2> descriptors;
-    int nfeatures[2], nmatches;
-
-    // SURF as feature detector (Default detector)
-    if(detector == 0 || detector == -1){
-        detectorName = "SURF Detector";
-
-        Ptr<cv::cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher();
-        cv::cuda::SURF_CUDA surf;
-        Ptr<cv::cuda::Feature2DAsync> detector;
-        // Detecting keypoints and computing descriptors
-        surf(img[currImg], GpuMat(), keypointsGPU[0], descriptorsGPU[0]);
-        surf(img[nextImg], GpuMat(), keypointsGPU[1], descriptorsGPU[1]);
-        // Matching descriptors
-        matcher->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches, 2);
-        // Downloading results
-        surf.downloadKeypoints(keypointsGPU[0], keypoints[0]);
-        surf.downloadKeypoints(keypointsGPU[1], keypoints[1]);
-        surf.downloadDescriptors(descriptorsGPU[0], descriptors[0]); //REVISAR SU FUTURA UTILIDAD
-        surf.downloadDescriptors(descriptorsGPU[1], descriptors[1]); //REVISAR SU FUTURA UTILIDAD
-    }
-    // ORB as feature detector
-    if(detector == 1){
-        detectorName = "ORB Detector";
-
-        // Detecting kypoints and computing descriptors
-        Ptr<cuda::ORB> orb = cv::cuda::ORB::create();
-        Ptr<cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher(cv::NORM_HAMMING);
-        orb->detectAndCompute(img[currImg], noArray(), keypoints[0], descriptorsGPU[0]);
-        orb->detectAndCompute(img[nextImg], noArray(), keypoints[1], descriptorsGPU[1]);
-        // Matching descriptors
-        matcher->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches, 2);
-    }
-    
-    // Obtain good matches (delete outliers)
-    vector<DMatch> goodMatches;
-    goodMatches = getGoodMatches(matches);
-
-    // Apply grid filtering of matches found (for homogenous sparse of features)
-    goodMatches = gridFiltering(goodMatches, keypoints[0]);
-
-    // Obtain good keypoints from goodMatches
-    array<vector<KeyPoint>,2> goodKeypoints;
-    goodKeypoints = getGoodKeypoints(goodMatches, keypoints);
-
-    // Show results of feature detection (optional)
-    if(feature_stats){
-        Mat img_matches;
-        drawMatches(Mat(img[currImg]), keypoints[0], Mat(img[nextImg]), keypoints[1], 
-                        goodMatches, img_matches,Scalar::all(-1), Scalar::all(-1), 
-                        vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-        nfeatures[0] = keypoints[0].size();
-        nfeatures[1] = keypoints[1].size();
-        nmatches = goodMatches.size();
-        showFeatureStats(detectorName,nfeatures,nmatches);
-        imshow(detectorName, img_matches);
-        waitKey(0);     
-    }
-
-    // Pose Estimation Section
-    // Transform keypoints to Point2f vectors of coordinates 
-    array<vector<Point2f>,2> points;
-    KeyPoint::convert(goodKeypoints[0], points[0], vector<int>());
-    KeyPoint::convert(goodKeypoints[1], points[1], vector<int>());
-
-    // Obtain Essential Matrix with the Five-Point Algorithm (David Nister, 2004)
-    Mat EssentialMat, mask;
-    EssentialMat = findEssentialMat(points[0], points[1], focal, pp, cv::RANSAC, 0.999, 3.0, mask);
-    // TODO print inliers and outliers 
-
-    // Obtain Pose from Essential Matrix (Rotation Matrix and Translation Vector)
-    Mat rotationMat, translationMat;
-    int inliers2 = recoverPose(EssentialMat, points[0], points[1], rotationMat, 
-                                translationMat, focal, pp, mask);
-
-    // Obtain projection matrices
-    Mat P1 = getProjectionMat(cameraMat, Mat(), Mat(), true);
-    Mat P2 = getProjectionMat(cameraMat, rotationMat, translationMat, false);
-
-    // Compute depth of 3D points using triangulation
-    Mat mapPoints;
-    triangulatePoints(P1, P2, points[0], points[1], mapPoints);
-
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
     // ROS Kinetic section
     ros::init(argc, argv, "uw_slam");
     ros::NodeHandle n;
@@ -223,8 +120,7 @@ int main( int argc, char** argv ){
     ros::NodeHandle nh;
     image_transport::ImageTransport it(nh);
     image_transport::Publisher img_pub = it.advertise("camera/image",1);
-    sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", currImgRes).toImageMsg();
-
+    
     // Set our initial shape type to be a cube
     uint32_t shape = visualization_msgs::Marker::CUBE;
 
@@ -244,80 +140,301 @@ int main( int argc, char** argv ){
     // Set the marker action.  Options are ADD, DELETE, and new in ROS Indigo: 3 (DELETEALL)
     marker.action = visualization_msgs::Marker::ADD;
 
+    marker.pose.orientation.x = 0.0;
+    marker.pose.orientation.y = 0.0;
+    marker.pose.orientation.z = 0.0;
+    marker.pose.orientation.w = 1.0;
+
     // Set the scale of the marker -- 1x1x1 here means 1m on a side
     marker.scale.x = 0.10;
     marker.scale.y = 0.10;
     marker.scale.z = 0.10;
-
+    
     // Set the color -- be sure to set alpha to something non-zero!
     marker.color.r = 0.12f;
     marker.color.g = 0.56f;
     marker.color.b = 1.0f;
     marker.color.a = 1.0;
-
     marker.lifetime = ros::Duration();
-    //while (ros::ok()){
-        for(int i=0; i < mapPoints.cols; i++){
-                        
-            // Set the frame ID and timestamp.  See the TF tutorials for information on these.
-            marker.header.frame_id = "/main_uw";
-            marker.header.stamp = ros::Time::now();
 
-            // Set the namespace and id for this marker.  This serves to create a unique ID
-            // Any marker sent with the same namespace and id will overwrite the old one
-            marker.ns = "uw_slam";
-            marker.id = i;
+    while(ros::ok()){
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        // Read current and next image
+        Mat currImgRes, nextImgRes;
+        currImgRes = imread(image_names[currImg]);
+        nextImgRes = imread(image_names[nextImg]);
 
-            // Set the marker type.  Initially this is CUBE, and cycles between that and SPHERE, ARROW, and CYLINDER
-            marker.type = shape;
-
-            // Set the marker action.  Options are ADD, DELETE, and new in ROS Indigo: 3 (DELETEALL)
-            marker.action = visualization_msgs::Marker::ADD;
-
-            // Set the pose of the marker.  This is a full 6DOF pose relative to the frame/time specified in the header
-            marker.pose.position.x = -10 + (mapPoints.at<float>(2,i)/mapPoints.at<float>(3,i));
-            marker.pose.position.y = 0 + (mapPoints.at<float>(0,i)/mapPoints.at<float>(3,i));
-            marker.pose.position.z = 2 -(mapPoints.at<float>(1,i)/mapPoints.at<float>(3,i));
-            marker.pose.position.x /= 2;
-            marker.pose.position.y /= 2;
-            marker.pose.position.z /= 2;
-
-            marker.pose.orientation.x = 0.0;
-            marker.pose.orientation.y = 0.0;
-            marker.pose.orientation.z = 0.0;
-            marker.pose.orientation.w = 1.0;
-
-            // Set the scale of the marker -- 1x1x1 here means 1m on a side
-            marker.scale.x = 0.10;
-            marker.scale.y = 0.10;
-            marker.scale.z = 0.10;
-
-            // Set the color -- be sure to set alpha to something non-zero!
-            marker.color.r = 0.12f;
-            marker.color.g = 0.56f;
-            marker.color.b = 1.0f;
-            marker.color.a = 1.0;
-            
-            marker.lifetime = ros::Duration();
-
-            // Publish the marker
-            while (marker_pub.getNumSubscribers() < 1 && img_pub.getNumSubscribers() < 1)
-            {
-                if (!ros::ok())
-                {
-                return 0;
-                }
-                ROS_WARN_ONCE("Please create a subscriber to the marker/image");
-                sleep(1);
-            }
-
-            img_pub.publish(msg);
-            marker_pub.publish(marker);
-            ros::spinOnce();
-
-            //r.sleep();
+        // Checking for errors
+        if (!currImgRes.data){
+            std::cout << "***************************************" << endl;
+            std::cout << "Finished." << std::endl; return -1;
         }
-    //}
+        if (!nextImgRes.data){
+            std::cout << "***************************************" << endl;
+            std::cout << "Finished." << std::endl; return -1;
+        }
+        // Update current image to ROS message
+        sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", currImgRes).toImageMsg();
+        
+        // Resizing the images to 640 x 480
+        resize(currImgRes, currImgRes, Size(DIMENSION_WIDTH, DIMENSION_HEIGHT), 0 ,0, CV_INTER_LINEAR);
+        resize(nextImgRes, nextImgRes, Size(DIMENSION_WIDTH , DIMENSION_HEIGHT), 0 ,0, CV_INTER_LINEAR);
+
+        // Converting the images to GRAY
+        cvtColor(currImgRes,currImgRes,COLOR_BGR2GRAY);
+        cvtColor(nextImgRes,nextImgRes,COLOR_BGR2GRAY);
+
+        // Uploading the images to GpuMat
+        img[currImg].upload(currImgRes);
+        img[nextImg].upload(nextImgRes);
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        // Feature detection section
+        GpuMat keypointsGPU[2];
+        GpuMat descriptorsGPU[2];
+        GpuMat matchesGPU;
+        vector< vector< DMatch> > matches;
+        array<vector<KeyPoint>,2> keypoints;
+        array<vector<float>,2> descriptors;
+        int nfeatures[2], nmatches;
+
+        // SURF as feature detector (Default detector)
+        if(detector == 0 || detector == -1){
+            detectorName = "SURF Detector";
+            
+            Ptr<cv::cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher();
+            cv::cuda::SURF_CUDA surf;
+            Ptr<cv::cuda::Feature2DAsync> detector;
+            // Detecting keypoints and computing descriptors
+            surf(img[currImg], GpuMat(), keypointsGPU[0], descriptorsGPU[0]);
+            surf(img[nextImg], GpuMat(), keypointsGPU[1], descriptorsGPU[1]);
+            // Matching descriptors
+            matcher->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches, 2);
+            // Downloading results
+            surf.downloadKeypoints(keypointsGPU[0], keypoints[0]);
+            surf.downloadKeypoints(keypointsGPU[1], keypoints[1]);
+            surf.downloadDescriptors(descriptorsGPU[0], descriptors[0]); //REVISAR SU FUTURA UTILIDAD
+            surf.downloadDescriptors(descriptorsGPU[1], descriptors[1]); //REVISAR SU FUTURA UTILIDAD
+        }
+        // ORB as feature detector
+        if(detector == 1){
+            detectorName = "ORB Detector";
+
+            // Detecting kypoints and computing descriptors
+            Ptr<cuda::ORB> orb = cv::cuda::ORB::create();
+            Ptr<cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher(cv::NORM_HAMMING);
+            orb->detectAndCompute(img[currImg], noArray(), keypoints[0], descriptorsGPU[0]);
+            orb->detectAndCompute(img[nextImg], noArray(), keypoints[1], descriptorsGPU[1]);
+            // Matching descriptors
+            matcher->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches, 2);
+        }
+        
+        // Obtain good matches (delete outliers)
+        vector<DMatch> goodMatches;
+        goodMatches = getGoodMatches(matches);
+
+        // Apply grid filtering of matches found (for homogenous sparse of features)
+        goodMatches = gridFiltering(goodMatches, keypoints[0]);
+
+        // Obtain good keypoints from goodMatches
+        array<vector<KeyPoint>,2> goodKeypoints;
+        goodKeypoints = getGoodKeypoints(goodMatches, keypoints);
+
+        // Show results of feature detection (optional)
+        if(feature_stats){
+            Mat img_matches;
+            drawMatches(Mat(img[currImg]), keypoints[0], Mat(img[nextImg]), keypoints[1], 
+                            goodMatches, img_matches,Scalar::all(-1), Scalar::all(-1), 
+                            vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+            nfeatures[0] = keypoints[0].size();
+            nfeatures[1] = keypoints[1].size();
+            nmatches = goodMatches.size();
+            showFeatureStats(detectorName,nfeatures,nmatches);
+            imshow(detectorName, img_matches);
+            waitKey(0);     
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        // Pose Estimation Section
+        // Transform keypoints to Point2f vectors of coordinates 
+        array<vector<Point2f>,2> points;
+        KeyPoint::convert(goodKeypoints[0], points[0], vector<int>());
+        KeyPoint::convert(goodKeypoints[1], points[1], vector<int>());
+
+        // Obtain Essential Matrix with the Five-Point Algorithm (David Nister, 2004)
+        Mat EssentialMat, mask;
+        EssentialMat = findEssentialMat(points[0], points[1], focal, pp, cv::RANSAC, 0.999, 3.0, mask);
+        // TODO print inliers and outliers 
+
+        // Obtain Pose from Essential Matrix (Rotation Matrix and Translation Vector)
+        int inliers2 = recoverPose(EssentialMat, points[0], points[1], nextRotationMat, 
+                                    nextTranslationMat, focal, pp, mask);
+
+        // Compute current Rotation and Translation
+        nextTranslationMat.at<double>(0,2) = abs(nextTranslationMat.at<double>(0,2));
+        currTranslationMat = currTranslationMat + (currRotationMat * nextTranslationMat);
+        cout << "Translation: " << currTranslationMat << endl;
+
+        // Obtain projection matrices for the two perspectives
+        Mat P1 = getProjectionMat(cameraMat, currRotationMat, currTranslationMat);
+        Mat P2 = getProjectionMat(cameraMat, nextRotationMat, nextTranslationMat);
+
+        // Compute depth of 3D points using triangulation
+        Mat mapPoints;
+        triangulatePoints(P1, P2, points[0], points[1], mapPoints);
+
+        marker.id = id;
+        // Set the pose of the marker.  This is a full 6DOF pose relative to the frame/time specified in the header
+        marker.pose.position.x = currTranslationMat.at<float>(0,2);
+        marker.pose.position.y = currTranslationMat.at<float>(0,0);
+        marker.pose.position.z = currTranslationMat.at<float>(0,1);
+        // marker.pose.position.x /= 2;
+        // marker.pose.position.y /= 2;
+        // marker.pose.position.z /= 2;
+
+
+        while (marker_pub.getNumSubscribers() < 1 && img_pub.getNumSubscribers() < 1)
+        {
+            if (!ros::ok())
+            {
+            return 0;
+            }
+            ROS_WARN_ONCE("Please create a subscriber to the marker/image");
+            sleep(1);
+        }
+
+        // Publish the marker
+        marker_pub.publish(marker);
+        ros::spinOnce();
+        id += 1;
+        //r.sleep();
+
+        img_pub.publish(msg);
+
+        // Release memory
+        img[currImg].release();
+        keypointsGPU[0].release(), keypointsGPU[1].release();
+        currImgRes.release(), nextImgRes.release();
+        matchesGPU.release();
+        keypoints[0].~vector(), keypoints[1].~vector();
+        descriptors[0].~vector(), descriptors[1].~vector(); 
+        goodMatches.~vector();
+        goodKeypoints[0].~vector(), goodKeypoints[1].~vector();
+
+        // Updating values for next frame
+        currImg += 1;
+        nextImg += 1;
+        currRotationMat    = nextRotationMat.clone();
+        currTranslationMat = nextTranslationMat.clone();
+
+    
+    }
+
+    // ////////////////////////////////////////////////////////////////////////////////////////////////////
+    // // ROS Kinetic section
+    // ros::init(argc, argv, "uw_slam");
+    // ros::NodeHandle n;
+    // ros::Rate r(1);
+    // ros::Publisher marker_pub = n.advertise<visualization_msgs::Marker>("visualization_marker", 100);
+
+    // ros::NodeHandle nh;
+    // image_transport::ImageTransport it(nh);
+    // image_transport::Publisher img_pub = it.advertise("camera/image",1);
+    // sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", currImgRes).toImageMsg();
+
+    // // Set our initial shape type to be a cube
+    // uint32_t shape = visualization_msgs::Marker::CUBE;
+
+    // visualization_msgs::Marker marker;
+
+    // // Set the frame ID and timestamp.  See the TF tutorials for information on these.
+    // marker.header.frame_id = "/main_uw";
+    // marker.header.stamp = ros::Time::now();
+
+    // // Set the namespace and id for this marker.  This serves to create a unique ID
+    // // Any marker sent with the same namespace and id will overwrite the old one
+    // marker.ns = "uw_slam";
+
+    // // Set the marker type.  Initially this is CUBE, and cycles between that and SPHERE, ARROW, and CYLINDER
+    // marker.type = shape;
+
+    // // Set the marker action.  Options are ADD, DELETE, and new in ROS Indigo: 3 (DELETEALL)
+    // marker.action = visualization_msgs::Marker::ADD;
+
+    // // Set the scale of the marker -- 1x1x1 here means 1m on a side
+    // marker.scale.x = 0.10;
+    // marker.scale.y = 0.10;
+    // marker.scale.z = 0.10;
+
+    // // Set the color -- be sure to set alpha to something non-zero!
+    // marker.color.r = 0.12f;
+    // marker.color.g = 0.56f;
+    // marker.color.b = 1.0f;
+    // marker.color.a = 1.0;
+
+    // marker.lifetime = ros::Duration();
+    // //while (ros::ok()){
+    //     for(int i=0; i < mapPoints.cols; i++){
+                        
+    //         // Set the frame ID and timestamp.  See the TF tutorials for information on these.
+    //         marker.header.frame_id = "/main_uw";
+    //         marker.header.stamp = ros::Time::now();
+
+    //         // Set the namespace and id for this marker.  This serves to create a unique ID
+    //         // Any marker sent with the same namespace and id will overwrite the old one
+    //         marker.ns = "uw_slam";
+    //         marker.id = i;
+
+    //         // Set the marker type.  Initially this is CUBE, and cycles between that and SPHERE, ARROW, and CYLINDER
+    //         marker.type = shape;
+
+    //         // Set the marker action.  Options are ADD, DELETE, and new in ROS Indigo: 3 (DELETEALL)
+    //         marker.action = visualization_msgs::Marker::ADD;
+
+    //         // Set the pose of the marker.  This is a full 6DOF pose relative to the frame/time specified in the header
+    //         marker.pose.position.x = -10 + (mapPoints.at<float>(2,i)/mapPoints.at<float>(3,i));
+    //         marker.pose.position.y = 0 + (mapPoints.at<float>(0,i)/mapPoints.at<float>(3,i));
+    //         marker.pose.position.z = 2 -(mapPoints.at<float>(1,i)/mapPoints.at<float>(3,i));
+    //         marker.pose.position.x /= 2;
+    //         marker.pose.position.y /= 2;
+    //         marker.pose.position.z /= 2;
+
+    //         marker.pose.orientation.x = 0.0;
+    //         marker.pose.orientation.y = 0.0;
+    //         marker.pose.orientation.z = 0.0;
+    //         marker.pose.orientation.w = 1.0;
+
+    //         // Set the scale of the marker -- 1x1x1 here means 1m on a side
+    //         marker.scale.x = 0.10;
+    //         marker.scale.y = 0.10;
+    //         marker.scale.z = 0.10;
+
+    //         // Set the color -- be sure to set alpha to something non-zero!
+    //         marker.color.r = 0.12f;
+    //         marker.color.g = 0.56f;
+    //         marker.color.b = 1.0f;
+    //         marker.color.a = 1.0;
+            
+    //         marker.lifetime = ros::Duration();
+
+    //         // Publish the marker
+    //         while (marker_pub.getNumSubscribers() < 1 && img_pub.getNumSubscribers() < 1)
+    //         {
+    //             if (!ros::ok())
+    //             {
+    //             return 0;
+    //             }
+    //             ROS_WARN_ONCE("Please create a subscriber to the marker/image");
+    //             sleep(1);
+    //         }
+
+    //         img_pub.publish(msg);
+    //         marker_pub.publish(marker);
+    //         ros::spinOnce();
+
+    //         //r.sleep();
+    //     }
+    // //}
     return 0;
     
 }
@@ -406,19 +523,9 @@ vector<DMatch> gridFiltering(vector<DMatch> goodMatches, vector<KeyPoint> keypoi
     return grid_matches;
 }
 
-Mat getProjectionMat(Mat cameraMat, Mat rotationMat, Mat translationMat, bool initialProjection){
-    // P1 = K * [I3 | 0]
-    // P2 = K * [R | t]
+Mat getProjectionMat(Mat cameraMat, Mat rotationMat, Mat translationMat){
+    // ProjectionMat = cameraMat * [Rotation | translation]
     Mat projectionMat;
-    // Initialize first projection matrix 
-    if(initialProjection){
-        Mat I3 = Mat::eye(3, 3, CV_64F);
-        Mat v0 = Mat(3,1,CV_64F, double(0));
-        hconcat(I3, v0, projectionMat);
-        projectionMat = cameraMat * projectionMat;
-
-        return projectionMat;
-    }
     hconcat(rotationMat, translationMat, projectionMat);
     projectionMat = cameraMat * projectionMat;
 
