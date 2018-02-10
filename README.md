@@ -46,5 +46,5 @@ Libraries files of uw-slam.
 
 Copyright (c) 2017 Fabio Morales (<fabmoraleshidalgo@gmail.com>).
 
-Release under the [GPL-3.0 License](LICENSE).
+Release under the [GPL-3.0 License](LICENSE). 
 
