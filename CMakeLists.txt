@@ -222,9 +222,15 @@ include_directories(
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
-add_executable(feature_detector src/feature_detector.cpp)
+file(GLOB uw-slam-files 
+    "src/main_uw_slam.cpp"
+    "include/*.h"
+    "include/*.hxx"
+    "include/*.cpp" 
+) 
+add_executable(main_uw_slam ${uw-slam-files})
 
 ## IMPORTANT - TO WORK WITH CUDA AND ROS (CUDA INSTALLED IN ANOTHER OPENCV)
 string(REPLACE "/opt/ros/kinetic/lib/libopencv_core3.so.3.2.0;" "" catkin_LIBRARIES "${catkin_LIBRARIES}")
 
-target_link_libraries(feature_detector ${OpenCV_LIBS} ${catkin_LIBRARIES})
+target_link_libraries(main_uw_slam ${OpenCV_LIBS} ${catkin_LIBRARIES} ${CUDA_LIBRARIES})

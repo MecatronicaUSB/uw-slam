@@ -85,7 +85,7 @@ int main( int argc, char** argv ){
         dir_calibration = args::get(parse_calibration);
         std::cout << "Directory of calibration xml file: " << args::get(parse_calibration) << endl;
     }else{
-        dir_calibration = "./include/calibration.xml";
+        dir_calibration = "./example/calibration.xml";
     }
     std::cout << endl;
 
