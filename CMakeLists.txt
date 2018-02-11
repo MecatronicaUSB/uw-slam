@@ -224,9 +224,14 @@ include_directories(
 # catkin_add_nosetests(test)
 file(GLOB uw-slam-files 
     "src/main_uw_slam.cpp"
+    "include/CameraModel.cpp" 
+    "include/CameraModel.h" 
+    "include/System.cpp" 
+    "include/System.h"
     "include/*.h"
     "include/*.hxx"
-    "include/*.cpp" 
+
+    "include/CameraModel.cpp" 
 ) 
 add_executable(main_uw_slam ${uw-slam-files})
 

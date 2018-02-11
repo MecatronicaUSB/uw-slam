@@ -20,7 +20,7 @@
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "../include/argsOptions.h"
+#include "../include/Options.h"
 #include "../include/System.h"
 
 // C++ namespaces
@@ -36,7 +36,7 @@ cuda::DeviceInfo deviceInfo;
 void showSettings(){
     cout << "CUDA enabled devices detected: " << deviceInfo.name() << endl;
     cout << "Directory of images: " << imagesPath << endl;
-    cout << "Directory of calibration xml file: " << calibrationPath << endl;
+    cout << "Directory of calibration xml file: " << calibrationPath << "\n"<< endl;
 }
 
 int main ( int argc, char *argv[] ){
@@ -81,18 +81,19 @@ int main ( int argc, char *argv[] ){
     if(parse_calibration){
         calibrationPath = args::get(parse_calibration);
     }else{
-        calibrationPath = "./example/calibration.xml";
+        calibrationPath = "./sample/calibration.xml";
     }
 
     showSettings();
 
+    // Create new System
     System* uwSystem = new System();
+    // Add list of images names (with path)
     uwSystem->addListImages(imagesPath);
-    uwSystem->addCalibrationMat(calibrationPath);
-    uwSystem->addFrameGroup(30);
-
-    imshow("5", uwSystem->lastFrame->data);
-    waitKey(0);
+    // Calibrates system with certain Camera Model (currently only FOV) 
+    uwSystem->Calibration(calibrationPath);
+    
+    cout << uwSystem->cameraModel->hOrg << endl;
 
     return 0;
 }

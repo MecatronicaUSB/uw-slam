@@ -19,9 +19,8 @@
 * You should have received a copy of the GNU General Public License
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
-#pragma once
-#include "CameraModel.h"
 
+#pragma once
 ///Basic C and C++ libraries
 #include <stdlib.h>
 #include <iostream>
@@ -47,55 +46,31 @@
 using namespace cv;
 using namespace std;
 
-// Global constants
-const float GTH         =   7;
-const int BLOCK_SIZE    =  256;
-const int TARGET_WIDTH  =  1280;
-const int TARGET_HEIGHT =  1024;
-
 namespace uw
 {
 
-class CameraModel;
-
-class Frame{
+class CameraModel
+{
 public:
-    Frame();
+	~CameraModel();
+    CameraModel();
 
-    int idFrame;
-    Mat data;
+    void getCameraModel(int in_width, int in_height, int  out_width, int out_height, Mat calibration_values, Mat rectification);
+    void distortCordinatesFOV(float* in_x, float* in_y, float* out_x, float* out_y, int n);
+    // Camera Calibration Parameters 
+    vector<float> intrinsicParam;   // fx,  fy,  cx,  cy,  omega 
+    vector<float> distCoeff;        // fx', fy', cx', cy', 0
+    Mat K = Mat::eye(3, 3, CV_32F);
 
-    Frame* nextFrame;
-    Frame* prevFrame;
-};
+    // Dimensions of images
+    int wOrg, hOrg, w, h;
 
-
-class System{
-public:
-    System();
-    ~System();
-
-    void addFrame(int id);
-    void addFrameGroup(int nImages);
-    void addListImages(string path);
-    void Calibration(string calibrationPath);
-    void showFrame(int id);
-
-    Mat applyGradient(int id);
-
-    vector<Frame*> frames;
-
-    int nFrames;
-    vector<string> imagesList;
-
-    CameraModel* cameraModel;
-
-    // Filters for calculating gradient in images
-    Ptr<cuda::Filter> soberX = cuda::createSobelFilter(0, 0, 1, 0, CV_SCHARR, 1.0, BORDER_DEFAULT);
-    Ptr<cuda::Filter> soberY = cuda::createSobelFilter(0, 0, 0, 1, CV_SCHARR, 1.0, BORDER_DEFAULT);
+    // Remapping using CameraModel
+ 	float* remapX;
+	float* remapY;
     
+    bool valid;
 };
-
 
 
 

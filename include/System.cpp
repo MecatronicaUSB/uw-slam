@@ -21,47 +21,41 @@
 */
 
 #include "System.h"
+#include "CameraModel.h"
 
 namespace uw
 {
 
-Frame::Frame(){
-    idFrame  = 0;
-
-    nextFrame = 0;
-    prevFrame = 0;
+System::System(){
+    nFrames  = 0;
 }
 
-System::System(){
-    firstFrame  = 0;
-    lastFrame   = 0;
-    cameraMat   = 0;
-    nFrames     = 0;
+System::~System(){
+
+}
+
+Frame::Frame(){
+    idFrame  = 0;
 }
 
 void System::addFrame(int id){
-    Frame* newFrame = new Frame();
-    newFrame->data = imread(imagesList[id], CV_LOAD_IMAGE_GRAYSCALE);
+    Frame* newFrame   = new Frame();
+    newFrame->data    = imread(imagesList[id], CV_LOAD_IMAGE_GRAYSCALE);
+    newFrame->idFrame = id;
 
-    if( firstFrame == 0){
-        firstFrame = newFrame;
-    }
-    else{
-        lastFrame->nextFrame = newFrame;
-        newFrame->prevFrame  = lastFrame;
-    }
+    frames.push_back(newFrame);
 
-    lastFrame = newFrame;
-    nFrames++;
 }
 
+void System::showFrame(int id){
+    imshow(to_string(id), frames[id]->data);
+    waitKey(0);
+}
 
 void System::addFrameGroup(int nImages){
-    for(int i = nFrames; i < nImages; i++){
+    for(int i = nFrames; i < nImages; i++)
         System::addFrame(i);
-    }
 }
-
 
 void System::addListImages(string path){
     vector<string> file_names;
@@ -85,17 +79,58 @@ void System::addListImages(string path){
     imagesList = file_names;
 }
 
-void System::addCalibrationMat(string calibrationPath){
-    Mat cameraMatrix;
+void System::Calibration(string calibrationPath){
+    // Considering only FOV Camera Model -- TODO Add other Cameras Models to the System (Pinhole...)
+    Mat calibration_values, rectification;
+    int in_width, in_height, out_width, out_height;
     FileStorage opencv_file(calibrationPath, cv::FileStorage::READ);
     if (opencv_file.isOpened()){
-        opencv_file["cameraMatrix"] >> cameraMat;
+        opencv_file["in_width"] >> in_width;
+        opencv_file["in_height"] >> in_height;
+        opencv_file["out_width"] >> out_width;
+        opencv_file["out_height"] >> out_height;
+        opencv_file["calibration_values"] >> calibration_values;
+        opencv_file["rectification"] >> rectification;
         opencv_file.release();
     }
+    else{
+        cout << "Calibration file could not be opened." << endl;
+        cout << "Exiting..." << endl;
+        exit(0);
+    }
+    
 
-    cameraMat = cameraMatrix;
+    cameraModel = new CameraModel();
+    cameraModel->getCameraModel(in_width, in_height, out_width, out_height, calibration_values, rectification);
+
 }
 
 
+
+Mat System::applyGradient(int id){
+    Mat gradientImage;
+    cuda::GpuMat frameX, frameY, frame;
+
+    frameX.upload(frames[id]->data);
+    frameY.upload(frames[id]->data);
+
+    soberX->apply(frameX, frameX);
+    soberX->apply(frameY, frameY);
+
+    cuda::addWeighted(frameX, 0.5, frameY, 0.5, 0, frame);
+
+    Mat example;
+    for(int x = 0; x < TARGET_WIDTH; x+= BLOCK_SIZE ){
+        for(int y = 0; y < TARGET_HEIGHT; y += BLOCK_SIZE){
+            cuda::GpuMat block = cuda::GpuMat(frame, Rect(x,y,BLOCK_SIZE,BLOCK_SIZE));
+            block.download(example);
+        }
+    }
+    
+    frame.download(gradientImage);
+    imshow("0", gradientImage);     
+    waitKey(0);
+    return gradientImage;
+}
 
 }
