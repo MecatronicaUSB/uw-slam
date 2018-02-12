@@ -58,6 +58,7 @@ void System::addFrameGroup(int nImages){
 }
 
 void System::addListImages(string path){
+    
     vector<string> file_names;
     DIR *dir;
     struct dirent *ent;
@@ -80,32 +81,15 @@ void System::addListImages(string path){
 }
 
 void System::Calibration(string calibrationPath){
-    // Considering only FOV Camera Model -- TODO Add other Cameras Models to the System (Pinhole...)
-    Mat calibration_values, rectification;
-    int in_width, in_height, out_width, out_height;
-    FileStorage opencv_file(calibrationPath, cv::FileStorage::READ);
-    if (opencv_file.isOpened()){
-        opencv_file["in_width"] >> in_width;
-        opencv_file["in_height"] >> in_height;
-        opencv_file["out_width"] >> out_width;
-        opencv_file["out_height"] >> out_height;
-        opencv_file["calibration_values"] >> calibration_values;
-        opencv_file["rectification"] >> rectification;
-        opencv_file.release();
-    }
-    else{
-        cout << "Calibration file could not be opened." << endl;
-        cout << "Exiting..." << endl;
-        exit(0);
-    }
-    
-
     cameraModel = new CameraModel();
-    cameraModel->getCameraModel(in_width, in_height, out_width, out_height, calibration_values, rectification);
-
+    cameraModel->getCameraModel(calibrationPath);
+    this->K = cameraModel->getK();
+    this->w = cameraModel->getOutputWidth();
+    this->h = cameraModel->getOutputHeight();
+    this->map1 = cameraModel->getMap1();
+    this->map2 = cameraModel->getMap2();
+    this->rectificationValid = cameraModel->isValid();
 }
-
-
 
 Mat System::applyGradient(int id){
     Mat gradientImage;

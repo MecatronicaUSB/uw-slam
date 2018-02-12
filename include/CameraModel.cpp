@@ -25,124 +25,124 @@
 namespace uw
 {
 
-CameraModel::CameraModel(){
-    bool valid = false;
-}
-
 CameraModel::~CameraModel()
 {
-	if(remapX != 0) delete[] remapX;
-	if(remapY != 0) delete[] remapY;
 }
 
-// Checks which Camera Model Implement (FOV,...?)
-void CameraModel::getCameraModel(int in_width, int in_height, int  out_width, int out_height, 
-                                                        Mat calibration_values, Mat rectification)
+// Checks which Camera Model Implement (RadTan,...?)
+void CameraModel::getCameraModel(string calibrationPath)
 {
-    wOrg = in_width;
-    hOrg = in_height;
-    w = out_width;
-    h = out_height;
-    
-    // FOV Camera Model
-    for(int i = 0; i < 5; i++){
-        intrinsicParam.push_back(calibration_values.at<double>(0,i));
-        distCoeff.push_back(rectification.at<double>(0,i));
+	valid = true;
+
+    // Reading intrinsic parameters and distortion coefficients from file
+    Mat calibration_values, distortion_values;
+    FileStorage opencv_file(calibrationPath, cv::FileStorage::READ);
+    if (opencv_file.isOpened()){
+        opencv_file["in_width"] >> in_width;
+        opencv_file["in_height"] >> in_height;
+        opencv_file["out_width"] >> out_width;
+        opencv_file["out_height"] >> out_height;
+        opencv_file["calibration_values"] >> calibration_values;
+        opencv_file["rectification"] >> distortion_values;
+        opencv_file.release();
+    }
+    else{
+        cout << "Calibration file could not be opened." << endl;
+        cout << "Exiting..." << endl;
+        valid = false;
+        exit(0);
     }
 
-    // TODO - So what's the point of having rectification?
-    if( distCoeff[0] != 0 ){
-        // Rescale and substract 0.5 offset
-        K.at<float>(0,0) = distCoeff[0] * w;
-        K.at<float>(1,1) = distCoeff[1] * h;
-        K.at<float>(0,2) = distCoeff[2] * w - 0.5;
-        K.at<float>(1,2) = distCoeff[3] * h - 0.5;
-
-    }else{
-        if( intrinsicParam[2] < 1 && intrinsicParam[3] < 1){
-            // Rescale and substract 0.5 offset        
-            K.at<float>(0,0) = intrinsicParam[0] * in_width;
-            K.at<float>(1,1) = intrinsicParam[1] * in_height;
-            K.at<float>(0,2) = intrinsicParam[2] * in_width - 0.5;
-            K.at<float>(1,2) = intrinsicParam[3] * in_height - 0.5;
-        }
-        else{
-            // No need to rescale and substract 0.5 offset    
-            K.at<float>(0,0) = intrinsicParam[0];
-            K.at<float>(1,1) = intrinsicParam[1];
-            K.at<float>(0,2) = intrinsicParam[2];
-            K.at<float>(1,2) = intrinsicParam[3];
-        }
+    // Saving parameters and distCoeffs
+    for(int i = 0; i < 4; i++){
+        inputCalibration[i] = calibration_values.at<double>(0,i);
+		distCoeffs.at<float>(i,0) = distortion_values.at<double>(0,i);
     }
 
-    remapX = new float[w*h];
-    remapY = new float[w*h];
+    // Checking if the intrinsic parameters needs rescaling
+    if( inputCalibration[2] < 1 && inputCalibration[3] < 1){
+        cout << "WARNING: cx = " << inputCalibration[2] << " < 1, which should not be the case for normal cameras" << endl;
+        // Rescale. (Maybe will need -0.5 offset)      
+        inputCalibration[0] = inputCalibration[0] * in_width;
+        inputCalibration[1] = inputCalibration[1] * in_height;
+        inputCalibration[2] = inputCalibration[2] * in_width;
+        inputCalibration[3] = inputCalibration[3] * in_height;
+    }
 
-	for(int y=0;y<h;y++)
-		for(int x=0;x<w;x++){
-			remapX[x+y*w] = x;
-			remapY[x+y*w] = y;
-		}
+    // Saving parameters in originalK_
+    originalK_.at<double>(0,0) = inputCalibration[0];
+    originalK_.at<double>(1,1) = inputCalibration[1];
+    originalK_.at<double>(0,2) = inputCalibration[2];
+    originalK_.at<double>(1,2) = inputCalibration[3];
+    originalK_.at<double>(2, 2) = 1;
 
-    // FOV
-    distortCordinatesFOV(remapX, remapY, remapX, remapY, w*h);
-	for(int y=0;y<h;y++)
-		for(int x=0;x<w;x++){
-			// Rounding resistant
-			float ix = remapX[x+y*w];
-			float iy = remapY[x+y*w];
+    // If distCoeff are 0, dont apply rectification
+    if( distCoeffs.at<float>(0,0) == 0 ){
+        valid = false;
+        cout << "Distortion coefficients not found... not rectifying" << endl;
+    }
+    if(valid){
+        // Obtaining new Camera Matrix with outputs and inputs
+        K_ = getOptimalNewCameraMatrix(originalK_, distCoeffs, cv::Size(in_width, in_height), 0, cv::Size(out_width, out_height), nullptr, false);
+        initUndistortRectifyMap(originalK_, distCoeffs, cv::Mat(), K_, cv::Size(out_width, out_height), CV_16SC2, map1, map2);
+        
+        originalK_.at<double>(0, 0) /= in_width;
+		originalK_.at<double>(0, 2) /= in_width;
+		originalK_.at<double>(1, 1) /= in_height;
+		originalK_.at<double>(1, 2) /= in_height;
+    }
 
-			if(ix == 0) ix = 0.001;
-			if(iy == 0) iy = 0.001;
-			if(ix == in_width-1) ix = in_width-1.001;
-			if(iy == in_height-1) ix = in_height-1.001;
-
-			if(ix > 0 && iy > 0 && ix < in_width-1 &&  iy < in_height-1)
-			{
-				remapX[x+y*w] = ix;
-				remapY[x+y*w] = iy;
-			}
-			else
-			{
-				remapX[x+y*w] = -1;
-				remapY[x+y*w] = -1;
-			}
-		}
+	originalK_ = originalK_.t();
+	K_ = K_.t();
 }
 
-void CameraModel::distortCordinatesFOV(float* in_x, float* in_y, float* out_x, float* out_y, int n)
+void CameraModel::undistort(const cv::Mat& image, cv::OutputArray result) const
 {
-	float dist = intrinsicParam[4];
-	float d2t = 2.0f * tan(dist / 2.0f);
-
-	// Current Camera Parameters
-    float fx = intrinsicParam[0];
-    float fy = intrinsicParam[1];
-    float cx = intrinsicParam[2];
-    float cy = intrinsicParam[3];
-    
-    // Output Camera Intrinsic Parameters
-	float ofx = K.at<float>(0,0);
-	float ofy = K.at<float>(1,1);
-	float ocx = K.at<float>(0,2);
-	float ocy = K.at<float>(1,2);
-
-	for(int i=0;i<n;i++){
-		float x = in_x[i];
-		float y = in_y[i];
-		float ix = (x - ocx) / ofx;
-		float iy = (y - ocy) / ofy;
-
-		float r = sqrtf(ix*ix + iy*iy);
-		float fac = (r==0 || dist==0) ? 1 : atanf(r * d2t)/(dist*r);
-
-		ix = fx*fac*ix+cx;
-		iy = fy*fac*iy+cy;
-
-		out_x[i] = ix;
-		out_y[i] = iy;
-	}
+	cv::remap(image, result, map1, map2, cv::INTER_LINEAR);
 }
 
+const cv::Mat& CameraModel::getMap1() const
+{
+    return map1;
+}
+
+const cv::Mat& CameraModel::getMap2() const
+{
+    return map2;
+}
+
+const cv::Mat& CameraModel::getK() const
+{
+	return K_;
+}
+
+const cv::Mat& CameraModel::getOriginalK() const
+{
+	return originalK_;
+}
+
+int CameraModel::getOutputWidth() const
+{
+	return out_width;
+}
+
+int CameraModel::getOutputHeight() const
+{
+	return out_height;
+}
+int CameraModel::getInputWidth() const
+{
+	return in_width;
+}
+
+int CameraModel::getInputHeight() const
+{
+	return in_height;
+}
+
+bool CameraModel::isValid() const
+{
+	return valid;
+}
 
 }

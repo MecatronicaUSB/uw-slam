@@ -12,13 +12,17 @@
 * You should have received a copy of the GNU General Public License
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
+#pragma once
 
-// Parse library
-#include "args.hxx"
 
-// Args declarations
-args::ArgumentParser parser("Feature Detection Module.", "Author: Fabio Morales.");
-args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
+namespace uw{
 
-args::ValueFlag<std::string> dir_dataset(parser, "directory", "Directory of dataset files", {'d'});
-args::ValueFlag<std::string> parse_calibration(parser, "calibration", "Name of input XML calibration file", {"calibration"});
+#define PYR_LEVELS 6
+// Global constants
+const float GTH         =   7;
+const int BLOCK_SIZE    =  256;
+const int TARGET_WIDTH  =  1280;
+const int TARGET_HEIGHT =  1024;
+
+
+}

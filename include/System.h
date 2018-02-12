@@ -20,6 +20,7 @@
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 #pragma once
+#include "Options.h"
 #include "CameraModel.h"
 
 ///Basic C and C++ libraries
@@ -47,11 +48,6 @@
 using namespace cv;
 using namespace std;
 
-// Global constants
-const float GTH         =   7;
-const int BLOCK_SIZE    =  256;
-const int TARGET_WIDTH  =  1280;
-const int TARGET_HEIGHT =  1024;
 
 namespace uw
 {
@@ -85,11 +81,14 @@ public:
 
     vector<Frame*> frames;
 
+    int w, h;
     int nFrames;
     vector<string> imagesList;
-
+    Mat K;
+    Mat map1, map2;
     CameraModel* cameraModel;
-
+    
+    bool rectificationValid;
     // Filters for calculating gradient in images
     Ptr<cuda::Filter> soberX = cuda::createSobelFilter(0, 0, 1, 0, CV_SCHARR, 1.0, BORDER_DEFAULT);
     Ptr<cuda::Filter> soberY = cuda::createSobelFilter(0, 0, 0, 1, CV_SCHARR, 1.0, BORDER_DEFAULT);

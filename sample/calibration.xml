@@ -3,31 +3,26 @@
 <calibrationDate>"Thu 07 Apr 2016 04:23:03 PM MSK"</calibrationDate>
 
 <!-- Images dimensions (Input)-->
-<in_width  type_id="integer"> 1280 </in_width>
-<in_height type_id="integer"> 1024 </in_height>
+<in_width  type_id="integer"> 752 </in_width>
+<in_height type_id="integer"> 480 </in_height>
 
 <!-- Images dimensions (Output)-->
-<out_width  type_id="integer"> 640 </out_width>
+<out_width  type_id="integer"> 752 </out_width>
 <out_height type_id="integer"> 480 </out_height>
 
-<!-- Calibration Values of Dataset
-Dataset Camera Model   Structure of values
-
-Pinhole:               fx fy cx cy 0     0  0  0
-FOV:                   fx fy cx cy omega 0  0  0 
-Radial-Tangential:     fx fy cx cy k1    k2 k3 k4 -->
+<!-- Calibration Values of Dataset-->
 <calibration_values type_id="opencv-matrix">
   <rows>1</rows>
-  <cols>5</cols>
+  <cols>4</cols>
   <dt>d</dt>
   <data>
-    0.349153000000000	0.436593000000000	0.493140000000000	0.499021000000000	0.933271000000000 </data></calibration_values>
+    458.654	 457.296  367.215  248.375 </data></calibration_values>
 
 <rectification type_id="opencv-matrix">
   <rows>1</rows>
-  <cols>5</cols>
+  <cols>4</cols>
   <dt>d</dt>
   <data>
-    0.4  0.53  0.5  0.5 0 </data></rectification>
+    -0.28340811 0.07395907  0.00019359  1.76187114e-05 </data></rectification>
 
 </opencv_storage>

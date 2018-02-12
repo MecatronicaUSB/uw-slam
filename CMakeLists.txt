@@ -228,10 +228,10 @@ file(GLOB uw-slam-files
     "include/CameraModel.h" 
     "include/System.cpp" 
     "include/System.h"
+    "include/Options.h"
+    "include/args.hxx"
     "include/*.h"
     "include/*.hxx"
-
-    "include/CameraModel.cpp" 
 ) 
 add_executable(main_uw_slam ${uw-slam-files})
 

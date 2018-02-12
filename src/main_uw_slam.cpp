@@ -20,7 +20,7 @@
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "../include/Options.h"
+#include "../include/args.hxx"
 #include "../include/System.h"
 
 // C++ namespaces
@@ -38,6 +38,13 @@ void showSettings(){
     cout << "Directory of images: " << imagesPath << endl;
     cout << "Directory of calibration xml file: " << calibrationPath << "\n"<< endl;
 }
+
+// Args declarations
+args::ArgumentParser parser("Feature Detection Module.", "Author: Fabio Morales.");
+args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
+
+args::ValueFlag<std::string> dir_dataset(parser, "directory", "Directory of dataset files", {'d'});
+args::ValueFlag<std::string> parse_calibration(parser, "calibration", "Name of input XML calibration file", {"calibration"});
 
 int main ( int argc, char *argv[] ){
 
@@ -90,10 +97,13 @@ int main ( int argc, char *argv[] ){
     System* uwSystem = new System();
     // Add list of images names (with path)
     uwSystem->addListImages(imagesPath);
-    // Calibrates system with certain Camera Model (currently only FOV) 
+    // Calibrates system with certain Camera Model (currently only RadTan) 
     uwSystem->Calibration(calibrationPath);
-    
-    cout << uwSystem->cameraModel->hOrg << endl;
-
+    uwSystem->addFrame(0);
+    uwSystem->showFrame(0);
+    Mat dst;
+    remap(uwSystem->frames[0]->data, dst, uwSystem->map1, uwSystem->map2,INTER_LINEAR);
+    imshow("1", dst);
+    waitKey(0);
     return 0;
 }

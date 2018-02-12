@@ -21,6 +21,7 @@
 */
 
 #pragma once
+#include "Options.h"
 ///Basic C and C++ libraries
 #include <stdlib.h>
 #include <iostream>
@@ -52,23 +53,84 @@ namespace uw
 class CameraModel
 {
 public:
+    /**
+     * @brief Destructor of CameraModel
+     * 
+     */
 	~CameraModel();
-    CameraModel();
 
-    void getCameraModel(int in_width, int in_height, int  out_width, int out_height, Mat calibration_values, Mat rectification);
-    void distortCordinatesFOV(float* in_x, float* in_y, float* out_x, float* out_y, int n);
-    // Camera Calibration Parameters 
-    vector<float> intrinsicParam;   // fx,  fy,  cx,  cy,  omega 
-    vector<float> distCoeff;        // fx', fy', cx', cy', 0
-    Mat K = Mat::eye(3, 3, CV_32F);
-
-    // Dimensions of images
-    int wOrg, hOrg, w, h;
-
-    // Remapping using CameraModel
- 	float* remapX;
-	float* remapY;
+	/**
+	 * Creates an CameraModel by reading the distortion parameters from a file.
+	 * 
+	 * The file format is as follows:
+	 * fx fy cx cy d1 d2 d3 d4 d5 d6
+	 * inputWidth inputHeight
+	 * crop / full / none
+	 * outputWidth outputHeight
+	 */
+    void getCameraModel(string calibrationPath);
     
+	/**
+	 * Undistorts the given image and returns the result image.
+	 */
+	void undistort(const cv::Mat& image, cv::OutputArray result) const;
+	
+	/**
+	 * Returns the intrinsic parameter matrix of the undistorted images.
+	 */
+	const cv::Mat& getK() const;
+	
+	/**
+	 * Returns the intrinsic parameter matrix of the original images,
+	 */
+	const cv::Mat& getOriginalK() const;
+	
+    /**
+	 * Returns the map1 computed for undistortion.
+	 */
+	const cv::Mat&  getMap1() const;
+	
+    /**
+	 * Returns the map1 computed for undistortion.
+	 */
+	const cv::Mat&  getMap2() const;
+
+	/**
+	 * Returns the width of the undistorted images in pixels.
+	 */
+	int getOutputWidth() const;
+
+	/**
+	 * Returns the height of the undistorted images in pixels.
+	 */
+	int getOutputHeight() const;
+	
+	/**
+	 * Returns the width of the input images in pixels.
+	 */
+	int getInputWidth() const;
+
+	/**
+	 * Returns the height of the input images in pixels.
+	 */
+	int getInputHeight() const;
+
+	/**
+	 * Returns if the undistorter was initialized successfully.
+	 */
+	bool isValid() const;
+
+private:
+    Mat K_;
+    Mat originalK_ = cv::Mat(3, 3, CV_64F, cv::Scalar(0));
+
+    float inputCalibration[4];
+    Mat distCoeffs = cv::Mat::zeros(4, 1, CV_32F);
+
+    int out_width, out_height;
+	int in_width, in_height;
+	cv::Mat map1, map2;
+
     bool valid;
 };
 
