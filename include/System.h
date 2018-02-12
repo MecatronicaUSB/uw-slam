@@ -60,6 +60,7 @@ public:
 
     int idFrame;
     Mat data;
+    bool isKeyFrame;
 
     Frame* nextFrame;
     Frame* prevFrame;
@@ -79,11 +80,15 @@ public:
 
     Mat applyGradient(int id);
 
-    vector<Frame*> frames;
-
-    int w, h;
     int nFrames;
+    Frame* currentKeyFrame;
+    vector<Frame*> frames;
+    vector<Frame*> keyFrames;
     vector<string> imagesList;
+
+    int w, h, w_inp, h_inp;
+    float fx, fy, cx, cy;
+
     Mat K;
     Mat map1, map2;
     CameraModel* cameraModel;

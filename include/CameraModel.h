@@ -60,63 +60,82 @@ public:
 	~CameraModel();
 
 	/**
-	 * Creates an CameraModel by reading the distortion parameters from a file.
-	 * 
-	 * The file format is as follows:
-	 * fx fy cx cy d1 d2 d3 d4 d5 d6
-	 * inputWidth inputHeight
-	 * crop / full / none
-	 * outputWidth outputHeight
+	 * @brief Creates an CameraModel by reading the distortion parameters from a file
+	 * 			Please refer to calibration.xml file to see the format
+	 * @param calibrationPath String with calibration .xml file
 	 */
     void getCameraModel(string calibrationPath);
     
 	/**
-	 * Undistorts the given image and returns the result image.
+	 * @brief Undistorts the given image and returns the result image
+	 * 
+	 * @param image Image to undistorts
+	 * @param result Result image
 	 */
 	void undistort(const cv::Mat& image, cv::OutputArray result) const;
 	
 	/**
-	 * Returns the intrinsic parameter matrix of the undistorted images.
+	 * @brief Returns the intrinsic parameter matrix of the undistorted images
+	 * 
+	 * @return const cv::Mat& getK Intrinsic parameter matrix of undistorted images
 	 */
 	const cv::Mat& getK() const;
 	
 	/**
-	 * Returns the intrinsic parameter matrix of the original images,
+	 * @brief Returns the intrinsic parameter matrix of the original images
+	 * 
+	 * @return const cv::Mat& getOriginalK Intrinsic parameter matrix of distorted images
 	 */
 	const cv::Mat& getOriginalK() const;
 	
-    /**
-	 * Returns the map1 computed for undistortion.
+	/**
+	 * @brief Returns the map1 computed for undistortion
+	 * 
+	 * @return const cv::Mat& getMap1 Map1 computed for undistortion
 	 */
 	const cv::Mat&  getMap1() const;
 	
-    /**
-	 * Returns the map1 computed for undistortion.
+	/**
+	 * @brief Returns the map2 computed for undistortion
+	 * 
+	 * @return const cv::Mat& getMap2 Map2 computed for undistortion
 	 */
 	const cv::Mat&  getMap2() const;
 
 	/**
-	 * Returns the width of the undistorted images in pixels.
+	 * @brief Returns the width of the undistorted images in pixels
+	 * 
+	 * @return int getOutputWidth 
 	 */
 	int getOutputWidth() const;
 
+
 	/**
-	 * Returns the height of the undistorted images in pixels.
+	 * @brief Returns the height of the undistorted images in pixels
+	 * 
+	 * @return int getOutputHeight 
 	 */
 	int getOutputHeight() const;
 	
 	/**
-	 * Returns the width of the input images in pixels.
+	 * @brief Returns the width of the input images in pixels.
+	 * 
+	 * @return int getInputWidth 
 	 */
 	int getInputWidth() const;
 
 	/**
-	 * Returns the height of the input images in pixels.
+	 * @brief Returns the height of the input images in pixels.
+	 * 
+	 * @return int getInputHeight 
 	 */
 	int getInputHeight() const;
 
 	/**
-	 * Returns if the undistorter was initialized successfully.
+	 * @brief Returns if the undistorter was initialized successfully.
+	 * 
+	 * @return true 	Rectification was made
+	 * @return false 	Rectification wasn't made
 	 */
 	bool isValid() const;
 

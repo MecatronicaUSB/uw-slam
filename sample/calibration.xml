@@ -7,8 +7,8 @@
 <in_height type_id="integer"> 480 </in_height>
 
 <!-- Images dimensions (Output)-->
-<out_width  type_id="integer"> 752 </out_width>
-<out_height type_id="integer"> 480 </out_height>
+<out_width  type_id="integer"> 480 </out_width>
+<out_height type_id="integer"> 240 </out_height>
 
 <!-- Calibration Values of Dataset-->
 <calibration_values type_id="opencv-matrix">

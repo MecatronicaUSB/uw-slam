@@ -38,6 +38,7 @@ void CameraModel::getCameraModel(string calibrationPath)
     Mat calibration_values, distortion_values;
     FileStorage opencv_file(calibrationPath, cv::FileStorage::READ);
     if (opencv_file.isOpened()){
+        cout << " ... found" << endl;
         opencv_file["in_width"] >> in_width;
         opencv_file["in_height"] >> in_height;
         opencv_file["out_width"] >> out_width;
@@ -47,7 +48,8 @@ void CameraModel::getCameraModel(string calibrationPath)
         opencv_file.release();
     }
     else{
-        cout << "Calibration file could not be opened." << endl;
+        cout << " ... not found" << endl;
+        cout << "Cannot operate without calibration" << endl;
         cout << "Exiting..." << endl;
         valid = false;
         exit(0);
@@ -78,10 +80,12 @@ void CameraModel::getCameraModel(string calibrationPath)
 
     // If distCoeff are 0, dont apply rectification
     if( distCoeffs.at<float>(0,0) == 0 ){
+        cout << "Distortion coefficients not found ... not rectifying" << endl;
         valid = false;
-        cout << "Distortion coefficients not found... not rectifying" << endl;
+        K_ = originalK_;
     }
     if(valid){
+        cout << "Distortion coefficients found ... rectifying" << endl;
         // Obtaining new Camera Matrix with outputs and inputs
         K_ = getOptimalNewCameraMatrix(originalK_, distCoeffs, cv::Size(in_width, in_height), 0, cv::Size(out_width, out_height), nullptr, false);
         initUndistortRectifyMap(originalK_, distCoeffs, cv::Mat(), K_, cv::Size(out_width, out_height), CV_16SC2, map1, map2);
@@ -91,9 +95,6 @@ void CameraModel::getCameraModel(string calibrationPath)
 		originalK_.at<double>(1, 1) /= in_height;
 		originalK_.at<double>(1, 2) /= in_height;
     }
-
-	originalK_ = originalK_.t();
-	K_ = K_.t();
 }
 
 void CameraModel::undistort(const cv::Mat& image, cv::OutputArray result) const

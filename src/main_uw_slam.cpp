@@ -35,16 +35,16 @@ cuda::DeviceInfo deviceInfo;
 
 void showSettings(){
     cout << "CUDA enabled devices detected: " << deviceInfo.name() << endl;
-    cout << "Directory of images: " << imagesPath << endl;
-    cout << "Directory of calibration xml file: " << calibrationPath << "\n"<< endl;
+    cout << "Directory of calibration xml file: " << calibrationPath << endl;
+    cout << "Directory of images: " << imagesPath  << "\n" << endl;
 }
 
 // Args declarations
-args::ArgumentParser parser("Feature Detection Module.", "Author: Fabio Morales.");
+args::ArgumentParser parser("Underwater Simultaneous Localization and Mapping.", "Author: Fabio Morales. GitHub: @fmoralesh");
 args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
 
-args::ValueFlag<std::string> dir_dataset(parser, "directory", "Directory of dataset files", {'d'});
-args::ValueFlag<std::string> parse_calibration(parser, "calibration", "Name of input XML calibration file", {"calibration"});
+args::ValueFlag<std::string> dir_dataset(parser, "images path", "Directory of images files", {'d'});
+args::ValueFlag<std::string> parse_calibration(parser, "calibration xml", "Name of input .xml calibration file", {"calibration"});
 
 int main ( int argc, char *argv[] ){
 
@@ -91,19 +91,29 @@ int main ( int argc, char *argv[] ){
         calibrationPath = "./sample/calibration.xml";
     }
 
+    // Show parser settings and CUDA information
     showSettings();
 
     // Create new System
     System* uwSystem = new System();
-    // Add list of images names (with path)
-    uwSystem->addListImages(imagesPath);
+
     // Calibrates system with certain Camera Model (currently only RadTan) 
     uwSystem->Calibration(calibrationPath);
-    uwSystem->addFrame(0);
-    uwSystem->showFrame(0);
-    Mat dst;
-    remap(uwSystem->frames[0]->data, dst, uwSystem->map1, uwSystem->map2,INTER_LINEAR);
-    imshow("1", dst);
-    waitKey(0);
+
+    // Add list of images names (with path)
+    uwSystem->addListImages(imagesPath);
+
+    // Start SLAM process
+    for(int i=0; i<uwSystem->imagesList.size(); i++){
+        // Checks if the process is initializing
+        // If it does, first frame will be first keyFrame with randomly generated depth map 
+        // uwSystem->initializer()
+
+        uwSystem->addFrame(i);
+
+    }
+
+    cout << "Finished" << endl;
+    delete [] uwSystem;
     return 0;
 }

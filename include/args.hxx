@@ -569,7 +569,7 @@ namespace args
 
         /** The postfix for progline when showProglineOptions is true and command has any flags
          */
-        std::string proglineOptions = "[IMPUT DATA] --DETECTOR -MATCHER";//"{OPTIONS}";
+        std::string proglineOptions = "";//"{OPTIONS}";
 
         /** The prefix for progline when command has any subcommands
          */
