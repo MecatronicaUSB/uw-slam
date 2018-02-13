@@ -19,10 +19,7 @@ namespace uw{
 
 #define PYR_LEVELS 6
 // Global constants
-const float GTH         =   7;
-const int BLOCK_SIZE    =  256;
-const int TARGET_WIDTH  =  1280;
-const int TARGET_HEIGHT =  1024;
-
+const double GTH         =   7;
+const int BLOCK_SIZE    =  32;
 
 }

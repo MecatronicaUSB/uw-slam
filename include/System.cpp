@@ -22,19 +22,24 @@
 
 #include "System.h"
 #include "CameraModel.h"
+#include "Tracker.h"
 
 namespace uw
 {
 
-System::System(){
-    nFrames = 0;
+System::System(void){
+    initialized = false;
+    rectificationValid = false;
+    nFrames     = 0;
+    nKeyFrames  = 0;
 }
 
-System::~System(){
+System::~System(void){
+    cout << "System deleted" << endl;
 
 }
 
-Frame::Frame(){
+Frame::Frame(void){
     idFrame = 0;
     isKeyFrame = false;
 }
@@ -50,7 +55,24 @@ void System::addFrame(int id){
     newFrame->idFrame = id;
     newFrame->isKeyFrame = false;
     this->nFrames++;
+    this->currentFrame = newFrame;
     frames.push_back(newFrame);
+}
+
+void System::addKeyFrame(int id){
+    if(id > this->nFrames){
+        cout << "Can't add keyframe because frame " << id << " is not part of the systems frames" << endl;
+        cout << "Exiting ..." << endl;
+        exit(0);
+    }
+    
+    Frame* newKeyFrame   = new Frame();
+    newKeyFrame = frames[id];
+    currentKeyFrame = newKeyFrame;
+
+    this->frames[id]->isKeyFrame = true;
+    this->nKeyFrames++;
+    keyFrames.push_back(newKeyFrame);
 }
 
 void System::showFrame(int id){
@@ -58,7 +80,7 @@ void System::showFrame(int id){
     waitKey(0);
 }
 
-void System::addFrameGroup(int nImages){
+void System::addFramesGroup(int nImages){
     for(int i = nFrames; i < nImages; i++)
         System::addFrame(i);
 }
@@ -78,7 +100,8 @@ void System::addListImages(string path){
         closedir (dir);
     }else{
         // If the directory could not be opened
-        cout << " can not find directory." << endl;
+        cout << "can not find directory" << endl;
+        cout << "Exiting..." << endl;
         exit(0);
     }
     // Sorting the vector of strings so it is alphabetically ordered
@@ -99,6 +122,15 @@ void System::Calibration(string calibrationPath){
     cameraModel = new CameraModel();
     cameraModel->getCameraModel(calibrationPath);
 
+    if(w%16!=0 || h%16!=0){
+		cout << "Output image dimensions must be multiples of 32. Choose another output dimentions" << endl;
+        cout << "Exiting..." << endl;
+		exit(0);
+	}
+}
+
+void System::initializeSystem(){
+    
     this->K = cameraModel->getK();
     this->w_inp = cameraModel->getInputHeight();
     this->h_inp = cameraModel->getInputWidth();
@@ -106,43 +138,24 @@ void System::Calibration(string calibrationPath){
     this->h = cameraModel->getOutputHeight();
     this->map1 = cameraModel->getMap1();
     this->map2 = cameraModel->getMap2();
-    this->rectificationValid = cameraModel->isValid();
     this->fx = cameraModel->getK().at<double>(0,0);
     this->fy = cameraModel->getK().at<double>(1,1);
     this->cx = cameraModel->getK().at<double>(0,2);
     this->cy = cameraModel->getK().at<double>(1,2);
+    this->rectificationValid = cameraModel->isValid();
 
-    if(w%16!=0 || h%16!=0){
-		cout << "Output image dimensions must be multiples of 16. Choose another output dimentions" << endl;
-        cout << "Exiting..." << endl;
-		exit(0);
-	}
+    tracker = new Tracker();
+    tracker->w = this->w;
+    tracker->h = this->h;
+
+    this->initialized = true;       
 }
 
-Mat System::applyGradient(int id){
-    Mat gradientImage;
-    cuda::GpuMat frameX, frameY, frame;
+void System::Tracking(){
 
-    frameX.upload(frames[id]->data);
-    frameY.upload(frames[id]->data);
+    tracker->getCandidatePoints(this->currentFrame, tracker->candidatePoints);
 
-    soberX->apply(frameX, frameX);
-    soberX->apply(frameY, frameY);
-
-    cuda::addWeighted(frameX, 0.5, frameY, 0.5, 0, frame);
-
-    Mat example;
-    for(int x = 0; x < TARGET_WIDTH; x+= BLOCK_SIZE ){
-        for(int y = 0; y < TARGET_HEIGHT; y += BLOCK_SIZE){
-            cuda::GpuMat block = cuda::GpuMat(frame, Rect(x,y,BLOCK_SIZE,BLOCK_SIZE));
-            block.download(example);
-        }
-    }
-    
-    frame.download(gradientImage);
-    imshow("0", gradientImage);     
-    waitKey(0);
-    return gradientImage;
 }
+
 
 }

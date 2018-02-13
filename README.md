@@ -23,7 +23,7 @@ This repository provides all you need to simulate and execute UW-SLAM.
 cd <catkin_ws_directory>
 git clone https://github.com/MecatronicaUSB/uw-slam.git
 catkin_make
-rosrun uw-slam uw-slam
+rosrun uw_slam main_uw_slam -d <images directory> -c <calibration file directory> 
 ```
 
 ## Software Details

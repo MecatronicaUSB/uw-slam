@@ -19,10 +19,9 @@
 * You should have received a copy of the GNU General Public License
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
+
 #pragma once
 #include "Options.h"
-#include "CameraModel.h"
-#include "Tracker.h"
 
 ///Basic C and C++ libraries
 #include <stdlib.h>
@@ -49,66 +48,26 @@
 using namespace cv;
 using namespace std;
 
-
 namespace uw
 {
 
-class CameraModel;
-class Tracker;
+class Frame;
 
-class Frame{
+class Tracker
+{
 public:
-    Frame();
+    ~Tracker();
+    void getCandidatePoints(Frame* frame, vector<Point2d> candidatePoints);
+    void debugShowCandidatePoints(Frame* frame);
+    vector<Point2d> candidatePoints;
 
-    int idFrame;
-    Mat data;
-    bool isKeyFrame;
-
-    Frame* nextFrame;
-    Frame* prevFrame;
-};
-
-
-class System{
-public:
-    System();
-    ~System();
-
-    void addFrame(int id);
-    void addFramesGroup(int nImages);
-    void addKeyFrame(int id);
-
-    void addListImages(string path);
-    void showFrame(int id);
-
-    void initializeSystem();
-    void Calibration(string calibrationPath);
-
-    void Tracking();
-    
-    Tracker* tracker;
-
-    int nFrames;
-    int nKeyFrames;
-    Frame* currentFrame;
-    Frame* currentKeyFrame;
-    vector<Frame*> frames;
-    vector<Frame*> keyFrames;
-    vector<string> imagesList;
-
-    int w, h, w_inp, h_inp;
-    float fx, fy, cx, cy;
-
-    Mat K;
-    Mat map1, map2;
-    CameraModel* cameraModel;
-    
-    bool initialized;
-    bool rectificationValid;
-    
+    // Filters for calculating gradient in images
+    Ptr<cuda::Filter> soberX = cuda::createSobelFilter(0, 0, 1, 0, CV_SCHARR, 1.0, BORDER_DEFAULT);
+    Ptr<cuda::Filter> soberY = cuda::createSobelFilter(0, 0, 0, 1, CV_SCHARR, 1.0, BORDER_DEFAULT);
+    int w, h;
+private:
 
 };
-
 
 
 

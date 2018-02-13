@@ -22,6 +22,7 @@
 
 #include "../include/args.hxx"
 #include "../include/System.h"
+#include "../include/Tracker.h"
 
 // C++ namespaces
 using namespace uw;
@@ -43,8 +44,8 @@ void showSettings(){
 args::ArgumentParser parser("Underwater Simultaneous Localization and Mapping.", "Author: Fabio Morales. GitHub: @fmoralesh");
 args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
 
-args::ValueFlag<std::string> dir_dataset(parser, "images path", "Directory of images files", {'d'});
-args::ValueFlag<std::string> parse_calibration(parser, "calibration xml", "Name of input .xml calibration file", {"calibration"});
+args::ValueFlag<std::string> dir_dataset(parser, "images path", "Directory of images files", {'d', "directory"});
+args::ValueFlag<std::string> parse_calibration(parser, "calibration xml", "Name of input .xml calibration file", {'c', "calibration"});
 
 int main ( int argc, char *argv[] ){
 
@@ -100,20 +101,26 @@ int main ( int argc, char *argv[] ){
     // Calibrates system with certain Camera Model (currently only RadTan) 
     uwSystem->Calibration(calibrationPath);
 
-    // Add list of images names (with path)
+    // Add list of the dataset images names
     uwSystem->addListImages(imagesPath);
 
     // Start SLAM process
-    for(int i=0; i<uwSystem->imagesList.size(); i++){
+    for(int i=0; i<uwSystem->imagesList.size(); i=i+100){
         // Checks if the process is initializing
         // If it does, first frame will be first keyFrame with randomly generated depth map 
-        // uwSystem->initializer()
+        if(not uwSystem->initialized){
+            uwSystem->addFrame(i);
+            uwSystem->addKeyFrame(i);
+            uwSystem->initializeSystem();
+        }
+        else{
+            uwSystem->addFrame(i);
+            uwSystem->Tracking();
+        }
 
-        uwSystem->addFrame(i);
 
     }
 
-    cout << "Finished" << endl;
-    delete [] uwSystem;
+    // delete [] uwSystem;
     return 0;
 }
