@@ -50,22 +50,32 @@ using namespace std;
 
 namespace uw
 {
-
 class Frame;
+
+class Map
+{
+public:
+    cuda::GpuMat candidatePoints;
+    cuda::GpuMat pointsDepth;    
+};
 
 class Tracker
 {
 public:
     ~Tracker();
-    void getCandidatePoints(Frame* frame, vector<Point2d> candidatePoints);
-    void debugShowCandidatePoints(Frame* frame);
-    vector<Point2d> candidatePoints;
+    void GetCandidatePoints(Frame* frame, vector<Point2d> candidatePoints);
+    void DebugShowCandidatePoints(Frame* frame);
+
+
+    void WarpFunction();
+
+    vector<Point2d> candidatePoints_;
+
 
     // Filters for calculating gradient in images
-    Ptr<cuda::Filter> soberX = cuda::createSobelFilter(0, 0, 1, 0, CV_SCHARR, 1.0, BORDER_DEFAULT);
-    Ptr<cuda::Filter> soberY = cuda::createSobelFilter(0, 0, 0, 1, CV_SCHARR, 1.0, BORDER_DEFAULT);
-    int w, h;
-private:
+    Ptr<cuda::Filter> soberX_ = cuda::createSobelFilter(0, 0, 1, 0, CV_SCHARR, 1.0, BORDER_DEFAULT);
+    Ptr<cuda::Filter> soberY_ = cuda::createSobelFilter(0, 0, 0, 1, CV_SCHARR, 1.0, BORDER_DEFAULT);
+    int w_, h_;
 
 };
 

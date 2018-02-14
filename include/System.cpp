@@ -28,66 +28,101 @@ namespace uw
 {
 
 System::System(void){
-    initialized = false;
-    rectificationValid = false;
-    nFrames     = 0;
-    nKeyFrames  = 0;
+    initialized_ = false;
+    rectification_valid_ = false;
+    num_frames_     = 0;
+    num_keyframes_  = 0;
 }
 
 System::~System(void){
     cout << "System deleted" << endl;
+}
 
+void System::Calibration(string calibration_path) {
+    cout << "Reading calibration xml file";
+    camera_model_ = new CameraModel();
+    camera_model_->GetCameraModel(calibration_path);
+
+    if (w_%16!=0 || h_%16!=0) {
+		cout << "Output image dimensions must be multiples of 32. Choose another output dimentions" << endl;
+        cout << "Exiting..." << endl;
+		exit(0);
+	}
+}
+
+void System::InitializeSystem() {
+    this->intrinsic_camera_ = camera_model_->GetK();
+    this->w_input_ = camera_model_->GetInputHeight();
+    this->h_input_ = camera_model_->GetInputWidth();
+    this->w_ = camera_model_->GetOutputWidth();
+    this->h_ = camera_model_->GetOutputHeight();
+    this->map1_ = camera_model_->GetMap1();
+    this->map2_ = camera_model_->GetMap2();
+    this->fx_ = camera_model_->GetK().at<double>(0,0);
+    this->fy_ = camera_model_->GetK().at<double>(1,1);
+    this->cx_ = camera_model_->GetK().at<double>(0,2);
+    this->cy_ = camera_model_->GetK().at<double>(1,2);
+    this->rectification_valid_ = camera_model_->IsValid();
+
+    tracker_ = new Tracker();
+    tracker_->w_ = this->w_;
+    tracker_->h_ = this->h_;
+
+    this->initialized_ = true;       
+}
+
+void System::Tracking() {
+    tracker_->GetCandidatePoints(this->current_frame_, tracker_->candidatePoints_);
+    // tracker->warpFunction();
 }
 
 Frame::Frame(void){
-    idFrame = 0;
-    isKeyFrame = false;
+    idFrame_    = 0;
+    isKeyFrame_ = false;
 }
 
 // Adding frame to system. Assuming same dimentions for all images
-void System::addFrame(int id){
+void System::AddFrame(int id) {
     Frame* newFrame   = new Frame();
-    newFrame->data    = imread(imagesList[id], CV_LOAD_IMAGE_GRAYSCALE);
+    newFrame->data_   = imread(images_list_[id], CV_LOAD_IMAGE_GRAYSCALE);
 
-    if(rectificationValid){
-        remap(newFrame->data, newFrame->data, this->map1, this->map2, INTER_LINEAR);
+    if (rectification_valid_) {
+        remap(newFrame->data_, newFrame->data_, this->map1_, this->map2_, INTER_LINEAR);
     }
-    newFrame->idFrame = id;
-    newFrame->isKeyFrame = false;
-    this->nFrames++;
-    this->currentFrame = newFrame;
-    frames.push_back(newFrame);
+    newFrame->idFrame_ = id;
+    newFrame->isKeyFrame_ = false;
+    this->num_frames_++;
+    this->current_frame_ = newFrame;
+    frames_.push_back(newFrame);
 }
 
-void System::addKeyFrame(int id){
-    if(id > this->nFrames){
-        cout << "Can't add keyframe because frame " << id << " is not part of the systems frames" << endl;
+void System::AddKeyFrame(int id) {
+    if(id > this->current_frame_->idFrame_){
+        cout << "Can not add keyframe because frame " << id << " is not part of the systems frames" << endl;
         cout << "Exiting ..." << endl;
         exit(0);
     }
     
     Frame* newKeyFrame   = new Frame();
-    newKeyFrame = frames[id];
-    currentKeyFrame = newKeyFrame;
+    newKeyFrame = frames_[this->num_frames_ - 1];
+    current_keyframe_ = newKeyFrame;
 
-    this->frames[id]->isKeyFrame = true;
-    this->nKeyFrames++;
-    keyFrames.push_back(newKeyFrame);
+    this->frames_[this->num_frames_ - 1]->isKeyFrame_ = true;
+    this->num_keyframes_++;
+    keyframes_.push_back(newKeyFrame);
 }
 
-void System::showFrame(int id){
-    imshow("Show last frame", frames[id]->data);
+void System::ShowFrame(int id) {
+    imshow("Show last frame", frames_[id]->data_);
     waitKey(0);
 }
 
-void System::addFramesGroup(int nImages){
-    for(int i = nFrames; i < nImages; i++)
-        System::addFrame(i);
+void System::AddFramesGroup(int id, int num_images) {
+    for (int i = id; i < num_images; i++)
+        System::AddFrame(i);
 }
 
-
-void System::addListImages(string path){
-    
+void System::AddListImages(string path) {
     vector<string> file_names;
     DIR *dir;
     struct dirent *ent;
@@ -98,7 +133,7 @@ void System::addListImages(string path){
             file_names.push_back(path + string(ent->d_name));
         }
         closedir (dir);
-    }else{
+    } else {
         // If the directory could not be opened
         cout << "can not find directory" << endl;
         cout << "Exiting..." << endl;
@@ -108,54 +143,17 @@ void System::addListImages(string path){
     sort(file_names.begin(), file_names.end());
     file_names.erase(file_names.begin(), file_names.begin()+2);
 
-    if(file_names.size() < 15){
+    if (file_names.size() < 15) {
         cout << "\nInsufficient number of images found. Please use a larger dataset" << endl;
         cout << "Exiting..." << endl;
         exit(0);
     }
     cout << file_names.size() << " found"  << endl;
-    imagesList = file_names;
+    images_list_ = file_names;
 }
 
-void System::Calibration(string calibrationPath){
-    cout << "Reading calibration xml file";
-    cameraModel = new CameraModel();
-    cameraModel->getCameraModel(calibrationPath);
 
-    if(w%16!=0 || h%16!=0){
-		cout << "Output image dimensions must be multiples of 32. Choose another output dimentions" << endl;
-        cout << "Exiting..." << endl;
-		exit(0);
-	}
-}
 
-void System::initializeSystem(){
-    
-    this->K = cameraModel->getK();
-    this->w_inp = cameraModel->getInputHeight();
-    this->h_inp = cameraModel->getInputWidth();
-    this->w = cameraModel->getOutputWidth();
-    this->h = cameraModel->getOutputHeight();
-    this->map1 = cameraModel->getMap1();
-    this->map2 = cameraModel->getMap2();
-    this->fx = cameraModel->getK().at<double>(0,0);
-    this->fy = cameraModel->getK().at<double>(1,1);
-    this->cx = cameraModel->getK().at<double>(0,2);
-    this->cy = cameraModel->getK().at<double>(1,2);
-    this->rectificationValid = cameraModel->isValid();
-
-    tracker = new Tracker();
-    tracker->w = this->w;
-    tracker->h = this->h;
-
-    this->initialized = true;       
-}
-
-void System::Tracking(){
-
-    tracker->getCandidatePoints(this->currentFrame, tracker->candidatePoints);
-
-}
 
 
 }

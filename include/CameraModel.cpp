@@ -25,125 +25,112 @@
 namespace uw
 {
 
-CameraModel::~CameraModel()
-{
-}
+CameraModel::CameraModel() {}
 
-// Checks which Camera Model Implement (RadTan,...?)
-void CameraModel::getCameraModel(string calibrationPath)
-{
-	valid = true;
+CameraModel::~CameraModel() {}
 
+// TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com) 02-13-2018 - Implement other camera models to UWSLAM (FOV)
+void CameraModel::GetCameraModel(string calibration_path) {
     // Reading intrinsic parameters and distortion coefficients from file
     Mat calibration_values, distortion_values;
-    FileStorage opencv_file(calibrationPath, cv::FileStorage::READ);
-    if (opencv_file.isOpened()){
+    FileStorage opencv_file(calibration_path, cv::FileStorage::READ);
+    if (opencv_file.isOpened()) {
         cout << " ... found" << endl;
-        opencv_file["in_width"] >> in_width;
-        opencv_file["in_height"] >> in_height;
-        opencv_file["out_width"] >> out_width;
-        opencv_file["out_height"] >> out_height;
+        opencv_file["in_width"] >> in_width_;
+        opencv_file["in_height"] >> in_height_;
+        opencv_file["out_width"] >> out_width_;
+        opencv_file["out_height"] >> out_height_;
         opencv_file["calibration_values"] >> calibration_values;
         opencv_file["rectification"] >> distortion_values;
         opencv_file.release();
-    }
-    else{
+    } else {
         cout << " ... not found" << endl;
         cout << "Cannot operate without calibration" << endl;
         cout << "Exiting..." << endl;
-        valid = false;
+        valid_ = false;
         exit(0);
     }
 
     // Saving parameters and distCoeffs
-    for(int i = 0; i < 4; i++){
-        inputCalibration[i] = calibration_values.at<double>(0,i);
-		distCoeffs.at<float>(i,0) = distortion_values.at<double>(0,i);
+    for (int i = 0; i < 4; i++) {
+        input_calibration_[i] = calibration_values.at<double>(0,i);
+		dist_coeffs_.at<float>(i,0) = distortion_values.at<double>(0,i);
     }
 
     // Checking if the intrinsic parameters needs rescaling
-    if( inputCalibration[2] < 1 && inputCalibration[3] < 1){
-        cout << "WARNING: cx = " << inputCalibration[2] << " < 1, which should not be the case for normal cameras" << endl;
+    if (input_calibration_[2] < 1 && input_calibration_[3] < 1) {
+        cout << "WARNING: cx = " << input_calibration_[2] << " < 1, which should not be the case for normal cameras" << endl;
         // Rescale. (Maybe will need -0.5 offset)      
-        inputCalibration[0] = inputCalibration[0] * in_width;
-        inputCalibration[1] = inputCalibration[1] * in_height;
-        inputCalibration[2] = inputCalibration[2] * in_width;
-        inputCalibration[3] = inputCalibration[3] * in_height;
+        input_calibration_[0] = input_calibration_[0] * in_width_;
+        input_calibration_[1] = input_calibration_[1] * in_height_;
+        input_calibration_[2] = input_calibration_[2] * in_width_;
+        input_calibration_[3] = input_calibration_[3] * in_height_;
     }
 
-    // Saving parameters in originalK_
-    originalK_.at<double>(0,0) = inputCalibration[0];
-    originalK_.at<double>(1,1) = inputCalibration[1];
-    originalK_.at<double>(0,2) = inputCalibration[2];
-    originalK_.at<double>(1,2) = inputCalibration[3];
-    originalK_.at<double>(2, 2) = 1;
+    // Saving parameters in original_intrinsic_camera_
+    original_intrinsic_camera_.at<double>(0,0) = input_calibration_[0];
+    original_intrinsic_camera_.at<double>(1,1) = input_calibration_[1];
+    original_intrinsic_camera_.at<double>(0,2) = input_calibration_[2];
+    original_intrinsic_camera_.at<double>(1,2) = input_calibration_[3];
+    original_intrinsic_camera_.at<double>(2, 2) = 1;
 
     // If distCoeff are 0, dont apply rectification
-    if( distCoeffs.at<float>(0,0) == 0 ){
+    if (dist_coeffs_.at<float>(0,0) == 0) {
         cout << "Distortion coefficients not found ... not rectifying" << endl;
-        valid = false;
-        K_ = originalK_;
+        valid_ = false;
+        output_intrinsic_camera_ = original_intrinsic_camera_;
     }
-    if(valid){
+    if (valid_) {
         cout << "Distortion coefficients found ... rectifying" << endl;
-        // Obtaining new Camera Matrix with outputs and inputs
-        K_ = getOptimalNewCameraMatrix(originalK_, distCoeffs, cv::Size(in_width, in_height), 0, cv::Size(out_width, out_height), nullptr, false);
-        initUndistortRectifyMap(originalK_, distCoeffs, cv::Mat(), K_, cv::Size(out_width, out_height), CV_16SC2, map1, map2);
+        // Obtaining new intrinsic camera matrix with undistorted images
+        output_intrinsic_camera_ = getOptimalNewCameraMatrix(original_intrinsic_camera_, dist_coeffs_, cv::Size(in_width_, in_height_), 0, cv::Size(out_width_, out_height_), nullptr, false);
+        initUndistortRectifyMap(original_intrinsic_camera_, dist_coeffs_, cv::Mat(), output_intrinsic_camera_, cv::Size(out_width_, out_height_), CV_16SC2, map1_, map2_);
         
-        originalK_.at<double>(0, 0) /= in_width;
-		originalK_.at<double>(0, 2) /= in_width;
-		originalK_.at<double>(1, 1) /= in_height;
-		originalK_.at<double>(1, 2) /= in_height;
+        original_intrinsic_camera_.at<double>(0, 0) /= in_width_;
+		original_intrinsic_camera_.at<double>(0, 2) /= in_width_;
+		original_intrinsic_camera_.at<double>(1, 1) /= in_height_;
+		original_intrinsic_camera_.at<double>(1, 2) /= in_height_;
     }
 }
 
-void CameraModel::undistort(const cv::Mat& image, cv::OutputArray result) const
-{
-	cv::remap(image, result, map1, map2, cv::INTER_LINEAR);
+void CameraModel::Undistort(const cv::Mat& image, cv::OutputArray result) const {
+	cv::remap(image, result, map1_, map2_, cv::INTER_LINEAR);
 }
 
-const cv::Mat& CameraModel::getMap1() const
-{
-    return map1;
+const cv::Mat& CameraModel::GetMap1() const {
+    return map1_;
 }
 
-const cv::Mat& CameraModel::getMap2() const
-{
-    return map2;
+const cv::Mat& CameraModel::GetMap2() const {
+    return map2_;
 }
 
-const cv::Mat& CameraModel::getK() const
-{
-	return K_;
+const cv::Mat& CameraModel::GetK() const {
+	return output_intrinsic_camera_;
 }
 
-const cv::Mat& CameraModel::getOriginalK() const
-{
-	return originalK_;
+const cv::Mat& CameraModel::GetOriginalK() const {
+	return original_intrinsic_camera_;
 }
 
-int CameraModel::getOutputWidth() const
-{
-	return out_width;
+int CameraModel::GetOutputWidth() const {
+	return out_width_;
 }
 
-int CameraModel::getOutputHeight() const
-{
-	return out_height;
-}
-int CameraModel::getInputWidth() const
-{
-	return in_width;
+int CameraModel::GetOutputHeight() const {
+	return out_height_;
 }
 
-int CameraModel::getInputHeight() const
-{
-	return in_height;
+int CameraModel::GetInputWidth() const {
+	return in_width_;
 }
 
-bool CameraModel::isValid() const
-{
-	return valid;
+int CameraModel::GetInputHeight() const {
+	return in_height_;
+}
+
+bool CameraModel::IsValid() const {
+	return valid_;
 }
 
 }

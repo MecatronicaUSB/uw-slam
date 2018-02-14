@@ -25,22 +25,36 @@
 namespace uw
 {
 
-Tracker::~Tracker(void){};
+Tracker::~Tracker(void) {};
 
-void Tracker::getCandidatePoints(Frame* frame, vector<Point2d> candidatePoints){
+void Tracker::GetCandidatePoints(Frame* frame, vector<Point2d> candidatePoints) {
     
-    cuda::GpuMat frameX, frameY, frameGPU;
+    cuda::GpuMat frameXGPU, frameYGPU, frameGPU;
+    frameXGPU.create(frame->data_.size(),CV_32FC1);
+    frameYGPU.create(frame->data_.size(),CV_32FC1);
 
-    frameX.upload(frame->data);
-    frameY.upload(frame->data);
+    Mat showGPU, frameX, frameY;
+    frameXGPU.upload(frame->data_);
+    frameYGPU.upload(frame->data_);
 
-    soberX->apply(frameX, frameX);
-    soberX->apply(frameY, frameY);
+    soberX_->apply(frameXGPU, frameXGPU);
+    soberY_->apply(frameYGPU, frameYGPU);
+    cuda::abs(frameXGPU, frameXGPU);
+    cuda::abs(frameYGPU, frameYGPU);
+    
+    frameXGPU.download(frameX);
+    frameYGPU.download(frameY);
 
-    cuda::addWeighted(frameX, 0.5, frameY, 0.5, 0, frameGPU);
+    imshow("1", frameX);
+    waitKey(0);
+    imshow("1", frameY);
+    waitKey(0);
+    cuda::addWeighted(frameXGPU, 0.5, frameYGPU, 0.5, 0, frameGPU);
+    frameGPU.download(showGPU);
 
-    for( int x = 0; x < w; x += BLOCK_SIZE ){
-        for( int y = 0; y < h; y += BLOCK_SIZE ){
+
+    for( int x = 0; x < w_; x += BLOCK_SIZE ){
+        for( int y = 0; y < h_; y += BLOCK_SIZE ){
             Scalar mean, stdev;
             Point min_loc, max_loc;
             double min, max;
@@ -52,24 +66,44 @@ void Tracker::getCandidatePoints(Frame* frame, vector<Point2d> candidatePoints){
             if( max > threshold ){
                 max_loc.x += x;
                 max_loc.y += y;
-                this->candidatePoints.push_back(max_loc);
+                this->candidatePoints_.push_back(max_loc);
             }
         }
     }
 
-    debugShowCandidatePoints(frame);
+
+    DebugShowCandidatePoints(frame);
 }
 
-void Tracker::debugShowCandidatePoints(Frame* frame){
+void Tracker::WarpFunction(){
+    cuda::GpuMat a(1,1,CV_32F);
+    Mat K = (Mat_<double>(3,3) << 1,1,1,     2,2,2,      3,3,3);
+    Mat N = (Mat_<double>(3,1) << 1,2,3);
+    cout << N << endl;
+    cout << K << endl;
+    cuda::GpuMat KGPU;
+    cuda::GpuMat NGPU;
+    cuda::GpuMat ResultGPU;
+    Mat Result;
+    KGPU.upload(K);
+    NGPU.upload(N);
+    cuda::gemm(KGPU, NGPU, 1.0, cuda::GpuMat(), 0.0, ResultGPU);
+    //cuda::multiply(KGPU, NGPU, ResultGPU);
+    ResultGPU.download(Result);
+    cout << Result << endl;
+}   
+
+
+void Tracker::DebugShowCandidatePoints(Frame* frame){
     Mat showPoints;
-    cvtColor(frame->data, showPoints, CV_GRAY2RGB);
+    cvtColor(frame->data_, showPoints, CV_GRAY2RGB);
     
-    for( int i=0; i<this->candidatePoints.size(); i++ )
-        circle(showPoints, candidatePoints[i], 2, Scalar(255,0,0), 1, 8, 0);
+    for( int i=0; i<this->candidatePoints_.size(); i++ )
+        circle(showPoints, candidatePoints_[i], 2, Scalar(255,0,0), 1, 8, 0);
 
     imshow("Show candidates points", showPoints);
     waitKey(0);
-    this->candidatePoints.clear();
+    this->candidatePoints_.clear();
 }
 
 

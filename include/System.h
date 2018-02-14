@@ -19,6 +19,8 @@
 * You should have received a copy of the GNU General Public License
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
+
+// TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com) 02-13-2018 - Clean unused libraries.
 #pragma once
 #include "Options.h"
 #include "CameraModel.h"
@@ -49,67 +51,127 @@
 using namespace cv;
 using namespace std;
 
-
 namespace uw
 {
 
 class CameraModel;
 class Tracker;
+class Map;
 
-class Frame{
+class Frame {
 public:
+    /**
+     * @brief Constructor of Frame.
+     * 
+     */
     Frame();
 
-    int idFrame;
-    Mat data;
-    bool isKeyFrame;
+    /**
+     * @brief Destructor of Frame
+     * 
+     */
+    ~Frame();
 
-    Frame* nextFrame;
-    Frame* prevFrame;
+    Mat data_;
+    Map map_;
+    cuda::GpuMat rigid_body_transformation_;
+    int idFrame_;
+    bool isKeyFrame_;
 };
 
-
-class System{
+class System {
 public:
+    /**
+     * @brief Constructor of System.
+     * 
+     */
     System();
+
+    /**
+     * @brief Destructor of System.
+     * 
+     */
     ~System();
 
-    void addFrame(int id);
-    void addFramesGroup(int nImages);
-    void addKeyFrame(int id);
+    /**
+     * @brief Configures new Intrinsic Parameters Camera Matrix with the parameters from
+     *        the calibration .xml file. Refer to sample/calibration.xml for the file structure.
+     *        Camera Models supported: Pinhole, RadTan / Equidistant.
+     * 
+     * @param calibrationPath 
+     */
+    void Calibration(string calibration_path);
 
-    void addListImages(string path);
-    void showFrame(int id);
+    /**
+     * @brief Initializes necessary variables to start SLAM system.
+     *        Call after Calibration() but before adding the first frame to the system.
+     */
+    void InitializeSystem();
 
-    void initializeSystem();
-    void Calibration(string calibrationPath);
-
+    /**
+     * @brief Starts tracking thread of the next frame. 
+     *        Computes image alingment and optimization of camera poses given two frames and
+     *        their inverse depth map.
+     */
     void Tracking();
+
+    /**
+     * @brief Adds the frame corresponding on the id position from all the dataset.
+     * 
+     * @param id 
+     */
+    void AddFrame(int id);
+
+    /**
+     * @brief Adds num_images frames to the system, starting from the id position from
+     *        all the dataset. Only used for debuggin purposes.
+     * 
+     * @param nImages 
+     */
+    void AddFramesGroup(int id, int num_images);
+
+    /**
+     * @brief Adds the keyframe corresponding on the id position from all the dataset.
+     * 
+     * @param id 
+     */
+    void AddKeyFrame(int id);
+
+    /**
+     * @brief Adds a list of images path to the system, for future reading of the frames.
+     * 
+     * @param path 
+     */
+    void AddListImages(string path);
+
+    /**
+     * @brief Fast function to show an id frame. Only used for debuggin purposes.
+     * 
+     * @param id 
+     */
+    void ShowFrame(int id);
+
+
+    CameraModel* camera_model_;
+    Tracker* tracker_;
+
+    int num_frames_;
+    int num_keyframes_;
+    int w_, h_, w_input_, h_input_;
+    float fx_, fy_, cx_, cy_;
+
+    Frame* current_frame_;
+    Frame* current_keyframe_;
+    vector<Frame*> frames_;
+    vector<Frame*> keyframes_;
+    vector<string> images_list_;
+
+    Mat intrinsic_camera_;
+    Mat map1_, map2_;
+
+    bool initialized_;
+    bool rectification_valid_;
     
-    Tracker* tracker;
-
-    int nFrames;
-    int nKeyFrames;
-    Frame* currentFrame;
-    Frame* currentKeyFrame;
-    vector<Frame*> frames;
-    vector<Frame*> keyFrames;
-    vector<string> imagesList;
-
-    int w, h, w_inp, h_inp;
-    float fx, fy, cx, cy;
-
-    Mat K;
-    Mat map1, map2;
-    CameraModel* cameraModel;
-    
-    bool initialized;
-    bool rectificationValid;
-    
-
 };
-
-
-
 
 }
