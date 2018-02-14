@@ -43,11 +43,6 @@ namespace uw
 class CameraModel
 {
 public:
-	/**
-	 * @brief Constructor of CameraModel
-	 * 
-	 */
-	CameraModel();
 
     /**
      * @brief Destructor of CameraModel

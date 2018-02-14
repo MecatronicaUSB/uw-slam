@@ -21,7 +21,6 @@
 
 #pragma once
 
-
 namespace uw{
 
 #define PYR_LEVELS 6

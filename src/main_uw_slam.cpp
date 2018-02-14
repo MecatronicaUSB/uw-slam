@@ -42,7 +42,6 @@ args::ValueFlag<int> start_i(parser, "start index", "Start in certain frame of t
 args::ValueFlag<std::string> dir_dataset(parser, "images path", "Directory of images files", {'d', "directory"});
 args::ValueFlag<std::string> parse_calibration(parser, "calibration xml", "Name of input .xml calibration file", {'c', "calibration"});
 
-
 void ShowSettings() {
     cout << "CUDA enabled devices detected: " << device_info.name() << endl;
     cout << "Directory of calibration xml file: " << calibration_path << endl;

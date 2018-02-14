@@ -50,6 +50,7 @@ void System::Calibration(string calibration_path) {
 }
 
 void System::InitializeSystem() {
+
     this->intrinsic_camera_ = camera_model_->GetK();
     this->w_input_ = camera_model_->GetInputHeight();
     this->h_input_ = camera_model_->GetInputWidth();
@@ -67,6 +68,7 @@ void System::InitializeSystem() {
     tracker_->w_ = this->w_;
     tracker_->h_ = this->h_;
 
+    cout << "Initializing system ... done";
     this->initialized_ = true;       
 }
 
@@ -148,7 +150,8 @@ void System::AddListImages(string path) {
         exit(0);
     }
     cout << file_names.size() << " found"  << endl;
-    images_list_ = file_names;
+
+    this->images_list_ = file_names;
 }
 
 

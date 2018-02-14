@@ -24,8 +24,6 @@
 namespace uw
 {
 
-CameraModel::CameraModel() {}
-
 CameraModel::~CameraModel() {}
 
 // TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com) 02-13-2018 - Implement other camera models to UWSLAM (FOV)
