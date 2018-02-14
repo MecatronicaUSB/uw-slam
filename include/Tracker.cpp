@@ -3,8 +3,7 @@
 * 
 * Copyright 2018.
 * Developed by Fabio Morales,
-* If you use this code, please cite the respective publications as
-* listed on the above website.
+* Email: fabmoraleshidalgo@gmail.com; GitHub: @fmoralesh
 *
 * UW-SLAM is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -19,6 +18,7 @@
 * You should have received a copy of the GNU General Public License
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
+
 #include "Tracker.h"
 #include "System.h"
 
