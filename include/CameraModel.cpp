@@ -28,6 +28,8 @@ CameraModel::~CameraModel() {}
 
 // TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com) 02-13-2018 - Implement other camera models to UWSLAM (FOV)
 void CameraModel::GetCameraModel(string calibration_path) {
+    valid_ = true;
+
     // Reading intrinsic parameters and distortion coefficients from file
     Mat calibration_values, distortion_values;
     FileStorage opencv_file(calibration_path, cv::FileStorage::READ);

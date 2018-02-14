@@ -26,16 +26,24 @@
 namespace uw
 {
 
-System::System(void){
+System::System(void) {
     initialized_ = false;
     rectification_valid_ = false;
     num_frames_     = 0;
     num_keyframes_  = 0;
 }
 
-System::~System(void){
+System::~System(void) {
     cout << "System deleted" << endl;
 }
+
+Frame::Frame(void) {
+    idFrame_    = 0;
+    isKeyFrame_ = false;
+}
+
+Frame::~Frame(void) {}
+
 
 void System::Calibration(string calibration_path) {
     cout << "Reading calibration xml file";
@@ -50,7 +58,7 @@ void System::Calibration(string calibration_path) {
 }
 
 void System::InitializeSystem() {
-
+    cout << "Initializing system ... done" << endl;
     this->intrinsic_camera_ = camera_model_->GetK();
     this->w_input_ = camera_model_->GetInputHeight();
     this->h_input_ = camera_model_->GetInputWidth();
@@ -67,8 +75,6 @@ void System::InitializeSystem() {
     tracker_ = new Tracker();
     tracker_->w_ = this->w_;
     tracker_->h_ = this->h_;
-
-    cout << "Initializing system ... done";
     this->initialized_ = true;       
 }
 
@@ -77,12 +83,6 @@ void System::Tracking() {
     // tracker->warpFunction();
 }
 
-Frame::Frame(void){
-    idFrame_    = 0;
-    isKeyFrame_ = false;
-}
-
-// Adding frame to system. Assuming same dimentions for all images
 void System::AddFrame(int id) {
     Frame* newFrame   = new Frame();
     newFrame->data_   = imread(images_list_[id], CV_LOAD_IMAGE_GRAYSCALE);
@@ -153,9 +153,6 @@ void System::AddListImages(string path) {
 
     this->images_list_ = file_names;
 }
-
-
-
 
 
 }
