@@ -113,6 +113,7 @@ int main (int argc, char *argv[]){
         } else {
             uwSystem->AddFrame(i);
             uwSystem->Tracking();
+            cout << "OK: " << i << endl;
         }
     }
 

@@ -72,8 +72,11 @@ public:
 
 
     // Filters for calculating gradient in images
-    Ptr<cuda::Filter> soberX_ = cuda::createSobelFilter(0, 0, 1, 0, CV_SCHARR, 1.0, BORDER_DEFAULT);
-    Ptr<cuda::Filter> soberY_ = cuda::createSobelFilter(0, 0, 0, 1, CV_SCHARR, 1.0, BORDER_DEFAULT);
+    Ptr<cuda::Filter> soberX_ = cuda::createSobelFilter(0, CV_32FC1, 1, 0, CV_SCHARR, 1.0, BORDER_DEFAULT);
+    Ptr<cuda::Filter> soberY_ = cuda::createSobelFilter(0, CV_32FC1, 0, 1, CV_SCHARR, 1.0, BORDER_DEFAULT);
+    Ptr<cuda::Filter> laplacian_ = cuda::createLaplacianFilter(0, 0, 1, 1.0);
+
+
     int w_, h_;
 
 };

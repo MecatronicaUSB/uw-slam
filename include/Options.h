@@ -23,9 +23,9 @@
 
 namespace uw{
 
-#define PYR_LEVELS 6
 // Global constants
-const double GTH         =   7;
-const int BLOCK_SIZE    =  32;
+const int PYR_LEVELS            =   3;
+const double GRADIENT_THRESHOLD =   7;
+const int BLOCK_SIZE            =  32;
 
 }

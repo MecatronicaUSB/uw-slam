@@ -27,42 +27,37 @@ namespace uw
 
 Tracker::~Tracker(void) {};
 
+// TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com)
+//  02-13-2018 - Implement a faster way to obtain points with gradient superior of the mean threshold of 32x32 px block
 void Tracker::GetCandidatePoints(Frame* frame, vector<Point2d> candidatePoints) {
+    // frameXGPU.create(frame->data_.size(),CV_32FC1);
+    // frameYGPU.create(frame->data_.size(),CV_32FC1);
+    // Mat showGPU, frameX, frameY;
+    // frameXGPU.upload(frame->data_);
+    // frameYGPU.upload(frame->data_);
+    // soberX_->apply(frameXGPU, frameXGPU);
+    // soberY_->apply(frameYGPU, frameYGPU);
+    // cuda::abs(frameXGPU, frameXGPU);
+    // cuda::abs(frameYGPU, frameYGPU);
+    // cuda::addWeighted(frameXGPU, 0.5, frameYGPU, 0.5, 0, frameGPU);
     
-    cuda::GpuMat frameXGPU, frameYGPU, frameGPU;
-    frameXGPU.create(frame->data_.size(),CV_32FC1);
-    frameYGPU.create(frame->data_.size(),CV_32FC1);
+    //Mat showGPU
+    double threshold;
+    cuda::GpuMat frameGPU(frame->data_);
+    // Applying Laplacian filter to the image
+    laplacian_->apply(frameGPU, frameGPU);
 
-    Mat showGPU, frameX, frameY;
-    frameXGPU.upload(frame->data_);
-    frameYGPU.upload(frame->data_);
-
-    soberX_->apply(frameXGPU, frameXGPU);
-    soberY_->apply(frameYGPU, frameYGPU);
-    cuda::abs(frameXGPU, frameXGPU);
-    cuda::abs(frameYGPU, frameYGPU);
-    
-    frameXGPU.download(frameX);
-    frameYGPU.download(frameY);
-
-    imshow("1", frameX);
-    waitKey(0);
-    imshow("1", frameY);
-    waitKey(0);
-    cuda::addWeighted(frameXGPU, 0.5, frameYGPU, 0.5, 0, frameGPU);
-    frameGPU.download(showGPU);
-
-
-    for( int x = 0; x < w_; x += BLOCK_SIZE ){
-        for( int y = 0; y < h_; y += BLOCK_SIZE ){
+    // Block size search for high gradient points
+    for (int x=0; x<w_; x+=BLOCK_SIZE) {
+        for (int y =0; y<h_; y+=BLOCK_SIZE) {
             Scalar mean, stdev;
             Point min_loc, max_loc;
             double min, max;
-            double threshold = GTH;
-            cuda::GpuMat block = cuda::GpuMat(frameGPU, Rect(x,y,BLOCK_SIZE,BLOCK_SIZE));
+            cuda::GpuMat block(frameGPU, Rect(x,y,BLOCK_SIZE,BLOCK_SIZE));
             cuda::meanStdDev(block, mean, stdev);
-            threshold += mean[0];
+            threshold = mean[0] + GRADIENT_THRESHOLD;
             cuda::minMaxLoc(block, &min, &max, &min_loc, &max_loc);
+
             if( max > threshold ){
                 max_loc.x += x;
                 max_loc.y += y;
@@ -70,9 +65,7 @@ void Tracker::GetCandidatePoints(Frame* frame, vector<Point2d> candidatePoints) 
             }
         }
     }
-
-
-    DebugShowCandidatePoints(frame);
+    //DebugShowCandidatePoints(frame);
 }
 
 void Tracker::WarpFunction(){
