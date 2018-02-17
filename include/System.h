@@ -71,9 +71,12 @@ public:
      */
     ~Frame();
 
-    Mat data_;
-    Map map_;
-    cuda::GpuMat rigid_body_transformation_;
+
+    int id;
+    vector<Mat> image = vector<Mat>(PYRAMID_LEVELS);
+    vector<Point2d> candidatePoints_;
+    vector<float> map_;
+    Mat rigid_body_transformation_;
     int idFrame_;
     bool isKeyFrame_;
 };
@@ -97,7 +100,7 @@ public:
      *        the calibration .xml file. Refer to sample/calibration.xml for the file structure.
      *        Camera Models supported: Pinhole, RadTan / Equidistant.
      * 
-     * @param calibrationPath 
+     * @param calibration_path 
      */
     void Calibration(string calibration_path);
 
@@ -160,12 +163,13 @@ public:
     float fx_, fy_, cx_, cy_;
 
     Frame* current_frame_;
+    Frame* previous_frame_;
     Frame* current_keyframe_;
     vector<Frame*> frames_;
     vector<Frame*> keyframes_;
     vector<string> images_list_;
-
-    Mat intrinsic_camera_;
+    
+    Mat K_;
     Mat map1_, map2_;
 
     bool initialized_;

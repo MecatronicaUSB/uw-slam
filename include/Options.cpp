@@ -19,7 +19,7 @@
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#pragma once
+#include "../include/Options.h"
 /// OpenCV libraries. May need review for the final release
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
@@ -28,26 +28,9 @@
 
 namespace uw{
 
-// Global constants
-extern const int PYRAMID_LEVELS;
-extern int BLOCK_SIZE;
-extern double GRADIENT_THRESHOLD;
+const int PYRAMID_LEVELS  =   4;
+double GRADIENT_THRESHOLD =   7;
+int BLOCK_SIZE            =  32;
 
-
-// Global variables
-// extern float fx_pyramid[PYRAMID_LEVELS];
-// extern float fy_pyramid[PYRAMID_LEVELS];
-// extern float cx_pyramid[PYRAMID_LEVELS];
-// extern float cy_pyramid[PYRAMID_LEVELS];
-// extern float inverse_fx_pyramid[PYRAMID_LEVELS];
-// extern float inverse_fy_pyramid[PYRAMID_LEVELS];
-// extern float inverse_cx_pyramid[PYRAMID_LEVELS];
-// extern float inverse_cy_pyramid[PYRAMID_LEVELS];
-
-// extern int   w_pyramid[PYRAMID_LEVELS];
-// extern int   h_pyramid[PYRAMID_LEVELS];
-
-// extern cv::Mat   K[PYRAMID_LEVELS];
-// extern cv::Mat   inv_K[PYRAMID_LEVELS];
 
 }

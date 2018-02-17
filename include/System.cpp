@@ -58,63 +58,75 @@ void System::Calibration(string calibration_path) {
 }
 
 void System::InitializeSystem() {
-    cout << "Initializing system ... done" << endl;
-    this->intrinsic_camera_ = camera_model_->GetK();
-    this->w_input_ = camera_model_->GetInputHeight();
-    this->h_input_ = camera_model_->GetInputWidth();
-    this->w_ = camera_model_->GetOutputWidth();
-    this->h_ = camera_model_->GetOutputHeight();
-    this->map1_ = camera_model_->GetMap1();
-    this->map2_ = camera_model_->GetMap2();
-    this->fx_ = camera_model_->GetK().at<double>(0,0);
-    this->fy_ = camera_model_->GetK().at<double>(1,1);
-    this->cx_ = camera_model_->GetK().at<double>(0,2);
-    this->cy_ = camera_model_->GetK().at<double>(1,2);
-    this->rectification_valid_ = camera_model_->IsValid();
+    K_ = camera_model_->GetK();
+    w_input_ = camera_model_->GetInputHeight();
+    h_input_ = camera_model_->GetInputWidth();
+    w_ = camera_model_->GetOutputWidth();
+    h_ = camera_model_->GetOutputHeight();
+    map1_ = camera_model_->GetMap1();
+    map2_ = camera_model_->GetMap2();
+    fx_ = camera_model_->GetK().at<double>(0,0);
+    fy_ = camera_model_->GetK().at<double>(1,1);
+    cx_ = camera_model_->GetK().at<double>(0,2);
+    cy_ = camera_model_->GetK().at<double>(1,2);
+    rectification_valid_ = camera_model_->IsValid();
 
     tracker_ = new Tracker();
-    tracker_->w_ = this->w_;
-    tracker_->h_ = this->h_;
-    this->initialized_ = true;       
+    tracker_->InitializePyramid(w_, h_, K_);
+    
+    cout << "Initializing system ... done" << endl;
+    initialized_ = true;       
 }
 
 void System::Tracking() {
-    tracker_->GetCandidatePoints(this->current_frame_, tracker_->candidatePoints_);
+    tracker_->EstimatePose(previous_frame_, current_frame_);
+    //tracker_->GetCandidatePoints(current_frame_, current_frame_->candidatePoints_);
     // tracker->warpFunction();
 }
 
 void System::AddFrame(int id) {
     Frame* newFrame   = new Frame();
-    newFrame->data_   = imread(images_list_[id], CV_LOAD_IMAGE_GRAYSCALE);
-
-    if (rectification_valid_) {
-        remap(newFrame->data_, newFrame->data_, this->map1_, this->map2_, INTER_LINEAR);
+    newFrame->idFrame_ = id;    
+    newFrame->image[0]   = imread(images_list_[id], CV_LOAD_IMAGE_GRAYSCALE);
+            
+    if (rectification_valid_)
+        remap(newFrame->image[0], newFrame->image[0], map1_, map2_, INTER_LINEAR);
+    
+    for (int i=1; i<PYRAMID_LEVELS; i++)
+        resize(newFrame->image[i-1], newFrame->image[i], Size(), 0.5, 0.5);
+    
+    // for (int i=0; i<PYRAMID_LEVELS; i++){
+    //     imshow("", newFrame->image[i]);
+    //     waitKey(0);
+    // }
+    if (num_frames_ == 0) {
+        current_frame_ = newFrame;
+    } else {
+        previous_frame_ = current_frame_;
+        current_frame_ = newFrame;
     }
-    newFrame->idFrame_ = id;
-    newFrame->isKeyFrame_ = false;
-    this->num_frames_++;
-    this->current_frame_ = newFrame;
     frames_.push_back(newFrame);
+    num_frames_++;
 }
 
 void System::AddKeyFrame(int id) {
-    if(id > this->current_frame_->idFrame_){
+    if(id > current_frame_->idFrame_){
         cout << "Can not add keyframe because frame " << id << " is not part of the systems frames" << endl;
         cout << "Exiting ..." << endl;
         exit(0);
     }
     
     Frame* newKeyFrame   = new Frame();
-    newKeyFrame = frames_[this->num_frames_ - 1];
+    newKeyFrame = frames_[num_frames_ - 1];
     current_keyframe_ = newKeyFrame;
 
-    this->frames_[this->num_frames_ - 1]->isKeyFrame_ = true;
-    this->num_keyframes_++;
+    frames_[num_frames_ - 1]->isKeyFrame_ = true;
+    num_keyframes_++;
     keyframes_.push_back(newKeyFrame);
 }
 
 void System::ShowFrame(int id) {
-    imshow("Show last frame", frames_[id]->data_);
+    imshow("Show last frame", frames_[id]->image[0]);
     waitKey(0);
 }
 
@@ -151,7 +163,7 @@ void System::AddListImages(string path) {
     }
     cout << file_names.size() << " found"  << endl;
 
-    this->images_list_ = file_names;
+    images_list_ = file_names;
 }
 
 

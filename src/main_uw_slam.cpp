@@ -21,14 +21,13 @@
 
 #include "../include/System.h"
 #include "../include/Tracker.h"
-#include "../thirdparty/Parser_Library/args.hxx"
+#include "../include/args.hxx"
 
 // C++ namespaces
 using namespace uw;
 using namespace cv;
 using namespace std;
 using namespace cv::cuda;
-
 
 int start_index;
 string images_path;
@@ -48,7 +47,8 @@ void ShowSettings() {
     cout << "Directory of images: " << images_path  << "\n" << endl;
 }
 
-int main (int argc, char *argv[]){
+int main (int argc, char *argv[]) {
+
     cout << "===================================================" << endl;
     int n_cuda_devices = cuda::getCudaEnabledDeviceCount();
     if (n_cuda_devices > 0) {
@@ -62,14 +62,14 @@ int main (int argc, char *argv[]){
     // Parse section
     try {
         parser.ParseCLI(argc, argv);
-    } catch (args::Help){
+    } catch (args::Help) {
         cout << parser;
         return 0;
-    } catch (args::ParseError e){
+    } catch (args::ParseError e) {
         cerr << e.what() << endl;
         cerr << parser;
         return 1;
-    } catch (args::ValidationError e){
+    } catch (args::ValidationError e) {
         cerr << e.what() << endl;
         cerr << parser;
         return 1;
@@ -107,9 +107,9 @@ int main (int argc, char *argv[]){
     // Start SLAM process
     for (int i=start_index; i<uwSystem->images_list_.size(); i++) {
         if (not uwSystem->initialized_) {
+            uwSystem->InitializeSystem();
             uwSystem->AddFrame(i);
             uwSystem->AddKeyFrame(i);
-            uwSystem->InitializeSystem();
         } else {
             uwSystem->AddFrame(i);
             uwSystem->Tracking();

@@ -24,11 +24,17 @@
 
 namespace uw
 {
+Tracker::Tracker() {
+    for (Mat K: K_)
+        K = Mat(3,3,CV_64FC1, Scalar(0.f));
+    for (Mat invK: invK_)
+        invK = Mat(3,3,CV_64FC1, Scalar(0.f));
+};
 
 Tracker::~Tracker(void) {};
 
 // TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com)
-//  02-13-2018 - Implement a faster way to obtain points with gradient superior of the mean threshold of 32x32 px block
+// 02-13-2018 - Implement a faster way to obtain candidate points with high gradient (above of a certain threshold)
 void Tracker::GetCandidatePoints(Frame* frame, vector<Point2d> candidatePoints) {
     // frameXGPU.create(frame->data_.size(),CV_32FC1);
     // frameYGPU.create(frame->data_.size(),CV_32FC1);
@@ -43,13 +49,13 @@ void Tracker::GetCandidatePoints(Frame* frame, vector<Point2d> candidatePoints) 
     
     //Mat showGPU
     double threshold;
-    cuda::GpuMat frameGPU(frame->data_);
+    cuda::GpuMat frameGPU(frame->image[0]);
     // Applying Laplacian filter to the image
     laplacian_->apply(frameGPU, frameGPU);
 
     // Block size search for high gradient points
-    for (int x=0; x<w_; x+=BLOCK_SIZE) {
-        for (int y =0; y<h_; y+=BLOCK_SIZE) {
+    for (int x=0; x<w_[0]; x+=BLOCK_SIZE) {
+        for (int y =0; y<h_[0]; y+=BLOCK_SIZE) {
             Scalar mean, stdev;
             Point min_loc, max_loc;
             double min, max;
@@ -61,11 +67,28 @@ void Tracker::GetCandidatePoints(Frame* frame, vector<Point2d> candidatePoints) 
             if( max > threshold ){
                 max_loc.x += x;
                 max_loc.y += y;
-                this->candidatePoints_.push_back(max_loc);
+                frame->candidatePoints_.push_back(max_loc);
             }
         }
     }
     //DebugShowCandidatePoints(frame);
+}
+
+void Tracker::EstimatePose(Frame* previous_frame, Frame* current_frame){
+    const int warp_mode = MOTION_HOMOGRAPHY;
+    Mat aligned;
+    Mat warp_matrix = Mat::eye(3, 3, CV_32F);
+    
+    for (int i=PYRAMID_LEVELS-1; i<0; i--) {
+        findTransformECC(previous_frame->image[i], current_frame->image[i], warp_matrix, warp_mode);
+        warpPerspective(current_frame->image[i], aligned, warp_matrix,previous_frame->image[i].size(), INTER_LINEAR + WARP_INVERSE_MAP);
+    }
+
+    imshow("hey", current_frame->image[0]);
+    waitKey(0);
+    imshow("hey", aligned); 
+    waitKey(0);
+
 }
 
 void Tracker::WarpFunction(){
@@ -89,15 +112,49 @@ void Tracker::WarpFunction(){
 
 void Tracker::DebugShowCandidatePoints(Frame* frame){
     Mat showPoints;
-    cvtColor(frame->data_, showPoints, CV_GRAY2RGB);
+    cvtColor(frame->image[0], showPoints, CV_GRAY2RGB);
     
-    for( int i=0; i<this->candidatePoints_.size(); i++ )
-        circle(showPoints, candidatePoints_[i], 2, Scalar(255,0,0), 1, 8, 0);
+    for( int i=0; i<frame->candidatePoints_.size(); i++ )
+        circle(showPoints, frame->candidatePoints_[i], 2, Scalar(255,0,0), 1, 8, 0);
 
     imshow("Show candidates points", showPoints);
     waitKey(0);
-    this->candidatePoints_.clear();
+    frame->candidatePoints_.clear();
 }
 
+void Tracker::InitializePyramid(int _width, int _height, Mat K) {
+    w_[0] = _width;
+    h_[0] = _height;
+    K_[0] = K;
+    invK_[0] = K.inv();
+
+    fx_[0] = K.at<double>(0,0);
+    fy_[0] = K.at<double>(1,1);
+    cx_[0] = K.at<double>(0,2);
+    cy_[0] = K.at<double>(1,2);
+    
+    for (int lvl = 1; lvl < PYRAMID_LEVELS; lvl++) {
+        w_[lvl] = _width >> lvl;
+        h_[lvl] = _height >> lvl;
+        
+        fx_[lvl] = fx_[lvl-1] * 0.5;
+        fy_[lvl] = fy_[lvl-1] * 0.5;
+        cx_[lvl] = (cx_[0] + 0.5) / ((int)1<<lvl) - 0.5;
+        cy_[lvl] = (cy_[0] + 0.5) / ((int)1<<lvl) - 0.5;
+
+        K_[lvl] = Mat::eye(Size(3,3), CV_64FC1);
+        K_[lvl].at<double>(0,0) = fx_[lvl];
+        K_[lvl].at<double>(1,1) = fy_[lvl];
+        K_[lvl].at<double>(0,2) = cx_[lvl];  
+        K_[lvl].at<double>(1,2) = cy_[lvl];    
+
+        invK_[lvl] = K_[lvl].inv();
+        invfx_[lvl] = invK_[lvl].at<double>(0,0);
+        invfy_[lvl] = invK_[lvl].at<double>(1,1);
+        invcx_[lvl] = invK_[lvl].at<double>(0,2);
+        invcy_[lvl] = invK_[lvl].at<double>(1,2);
+
+    }
+}
 
 }

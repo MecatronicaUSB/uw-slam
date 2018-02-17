@@ -35,6 +35,8 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include "opencv2/calib3d.hpp"
+#include <opencv2/video.hpp>
+
 
 /// CUDA specific libraries
 #include <opencv2/cudafilters.hpp>
@@ -61,14 +63,15 @@ public:
 class Tracker
 {
 public:
+    Tracker();
     ~Tracker();
+    void InitializePyramid(int _width, int _height, Mat K);
+    void EstimatePose(Frame* previous_frame, Frame* current_frame);
     void GetCandidatePoints(Frame* frame, vector<Point2d> candidatePoints);
     void DebugShowCandidatePoints(Frame* frame);
 
 
     void WarpFunction();
-
-    vector<Point2d> candidatePoints_;
 
 
     // Filters for calculating gradient in images
@@ -76,9 +79,20 @@ public:
     Ptr<cuda::Filter> soberY_ = cuda::createSobelFilter(0, CV_32FC1, 0, 1, CV_SCHARR, 1.0, BORDER_DEFAULT);
     Ptr<cuda::Filter> laplacian_ = cuda::createLaplacianFilter(0, 0, 1, 1.0);
 
+    vector<int> w_ = vector<int>(PYRAMID_LEVELS);
+    vector<int> h_ = vector<int>(PYRAMID_LEVELS);
 
-    int w_, h_;
+    vector<float> fx_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> fy_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> cx_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> cy_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> invfx_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> invfy_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> invcx_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> invcy_ = vector<float>(PYRAMID_LEVELS);
 
+    vector<Mat> K_ = vector<Mat>(PYRAMID_LEVELS);
+    vector<Mat> invK_ = vector<Mat>(PYRAMID_LEVELS);
 };
 
 

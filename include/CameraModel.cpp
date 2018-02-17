@@ -31,7 +31,8 @@ void CameraModel::GetCameraModel(string calibration_path) {
     valid_ = true;
 
     // Reading intrinsic parameters and distortion coefficients from file
-    Mat calibration_values, distortion_values;
+    Mat calibration_values = Mat(1, 4, CV_64FC1, Scalar(0.0));
+    Mat distortion_values  = Mat(1, 4, CV_64FC1, Scalar(0.0));
     FileStorage opencv_file(calibration_path, cv::FileStorage::READ);
     if (opencv_file.isOpened()) {
         cout << " ... found" << endl;
@@ -53,7 +54,7 @@ void CameraModel::GetCameraModel(string calibration_path) {
     // Saving parameters and distCoeffs
     for (int i = 0; i < 4; i++) {
         input_calibration_[i] = calibration_values.at<double>(0,i);
-		dist_coeffs_.at<float>(i,0) = distortion_values.at<double>(0,i);
+		dist_coeffs_.at<double>(i,0) = distortion_values.at<double>(0,i);
     }
 
     // Checking if the intrinsic parameters needs rescaling
@@ -74,7 +75,7 @@ void CameraModel::GetCameraModel(string calibration_path) {
     original_intrinsic_camera_.at<double>(2, 2) = 1;
 
     // If distCoeff are 0, dont apply rectification
-    if (dist_coeffs_.at<float>(0,0) == 0) {
+    if (dist_coeffs_.at<double>(0,0) == 0) {
         cout << "Distortion coefficients not found ... not rectifying" << endl;
         valid_ = false;
         output_intrinsic_camera_ = original_intrinsic_camera_;
