@@ -21,9 +21,18 @@
 
 #include "Tracker.h"
 #include "System.h"
+#include "ceres/ceres.h"
 
 namespace uw
 {
+
+struct CostFunctor {
+  template <typename T> bool operator()(const T* const x, T* residual) const {
+    residual[0] = 10.0 - x[0];
+    return true;
+  }
+};
+
 Tracker::Tracker() {
     for (Mat K: K_)
         K = Mat(3,3,CV_64FC1, Scalar(0.f));
@@ -75,19 +84,22 @@ void Tracker::GetCandidatePoints(Frame* frame, vector<Point2d> candidatePoints) 
 }
 
 void Tracker::EstimatePose(Frame* previous_frame, Frame* current_frame){
-    const int warp_mode = MOTION_HOMOGRAPHY;
-    Mat aligned;
-    Mat warp_matrix = Mat::eye(3, 3, CV_32F);
-    
-    for (int i=PYRAMID_LEVELS-1; i<0; i--) {
-        findTransformECC(previous_frame->image[i], current_frame->image[i], warp_matrix, warp_mode);
-        warpPerspective(current_frame->image[i], aligned, warp_matrix,previous_frame->image[i].size(), INTER_LINEAR + WARP_INVERSE_MAP);
-    }
+    double initial_x = previous_frame->id;
+    double x = initial_x;
 
-    imshow("hey", current_frame->image[0]);
-    waitKey(0);
-    imshow("hey", aligned); 
-    waitKey(0);
+    ceres::Problem problem;
+    ceres::CostFunction* cost_function = new ceres::AutoDiffCostFunction<CostFunctor, 1, 1>(new CostFunctor);
+    problem.AddResidualBlock(cost_function, NULL, &x);
+
+    ceres::Solver::Options options;
+    options.linear_solver_type = ceres::DENSE_QR;
+    options.minimizer_progress_to_stdout = true;
+    ceres::Solver::Summary summary;
+    ceres::Solve(options, &problem, &summary);
+
+    std::cout << summary.BriefReport() << "\n";
+    std::cout << "x : " << initial_x
+                << " -> " << x << "\n";
 
 }
 

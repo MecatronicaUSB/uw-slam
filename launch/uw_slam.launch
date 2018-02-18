@@ -1,4 +1,9 @@
 <launch>
-
-
+    <!-- UW-SLAM main thread-->
+    <node pkg="uw_slam" type="main_uw_slam" name="main"  
+        args="-d /home/fabio/Documents/datasets/EUROC/V1_02_medium/mav0/cam0/data/ 
+              -s 100" 
+        clear_params="true" />
+    <!-- Rviz visualizer-->
+    <node pkg="rviz" type="rviz" name="rviz"/>
 </launch>

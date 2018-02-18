@@ -24,6 +24,7 @@
 #include "Options.h"
 #include "CameraModel.h"
 #include "Tracker.h"
+#include "Visualizer.h"
 
 ///Basic C and C++ libraries
 #include <stdlib.h>
@@ -84,10 +85,10 @@ public:
 class System {
 public:
     /**
-     * @brief Constructor of System.
+     * @brief Constructor of System. Contains args from parser for ROS initialization.
      * 
      */
-    System();
+    System(int argc, char *argv[]);
 
     /**
      * @brief Destructor of System.
@@ -97,7 +98,7 @@ public:
 
     /**
      * @brief Configures new Intrinsic Parameters Camera Matrix with the parameters from
-     *        the calibration .xml file. Refer to sample/calibration.xml for the file structure.
+     *        the calibration .xml file. Refer to sample/calibration.xml for file structure.
      *        Camera Models supported: Pinhole, RadTan / Equidistant.
      * 
      * @param calibration_path 
@@ -156,6 +157,7 @@ public:
 
     CameraModel* camera_model_;
     Tracker* tracker_;
+    Visualizer* visualizer_;
 
     int num_frames_;
     int num_keyframes_;

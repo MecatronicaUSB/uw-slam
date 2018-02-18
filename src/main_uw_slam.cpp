@@ -19,9 +19,20 @@
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "../include/System.h"
-#include "../include/Tracker.h"
-#include "../include/args.hxx"
+#include <args.hxx>
+#include <thread>
+#include <System.h>
+#include <Tracker.h>
+
+#include <thread>
+#include <locale.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include "Eigen/Core"
+#include <boost/thread.hpp>
+#include "sophus/se3.hpp"
 
 // C++ namespaces
 using namespace uw;
@@ -33,13 +44,6 @@ int start_index;
 string images_path;
 std::string calibration_path;
 cuda::DeviceInfo device_info;
-
-// Args declarations
-args::ArgumentParser parser("Underwater Simultaneous Localization and Mapping.", "Author: Fabio Morales. GitHub: @fmoralesh");
-args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
-args::ValueFlag<int> start_i(parser, "start index", "Start in certain frame of the dataset (Default: 0)", {'s', "start"});
-args::ValueFlag<std::string> dir_dataset(parser, "images path", "Directory of images files", {'d', "directory"});
-args::ValueFlag<std::string> parse_calibration(parser, "calibration xml", "Name of input .xml calibration file", {'c', "calibration"});
 
 void ShowSettings() {
     cout << "CUDA enabled devices detected: " << device_info.name() << endl;
@@ -62,15 +66,17 @@ int main (int argc, char *argv[]) {
     // Parse section
     try {
         parser.ParseCLI(argc, argv);
-    } catch (args::Help) {
+    } 
+    catch (args::Help) {
         cout << parser;
         return 0;
-    } catch (args::ParseError e) {
+    } 
+    catch (args::ParseError e) {
         cerr << e.what() << endl;
         cerr << parser;
         return 1;
     } catch (args::ValidationError e) {
-        cerr << e.what() << endl;
+        cerr <<  e.what() << endl;
         cerr << parser;
         return 1;
     }
@@ -84,7 +90,7 @@ int main (int argc, char *argv[]) {
     if (parse_calibration) {
         calibration_path = args::get(parse_calibration);
     } else {
-        calibration_path = "./sample/calibration.xml";
+        calibration_path = "/home/fabio/catkin_ws/src/uw-slam/sample/calibration.xml";  // Need to change for final release
     }
     if (start_i) {
         start_index = args::get(start_i);
@@ -96,27 +102,29 @@ int main (int argc, char *argv[]) {
     ShowSettings();
 
     // Create new System
-    System* uwSystem = new System();
+    System* uwSystem = new System(argc, argv);
 
     // Calibrates system with certain Camera Model (currently only RadTan) 
     uwSystem->Calibration(calibration_path);
-
+    
     // Add list of the dataset images names
     uwSystem->AddListImages(images_path);
-
+    
     // Start SLAM process
     for (int i=start_index; i<uwSystem->images_list_.size(); i++) {
-        if (not uwSystem->initialized_) {
-            uwSystem->InitializeSystem();
-            uwSystem->AddFrame(i);
-            uwSystem->AddKeyFrame(i);
-        } else {
-            uwSystem->AddFrame(i);
-            uwSystem->Tracking();
-            cout << "OK: " << i << endl;
+        while(ros::ok()){
+            if (not uwSystem->initialized_) {
+                uwSystem->InitializeSystem();
+                uwSystem->AddFrame(i);
+                uwSystem->AddKeyFrame(i);
+            } else {
+                uwSystem->AddFrame(i);
+                uwSystem->Tracking();
+                uwSystem->visualizer_->SendVisualization();
+                cout << "OK: " << i << endl;
+            }
         }
     }
-
     // delete [] uwSystem;
     return 0;
 }

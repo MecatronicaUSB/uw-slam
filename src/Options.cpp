@@ -19,11 +19,13 @@
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <Options.h>
+
 namespace uw{
 
-// Global constants
-extern const int PYRAMID_LEVELS;
-extern int BLOCK_SIZE;
-extern double GRADIENT_THRESHOLD;
+const int PYRAMID_LEVELS  =   4;
+double GRADIENT_THRESHOLD =   7;
+int BLOCK_SIZE            =  32;
+
 
 }

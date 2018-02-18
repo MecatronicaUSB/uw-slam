@@ -1,6 +1,6 @@
 /**
 * This file is part of UW-SLAM.
-* 
+*
 * Copyright 2018.
 * Developed by Fabio Morales,
 * Email: fabmoraleshidalgo@gmail.com; GitHub: @fmoralesh
@@ -18,19 +18,54 @@
 * You should have received a copy of the GNU General Public License
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
+#pragma once
 
-#include "../include/Options.h"
+///Basic C and C++ libraries
+#include <stdlib.h>
+#include <fstream> 
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <string>
+#include <dirent.h>
+
 /// OpenCV libraries. May need review for the final release
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include "opencv2/calib3d.hpp"
 
-namespace uw{
+// ROS libraries
+#include <ros/ros.h>
+#include <visualization_msgs/Marker.h>
+#include <image_transport/image_transport.h>
+#include <cv_bridge/cv_bridge.h>
 
-const int PYRAMID_LEVELS  =   4;
-double GRADIENT_THRESHOLD =   7;
-int BLOCK_SIZE            =  32;
+// Namespaces
+using namespace std;
 
+namespace uw
+{
+
+
+class Visualizer
+{
+public:
+    Visualizer();
+    ~Visualizer();
+
+    void ReadGroundTruthEUROC(string groundtruth_path);
+    void ReadTimeStamps();
+    void SendVisualization();
+
+    ros::NodeHandle nodehandle_camera_pose_;
+    ros::Publisher publisher_camera_pose_;
+    visualization_msgs::Marker camera_pose_;
+
+    
+    // image_transport::Publisher publisher_current_frame;
+    vector<vector<double> > ground_truth_poses_;
+
+};
 
 }

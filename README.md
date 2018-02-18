@@ -14,6 +14,8 @@ UW-SLAM is a free and open hardware licensed under the [GPL-3.0 License](https:/
 
 - [OpenCV 3.2](http://opencv.org) and extra modules.
 - [CUDA 8.0](https://developer.nvidia.com/cuda-toolkit-archive).
+- [Eigen 3]().
+- [Sophus]().
 - [ROS Kinetic](http://wiki.ros.org/kinetic/Installation).
 
 ## Getting Started

@@ -20,8 +20,7 @@
 */
 
 #pragma once
-#include "Options.h"
-
+#include <Options.h>
 ///Basic C and C++ libraries
 #include <stdlib.h>
 #include <iostream>
@@ -37,6 +36,8 @@
 #include "opencv2/calib3d.hpp"
 #include <opencv2/video.hpp>
 
+// Eigen library
+#include <eigen3/Eigen/Core>
 
 /// CUDA specific libraries
 #include <opencv2/cudafilters.hpp>

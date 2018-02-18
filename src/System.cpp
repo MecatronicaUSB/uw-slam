@@ -1,6 +1,6 @@
 /**
 * This file is part of UW-SLAM.
-* 
+*
 * Copyright 2018.
 * Developed by Fabio Morales,
 * Email: fabmoraleshidalgo@gmail.com; GitHub: @fmoralesh
@@ -26,7 +26,9 @@
 namespace uw
 {
 
-System::System(void) {
+System::System(int argc, char *argv[]) {
+    ros::init(argc, argv, "uw_slam");
+
     initialized_ = false;
     rectification_valid_ = false;
     num_frames_     = 0;
@@ -73,32 +75,36 @@ void System::InitializeSystem() {
 
     tracker_ = new Tracker();
     tracker_->InitializePyramid(w_, h_, K_);
-    
+
+    ros::NodeHandle nodehandle_camera_pose;
+    visualizer_ = new Visualizer();
+    visualizer_->ReadGroundTruthEUROC("/home/fabio/Documents/datasets/EUROC/V1_02_medium/mav0/state_groundtruth_estimate/data.csv");
+
     cout << "Initializing system ... done" << endl;
-    initialized_ = true;       
+    initialized_ = true;
 }
 
 void System::Tracking() {
-    tracker_->EstimatePose(previous_frame_, current_frame_);
-    //tracker_->GetCandidatePoints(current_frame_, current_frame_->candidatePoints_);
+    // tracker_->EstimatePose(previous_frame_, current_frame_);
+    // tracker_->GetCandidatePoints(current_frame_, current_frame_->candidatePoints_);
     // tracker->warpFunction();
 }
 
 void System::AddFrame(int id) {
     Frame* newFrame   = new Frame();
-    newFrame->idFrame_ = id;    
+    newFrame->idFrame_ = id;
     newFrame->image[0]   = imread(images_list_[id], CV_LOAD_IMAGE_GRAYSCALE);
-            
+
     if (rectification_valid_)
         remap(newFrame->image[0], newFrame->image[0], map1_, map2_, INTER_LINEAR);
-    
+
     for (int i=1; i<PYRAMID_LEVELS; i++)
         resize(newFrame->image[i-1], newFrame->image[i], Size(), 0.5, 0.5);
-    
-    // for (int i=0; i<PYRAMID_LEVELS; i++){
-    //     imshow("", newFrame->image[i]);
-    //     waitKey(0);
-    // }
+
+    for (int i=0; i<PYRAMID_LEVELS; i++){
+        imshow("", newFrame->image[i]);
+        waitKey(0);
+    }
     if (num_frames_ == 0) {
         current_frame_ = newFrame;
     } else {
@@ -115,7 +121,7 @@ void System::AddKeyFrame(int id) {
         cout << "Exiting ..." << endl;
         exit(0);
     }
-    
+
     Frame* newKeyFrame   = new Frame();
     newKeyFrame = frames_[num_frames_ - 1];
     current_keyframe_ = newKeyFrame;

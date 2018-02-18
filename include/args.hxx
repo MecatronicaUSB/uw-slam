@@ -40,6 +40,7 @@
 #include <unordered_set>
 #include <type_traits>
 
+
 #ifdef ARGS_TESTNAMESPACE
 namespace argstest
 {
@@ -2245,7 +2246,7 @@ namespace args
                         } else
                         {
 #ifndef ARGS_NOEXCEPT
-                            throw ParseError("Passed in argument, but no positional arguments were ready to receive it: " + chunk);
+                            //throw ParseError("Passed in argument, but no positional arguments were ready to receive it: " + chunk);
 #else
                             error = Error::Parse;
                             return it;
@@ -3654,5 +3655,12 @@ namespace args
             }
     };
 }
+
+// Args declarations
+args::ArgumentParser parser("Underwater Simultaneous Localization and Mapping.", "Author: Fabio Morales. GitHub: @fmoralesh");
+args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
+args::ValueFlag<int> start_i(parser, "start index", "Start in certain frame of the dataset (Default: 0)", {'s', "start"});
+args::ValueFlag<std::string> dir_dataset(parser, "images path", "Directory of images files", {'d', "directory"});
+args::ValueFlag<std::string> parse_calibration(parser, "calibration xml", "Name of input .xml calibration file", {'c', "calibration"});
 
 #endif
