@@ -36,8 +36,14 @@
 #include "opencv2/calib3d.hpp"
 #include <opencv2/video.hpp>
 
+// Ceres library
+#include "ceres/ceres.h"
+
 // Eigen library
 #include <eigen3/Eigen/Core>
+
+// Sophus
+#include "sophus/se3.hpp"
 
 /// CUDA specific libraries
 #include <opencv2/cudafilters.hpp>
@@ -68,11 +74,11 @@ public:
     ~Tracker();
     void InitializePyramid(int _width, int _height, Mat K);
     void EstimatePose(Frame* previous_frame, Frame* current_frame);
-    void GetCandidatePoints(Frame* frame, vector<Point2d> candidatePoints);
+    void GetCandidatePoints(Frame* frame);
     void DebugShowCandidatePoints(Frame* frame);
 
 
-    void WarpFunction();
+    void WarpFunction(Frame* previous_image , Frame* current_image);
 
 
     // Filters for calculating gradient in images

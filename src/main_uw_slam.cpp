@@ -31,8 +31,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include "Eigen/Core"
-#include <boost/thread.hpp>
-#include "sophus/se3.hpp"
+
 
 // C++ namespaces
 using namespace uw;

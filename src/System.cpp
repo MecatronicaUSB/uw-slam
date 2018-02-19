@@ -40,6 +40,12 @@ System::~System(void) {
 }
 
 Frame::Frame(void) {
+    rigid_body_transformation_ = Mat::zeros(4,4, CV_64FC1);
+    rigid_body_transformation_.at<double>(0,0) = 1.0;
+    rigid_body_transformation_.at<double>(1,1) = 1.0;
+    rigid_body_transformation_.at<double>(2,2) = 1.0;
+    rigid_body_transformation_.at<double>(3,3) = 1.0;
+    
     idFrame_    = 0;
     isKeyFrame_ = false;
 }
@@ -85,14 +91,14 @@ void System::InitializeSystem() {
 void System::Tracking() {
     visualizer_->SendVisualization(current_frame_->image[0]);
     // tracker_->EstimatePose(previous_frame_, current_frame_);
-    // tracker_->GetCandidatePoints(current_frame_, current_frame_->candidatePoints_);
-    // tracker->warpFunction();
+    //tracker_->GetCandidatePoints(previous_frame_);
+    //tracker_->WarpFunction(previous_frame_, current_frame_);
 }
 
 void System::AddFrame(int id) {
     Frame* newFrame   = new Frame();
     newFrame->idFrame_ = id;
-    newFrame->image[0]   = imread(images_list_[id], CV_LOAD_IMAGE_GRAYSCALE);
+    newFrame->image[0] = imread(images_list_[id], CV_LOAD_IMAGE_GRAYSCALE);
 
     if (rectification_valid_)
         remap(newFrame->image[0], newFrame->image[0], map1_, map2_, INTER_LINEAR);

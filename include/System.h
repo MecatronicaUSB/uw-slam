@@ -76,7 +76,7 @@ public:
 
     int id;
     vector<Mat> image = vector<Mat>(PYRAMID_LEVELS);
-    vector<Point2d> candidatePoints_;
+    Mat candidatePoints_;
     vector<float> map_;
     Mat rigid_body_transformation_;
     int idFrame_;

@@ -21,7 +21,7 @@
 
 #include "Tracker.h"
 #include "System.h"
-#include "ceres/ceres.h"
+
 
 namespace uw
 {
@@ -44,8 +44,8 @@ Tracker::~Tracker(void) {};
 
 // TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com)
 // 02-13-2018 - Implement a faster way to obtain candidate points with high gradient (above of a certain threshold)
-void Tracker::GetCandidatePoints(Frame* frame, vector<Point2d> candidatePoints) {
-    // frameXGPU.create(frame->data_.size(),CV_32FC1);
+void Tracker::GetCandidatePoints(Frame* frame) {
+    // frameXGPU.create(frame->data_.size(),CV_32FC1); (double) (double)
     // frameYGPU.create(frame->data_.size(),CV_32FC1);
     // Mat showGPU, frameX, frameY;
     // frameXGPU.upload(frame->data_);
@@ -61,10 +61,11 @@ void Tracker::GetCandidatePoints(Frame* frame, vector<Point2d> candidatePoints) 
     cuda::GpuMat frameGPU(frame->image[0]);
     // Applying Laplacian filter to the image
     laplacian_->apply(frameGPU, frameGPU);
-
+    int i = 0;
     // Block size search for high gradient points
     for (int x=0; x<w_[0]; x+=BLOCK_SIZE) {
         for (int y =0; y<h_[0]; y+=BLOCK_SIZE) {
+            Mat point = Mat::ones(1,4,CV_64FC1);
             Scalar mean, stdev;
             Point min_loc, max_loc;
             double min, max;
@@ -74,14 +75,49 @@ void Tracker::GetCandidatePoints(Frame* frame, vector<Point2d> candidatePoints) 
             cuda::minMaxLoc(block, &min, &max, &min_loc, &max_loc);
 
             if( max > threshold ){
-                max_loc.x += x;
-                max_loc.y += y;
-                frame->candidatePoints_.push_back(max_loc);
+                point.at<double>(0,0) = x + max_loc.x;
+                point.at<double>(0,1) = y + max_loc.y;
+                frame->candidatePoints_.push_back(point);
             }
         }
     }
-    //DebugShowCandidatePoints(frame);
 }
+
+void Tracker::WarpFunction(Frame* previous_frame, Frame* current_frame){
+
+    // DebugShowCandidatePoints(previous_frame);
+
+    // imshow("Next", current_frame->image[0]);
+    // waitKey(0);
+
+    // cout << "Prev" << endl;
+    // cout << previous_frame->candidatePoints_.at<double>(previous_frame->candidatePoints_.rows-1,0) << " "
+    //      << previous_frame->candidatePoints_.at<double>(previous_frame->candidatePoints_.rows-1,1) << " "
+    //      << previous_frame->candidatePoints_.at<double>(previous_frame->candidatePoints_.rows-1,2) << " "
+    //      << previous_frame->candidatePoints_.at<double>(previous_frame->candidatePoints_.rows-1,3) << endl;
+
+    // cout << "Now" << endl;
+    // cout << previous_frame->candidatePoints_.at<double>(0,0) << " "
+    //      << previous_frame->candidatePoints_.at<double>(0,1) << " "
+    //      << previous_frame->candidatePoints_.at<double>(0,2) << " "
+    //      << previous_frame->candidatePoints_.at<double>(0,3) << endl;
+
+    previous_frame->rigid_body_transformation_.at<double>(0,3) = 0.0;
+    previous_frame->rigid_body_transformation_.at<double>(1,3) = 0.0;
+    previous_frame->rigid_body_transformation_.at<double>(2,3) = 30.0;
+    
+    cout << previous_frame->rigid_body_transformation_ << endl;
+    current_frame->candidatePoints_ = previous_frame->candidatePoints_ * previous_frame->rigid_body_transformation_.t();
+
+    // DebugShowCandidatePoints(current_frame);
+    // waitKey(0);
+
+    //cuda::gemm(KGPU, NGPU, 1.0, cuda::GpuMat(), 0.0, ResultGPU);
+    //cuda::multiply(KGPU, NGPU, ResultGPU);
+
+    previous_frame->candidatePoints_.release();
+
+}   
 
 void Tracker::EstimatePose(Frame* previous_frame, Frame* current_frame){
     double initial_x = previous_frame->id;
@@ -103,35 +139,20 @@ void Tracker::EstimatePose(Frame* previous_frame, Frame* current_frame){
 
 }
 
-void Tracker::WarpFunction(){
-    cuda::GpuMat a(1,1,CV_32F);
-    Mat K = (Mat_<double>(3,3) << 1,1,1,     2,2,2,      3,3,3);
-    Mat N = (Mat_<double>(3,1) << 1,2,3);
-    cout << N << endl;
-    cout << K << endl;
-    cuda::GpuMat KGPU;
-    cuda::GpuMat NGPU;
-    cuda::GpuMat ResultGPU;
-    Mat Result;
-    KGPU.upload(K);
-    NGPU.upload(N);
-    cuda::gemm(KGPU, NGPU, 1.0, cuda::GpuMat(), 0.0, ResultGPU);
-    //cuda::multiply(KGPU, NGPU, ResultGPU);
-    ResultGPU.download(Result);
-    cout << Result << endl;
-}   
-
 
 void Tracker::DebugShowCandidatePoints(Frame* frame){
     Mat showPoints;
     cvtColor(frame->image[0], showPoints, CV_GRAY2RGB);
     
-    for( int i=0; i<frame->candidatePoints_.size(); i++ )
-        circle(showPoints, frame->candidatePoints_[i], 2, Scalar(255,0,0), 1, 8, 0);
+    for( int i=0; i<frame->candidatePoints_.rows; i++) {
+        Point2d point;
+        point.x = frame->candidatePoints_.at<double>(i,0) / frame->candidatePoints_.at<double>(i,3);
+        point.y = frame->candidatePoints_.at<double>(i,1) / frame->candidatePoints_.at<double>(i,3);
+
+        circle(showPoints, point, 2, Scalar(255,0,0), 1, 8, 0);
+    }
 
     imshow("Show candidates points", showPoints);
-    waitKey(0);
-    frame->candidatePoints_.clear();
 }
 
 void Tracker::InitializePyramid(int _width, int _height, Mat K) {

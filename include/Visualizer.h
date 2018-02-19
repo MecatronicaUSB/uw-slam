@@ -60,8 +60,11 @@ public:
     void ReadTimeStamps();
     void SendVisualization(Mat image);
 
-    ros::Publisher publisher_camera_pose_;
+    ros::Publisher publisher_ground_truth_pose_;
     visualization_msgs::Marker ground_truth_pose_;
+
+    ros::Publisher publisher_camera_pose_;
+    visualization_msgs::Marker camera_pose_;
 
     image_transport::Publisher publisher_current_frame_;
 
