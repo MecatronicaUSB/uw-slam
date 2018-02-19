@@ -78,14 +78,12 @@ void System::InitializeSystem() {
 
     visualizer_ = new Visualizer(start_index_, images_list_.size(), ground_truth_path_);
 
-
-    visualizer_->ReadGroundTruthEUROC("/home/fabio/Documents/datasets/EUROC/V1_02_medium/mav0/state_groundtruth_estimate/data.csv");
-
     cout << "Initializing system ... done" << endl;
     initialized_ = true;
 }
 
 void System::Tracking() {
+    visualizer_->SendVisualization(current_frame_->image[0]);
     // tracker_->EstimatePose(previous_frame_, current_frame_);
     // tracker_->GetCandidatePoints(current_frame_, current_frame_->candidatePoints_);
     // tracker->warpFunction();

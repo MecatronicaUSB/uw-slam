@@ -49,7 +49,10 @@ cuda::DeviceInfo device_info;
 void ShowSettings() {
     cout << "CUDA enabled devices detected: " << device_info.name() << endl;
     cout << "Directory of calibration xml file: " << calibration_path << endl;
-    cout << "Directory of images: " << images_path  << "\n" << endl;
+    cout << "Directory of images: " << images_path  << endl;
+    if (not (ground_truth_path == ""))
+        cout << "Directory of ground truth poses: " << ground_truth_path << endl;
+    cout << endl;
 }
 
 int main (int argc, char *argv[]) {
@@ -125,7 +128,7 @@ int main (int argc, char *argv[]) {
         } else {
             uwSystem->AddFrame(i);
             uwSystem->Tracking();    
-            uwSystem->visualizer_->SendVisualization(uwSystem->current_frame_->image[0]);
+            //uwSystem->visualizer_->SendVisualization(uwSystem->current_frame_->image[0]);
         
         }
     }

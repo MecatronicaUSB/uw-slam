@@ -26,14 +26,12 @@ namespace uw
 
 Visualizer::Visualizer(int start_index, int num_images, string ground_truth_path){
     
-    use_ground_truth = false;
-    ground_truth_index = 0;
+    use_ground_truth_ = false;
     num_images_ = num_images;
 
     if (not (ground_truth_path == "")){
-        use_ground_truth = true;
-        ground_truth_index = start_index + 120; 
-        ReadGroundTruthEUROC(ground_truth_path);
+        use_ground_truth_ = true;
+        ReadGroundTruthEUROC(start_index, ground_truth_path);
     }
 
     ros::NodeHandle nodehandle_camera_pose;
@@ -48,7 +46,7 @@ Visualizer::Visualizer(int start_index, int num_images, string ground_truth_path
     ground_truth_pose.header.frame_id = "/camera_pose";            // Set the frame ID and timestamp. See the TF tutorials for information on these.
     ground_truth_pose.header.stamp = ros::Time::now();
     ground_truth_pose.ns = "uw_slam";                              // Set the namespace and id for this camera_pose.  This serves to create a unique ID. Any camera_pose. sent with the same namespace and id will overwrite the old one
-    ground_truth_pose.type = visualization_msgs::Marker::ARROW;     // Set the camera_pose. type.  Initially this is CUBE, and cycles between that and SPHERE, ARROW, and CYLINDER
+    ground_truth_pose.type = visualization_msgs::Marker::ARROW;    // Set the camera_pose. type.  Initially this is CUBE, and cycles between that and SPHERE, ARROW, and CYLINDER
     ground_truth_pose.action = visualization_msgs::Marker::ADD;    // Set the camera_pose. action.  Options are ADD, DELETE and DELETEALL
     ground_truth_pose.pose.position.x = 0;  
     ground_truth_pose.pose.position.y = 0;
@@ -74,17 +72,19 @@ Visualizer::Visualizer(int start_index, int num_images, string ground_truth_path
 
 void Visualizer::SendVisualization(Mat image){
 
-    ros::Rate r(60);
+    ros::Rate r(40);
     sensor_msgs::ImagePtr current_frame = cv_bridge::CvImage(std_msgs::Header(), "mono8", image).toImageMsg();
 
-    ground_truth_pose_.pose.position.x = ground_truth_poses_[ground_truth_index][0];
-    ground_truth_pose_.pose.position.y = ground_truth_poses_[ground_truth_index][1];
-    ground_truth_pose_.pose.position.z = ground_truth_poses_[ground_truth_index][2];
-    ground_truth_pose_.pose.orientation.x = ground_truth_poses_[ground_truth_index][4];           // Orientation of camera_pose.
-    ground_truth_pose_.pose.orientation.y = ground_truth_poses_[ground_truth_index][5];        
-    ground_truth_pose_.pose.orientation.z = ground_truth_poses_[ground_truth_index][6];      
-    ground_truth_pose_.pose.orientation.w = ground_truth_poses_[ground_truth_index][3]; 
-    ground_truth_index += ground_truth_step;
+    if (use_ground_truth_) {
+        ground_truth_pose_.pose.position.x = ground_truth_poses_[ground_truth_index_][0];
+        ground_truth_pose_.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
+        ground_truth_pose_.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
+        ground_truth_pose_.pose.orientation.x = ground_truth_poses_[ground_truth_index_][4];           
+        ground_truth_pose_.pose.orientation.y = ground_truth_poses_[ground_truth_index_][5];        
+        ground_truth_pose_.pose.orientation.z = ground_truth_poses_[ground_truth_index_][6];      
+        ground_truth_pose_.pose.orientation.w = ground_truth_poses_[ground_truth_index_][3]; 
+        ground_truth_index_ += ground_truth_step_;
+    }
 
     // Publish the marker
     while (publisher_camera_pose_.getNumSubscribers() < 1 && publisher_current_frame_.getNumSubscribers() < 1) {
@@ -98,13 +98,16 @@ void Visualizer::SendVisualization(Mat image){
     }
     r.sleep();
 
-    publisher_camera_pose_.publish(ground_truth_pose_);
     publisher_current_frame_.publish(current_frame);
+
+    if (use_ground_truth_)
+        publisher_camera_pose_.publish(ground_truth_pose_);
+
     ros::spinOnce();
 
 };
 
-void Visualizer::ReadGroundTruthEUROC(string groundtruth_path) {
+void Visualizer::ReadGroundTruthEUROC(int start_index, string groundtruth_path) {
     string delimiter = ",";
     string line = "";
     ifstream file(groundtruth_path);
@@ -128,8 +131,8 @@ void Visualizer::ReadGroundTruthEUROC(string groundtruth_path) {
     }
     file.close();
     num_ground_truth_poses_ = ground_truth_poses_.size();
-    ground_truth_step = num_ground_truth_poses_ / num_images_ ;
-    ground_truth_index *= ground_truth_step;
+    ground_truth_step_ = num_ground_truth_poses_ / num_images_ ;
+    ground_truth_index_ = start_index * ground_truth_step_ + 600;  // + 600 is a temporarly fix for syncronous video and pose of ground truth
 }
 
 

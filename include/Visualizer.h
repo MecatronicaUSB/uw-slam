@@ -56,7 +56,7 @@ public:
     Visualizer(int start_index_, int num_images, string ground_truth_path);
     ~Visualizer();
     void InitializeImageMsg();
-    void ReadGroundTruthEUROC(string groundtruth_path);
+    void ReadGroundTruthEUROC(int start_index, string groundtruth_path);
     void ReadTimeStamps();
     void SendVisualization(Mat image);
 
@@ -68,10 +68,10 @@ public:
     string ground_truth_path_;
     vector<vector<double> > ground_truth_poses_;
     int num_images_, num_ground_truth_poses_;
-    int ground_truth_step;
-    int ground_truth_index;
+    int ground_truth_step_;
+    int ground_truth_index_;
 
-    bool use_ground_truth;
+    bool use_ground_truth_;
 };
 
 }
