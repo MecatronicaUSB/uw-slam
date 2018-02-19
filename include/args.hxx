@@ -3661,6 +3661,7 @@ args::ArgumentParser parser("Underwater Simultaneous Localization and Mapping.",
 args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
 args::ValueFlag<int> start_i(parser, "start index", "Start in certain frame of the dataset (Default: 0)", {'s', "start"});
 args::ValueFlag<std::string> dir_dataset(parser, "images path", "Directory of images files", {'d', "directory"});
+args::ValueFlag<std::string> dir_groundtruth(parser, "groundtruth path", "Directory of ground truth poses (EUROC dataset)", {'g', "groundtruth"});
 args::ValueFlag<std::string> parse_calibration(parser, "calibration xml", "Name of input .xml calibration file", {'c', "calibration"});
 
 #endif

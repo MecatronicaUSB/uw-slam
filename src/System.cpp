@@ -76,8 +76,9 @@ void System::InitializeSystem() {
     tracker_ = new Tracker();
     tracker_->InitializePyramid(w_, h_, K_);
 
-    ros::NodeHandle nodehandle_camera_pose;
-    visualizer_ = new Visualizer(start_index_, images_list_.size());
+    visualizer_ = new Visualizer(start_index_, images_list_.size(), ground_truth_path_);
+
+
     visualizer_->ReadGroundTruthEUROC("/home/fabio/Documents/datasets/EUROC/V1_02_medium/mav0/state_groundtruth_estimate/data.csv");
 
     cout << "Initializing system ... done" << endl;
@@ -141,7 +142,7 @@ void System::AddFramesGroup(int id, int num_images) {
         System::AddFrame(i);
 }
 
-void System::AddListImages(string path) {
+void System::AddListImages(string path, string ground_truth_path) {
     vector<string> file_names;
     DIR *dir;
     struct dirent *ent;
@@ -169,6 +170,7 @@ void System::AddListImages(string path) {
     }
     cout << file_names.size() << " found"  << endl;
 
+    ground_truth_path_ = ground_truth_path;
     images_list_ = file_names;
 }
 

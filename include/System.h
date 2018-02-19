@@ -143,10 +143,12 @@ public:
 
     /**
      * @brief Adds a list of images path to the system, for future reading of the frames.
+     *        Propagates ground_truth_path to later use of Visualizer (optional).
      * 
      * @param path 
+     * @param ground_truth_path 
      */
-    void AddListImages(string path);
+    void AddListImages(string path, string ground_truth_path);
 
     /**
      * @brief Fast function to show an id frame. Only used for debuggin purposes.
@@ -172,7 +174,8 @@ public:
     vector<Frame*> frames_;
     vector<Frame*> keyframes_;
     vector<string> images_list_;
-    
+    string ground_truth_path_;
+
     Mat K_;
     Mat map1_, map2_;
 

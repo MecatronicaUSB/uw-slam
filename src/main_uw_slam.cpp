@@ -42,7 +42,8 @@ using namespace cv::cuda;
 
 int start_index;
 string images_path;
-std::string calibration_path;
+string calibration_path;
+string ground_truth_path;
 cuda::DeviceInfo device_info;
 
 void ShowSettings() {
@@ -86,7 +87,12 @@ int main (int argc, char *argv[]) {
         return 1;
     } else {
         images_path = args::get(dir_dataset);
-    } 
+    }
+    if (dir_groundtruth) {
+        ground_truth_path = args::get(dir_groundtruth);
+    } else {
+        ground_truth_path = "";  // Need to change for final release
+    }
     if (parse_calibration) {
         calibration_path = args::get(parse_calibration);
     } else {
@@ -107,8 +113,8 @@ int main (int argc, char *argv[]) {
     // Calibrates system with certain Camera Model (currently only RadTan) 
     uwSystem->Calibration(calibration_path);
     
-    // Add list of the dataset images names
-    uwSystem->AddListImages(images_path);
+    // Add list of the dataset images names (optionally ground truth reference)
+    uwSystem->AddListImages(images_path, ground_truth_path);
     
     // Start SLAM process
     for (int i=start_index; i<uwSystem->images_list_.size(); i++) {
@@ -118,9 +124,8 @@ int main (int argc, char *argv[]) {
             uwSystem->AddKeyFrame(i);
         } else {
             uwSystem->AddFrame(i);
-            uwSystem->Tracking();
+            uwSystem->Tracking();    
             uwSystem->visualizer_->SendVisualization(uwSystem->current_frame_->image[0]);
-            cout << "OK: " << i << endl;            
         
         }
     }

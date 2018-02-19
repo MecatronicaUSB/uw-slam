@@ -53,25 +53,25 @@ class System;
 class Visualizer
 {
 public:
-    Visualizer(int start_index_, int num_images);
+    Visualizer(int start_index_, int num_images, string ground_truth_path);
     ~Visualizer();
-
+    void InitializeImageMsg();
     void ReadGroundTruthEUROC(string groundtruth_path);
     void ReadTimeStamps();
     void SendVisualization(Mat image);
 
-    ros::NodeHandle nodehandle_camera_pose_;
     ros::Publisher publisher_camera_pose_;
-    visualization_msgs::Marker camera_pose_;
+    visualization_msgs::Marker ground_truth_pose_;
 
-    ros::NodeHandle nh_current_frame_;
-    //image_transport::ImageTransport node_current_frame_(nh_current_frame_);
     image_transport::Publisher publisher_current_frame_;
 
+    string ground_truth_path_;
     vector<vector<double> > ground_truth_poses_;
     int num_images_, num_ground_truth_poses_;
     int ground_truth_step;
     int ground_truth_index;
+
+    bool use_ground_truth;
 };
 
 }
