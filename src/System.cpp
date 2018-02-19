@@ -26,9 +26,9 @@
 namespace uw
 {
 
-System::System(int argc, char *argv[]) {
+System::System(int argc, char *argv[], int start_index) {
     ros::init(argc, argv, "uw_slam");
-
+    start_index_ = start_index;
     initialized_ = false;
     rectification_valid_ = false;
     num_frames_     = 0;
@@ -77,7 +77,7 @@ void System::InitializeSystem() {
     tracker_->InitializePyramid(w_, h_, K_);
 
     ros::NodeHandle nodehandle_camera_pose;
-    visualizer_ = new Visualizer();
+    visualizer_ = new Visualizer(start_index_, images_list_.size());
     visualizer_->ReadGroundTruthEUROC("/home/fabio/Documents/datasets/EUROC/V1_02_medium/mav0/state_groundtruth_estimate/data.csv");
 
     cout << "Initializing system ... done" << endl;
@@ -101,10 +101,10 @@ void System::AddFrame(int id) {
     for (int i=1; i<PYRAMID_LEVELS; i++)
         resize(newFrame->image[i-1], newFrame->image[i], Size(), 0.5, 0.5);
 
-    for (int i=0; i<PYRAMID_LEVELS; i++){
-        imshow("", newFrame->image[i]);
-        waitKey(0);
-    }
+    // for (int i=0; i<PYRAMID_LEVELS; i++){
+    //     imshow("", newFrame->image[i]);
+    //     waitKey(0);
+    // }
     if (num_frames_ == 0) {
         current_frame_ = newFrame;
     } else {

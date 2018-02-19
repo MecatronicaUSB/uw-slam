@@ -57,6 +57,7 @@ namespace uw
 class CameraModel;
 class Tracker;
 class Map;
+class Visualizer;
 
 class Frame {
 public:
@@ -88,7 +89,7 @@ public:
      * @brief Constructor of System. Contains args from parser for ROS initialization.
      * 
      */
-    System(int argc, char *argv[]);
+    System(int argc, char *argv[], int start_index);
 
     /**
      * @brief Destructor of System.
@@ -159,6 +160,7 @@ public:
     Tracker* tracker_;
     Visualizer* visualizer_;
 
+    int start_index_;
     int num_frames_;
     int num_keyframes_;
     int w_, h_, w_input_, h_input_;

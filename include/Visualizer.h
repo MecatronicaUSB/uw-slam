@@ -19,6 +19,7 @@
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 #pragma once
+#include <System.h>
 
 ///Basic C and C++ libraries
 #include <stdlib.h>
@@ -47,25 +48,30 @@ using namespace std;
 namespace uw
 {
 
+class System;
 
 class Visualizer
 {
 public:
-    Visualizer();
+    Visualizer(int start_index_, int num_images);
     ~Visualizer();
 
     void ReadGroundTruthEUROC(string groundtruth_path);
     void ReadTimeStamps();
-    void SendVisualization();
+    void SendVisualization(Mat image);
 
     ros::NodeHandle nodehandle_camera_pose_;
     ros::Publisher publisher_camera_pose_;
     visualization_msgs::Marker camera_pose_;
 
-    
-    // image_transport::Publisher publisher_current_frame;
-    vector<vector<double> > ground_truth_poses_;
+    ros::NodeHandle nh_current_frame_;
+    //image_transport::ImageTransport node_current_frame_(nh_current_frame_);
+    image_transport::Publisher publisher_current_frame_;
 
+    vector<vector<double> > ground_truth_poses_;
+    int num_images_, num_ground_truth_poses_;
+    int ground_truth_step;
+    int ground_truth_index;
 };
 
 }

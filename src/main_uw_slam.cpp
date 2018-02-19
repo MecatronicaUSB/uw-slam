@@ -102,7 +102,7 @@ int main (int argc, char *argv[]) {
     ShowSettings();
 
     // Create new System
-    System* uwSystem = new System(argc, argv);
+    System* uwSystem = new System(argc, argv, start_index);
 
     // Calibrates system with certain Camera Model (currently only RadTan) 
     uwSystem->Calibration(calibration_path);
@@ -112,17 +112,16 @@ int main (int argc, char *argv[]) {
     
     // Start SLAM process
     for (int i=start_index; i<uwSystem->images_list_.size(); i++) {
-        while(ros::ok()){
-            if (not uwSystem->initialized_) {
-                uwSystem->InitializeSystem();
-                uwSystem->AddFrame(i);
-                uwSystem->AddKeyFrame(i);
-            } else {
-                uwSystem->AddFrame(i);
-                uwSystem->Tracking();
-                uwSystem->visualizer_->SendVisualization();
-                cout << "OK: " << i << endl;
-            }
+        if (not uwSystem->initialized_) {
+            uwSystem->InitializeSystem();
+            uwSystem->AddFrame(i);
+            uwSystem->AddKeyFrame(i);
+        } else {
+            uwSystem->AddFrame(i);
+            uwSystem->Tracking();
+            uwSystem->visualizer_->SendVisualization(uwSystem->current_frame_->image[0]);
+            cout << "OK: " << i << endl;            
+        
         }
     }
     // delete [] uwSystem;
