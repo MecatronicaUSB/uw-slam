@@ -22,6 +22,8 @@
 #include "Tracker.h"
 #include "System.h"
 
+// OJO IMPORTANTE
+#include <opencv2/core/eigen.hpp>
 
 namespace uw
 {
@@ -85,10 +87,8 @@ void Tracker::GetCandidatePoints(Frame* frame) {
 
 void Tracker::WarpFunction(Frame* previous_frame, Frame* current_frame){
 
-    // DebugShowCandidatePoints(previous_frame);
+    DebugShowCandidatePoints(previous_frame);
 
-    // imshow("Next", current_frame->image[0]);
-    // waitKey(0);
 
     // cout << "Prev" << endl;
     // cout << previous_frame->candidatePoints_.at<double>(previous_frame->candidatePoints_.rows-1,0) << " "
@@ -102,20 +102,56 @@ void Tracker::WarpFunction(Frame* previous_frame, Frame* current_frame){
     //      << previous_frame->candidatePoints_.at<double>(0,2) << " "
     //      << previous_frame->candidatePoints_.at<double>(0,3) << endl;
 
-    previous_frame->rigid_body_transformation_.at<double>(0,3) = 0.0;
-    previous_frame->rigid_body_transformation_.at<double>(1,3) = 0.0;
-    previous_frame->rigid_body_transformation_.at<double>(2,3) = 30.0;
+    Mat rigid = Mat(4,4,CV_64FC1);
+    eigen2cv(previous_frame->rigid_body_transformation_, rigid);
+
+    rigid.at<double>(0,3) = 5.0;
+    rigid.at<double>(1,3) = 0.0;
+    rigid.at<double>(2,3) = 0.0;
+    cout << rigid << endl;
+    cout << previous_frame->candidatePoints_.row(0) << endl;
+
+    double d = 0.5;
+
+    // DSO - SLAM Warping function 
+
+    previous_frame->candidatePoints_.col(0) *= d;
+    previous_frame->candidatePoints_.col(1) *= d;
+    previous_frame->candidatePoints_.col(2) *= d;
     
-    cout << previous_frame->rigid_body_transformation_ << endl;
-    current_frame->candidatePoints_ = previous_frame->candidatePoints_ * previous_frame->rigid_body_transformation_.t();
+    current_frame->candidatePoints_ = rigid * previous_frame->candidatePoints_.t();
 
-    // DebugShowCandidatePoints(current_frame);
-    // waitKey(0);
+    current_frame->candidatePoints_.row(0) /= current_frame->candidatePoints_.row(2);
+    current_frame->candidatePoints_.row(1) /= current_frame->candidatePoints_.row(2);
+    current_frame->candidatePoints_.row(2) /= current_frame->candidatePoints_.row(2);
+    
+    // LSD - SLAM Warping function
 
+    // previous_frame->candidatePoints_.col(0) = ((previous_frame->candidatePoints_.col(0) + cx_[0]) * invfx_[0]) * d;
+    // previous_frame->candidatePoints_.col(1) = ((previous_frame->candidatePoints_.col(1) + cy_[0]) * invfy_[0]) * d;
+    // previous_frame->candidatePoints_.col(2) = previous_frame->candidatePoints_.col(2) * d;
+
+    // current_frame->candidatePoints_ = rigid * previous_frame->candidatePoints_.t();
+
+    // current_frame->candidatePoints_.row(0) /= current_frame->candidatePoints_.row(2);
+    // current_frame->candidatePoints_.row(1) /= current_frame->candidatePoints_.row(2);
+    // current_frame->candidatePoints_.row(0) *= fx_[0];
+    // current_frame->candidatePoints_.row(1) *= fy_[0];
+    // current_frame->candidatePoints_.row(0) -= cx_[0];
+    // current_frame->candidatePoints_.row(1) -= cy_[0];
+    
+    cout << current_frame->candidatePoints_.col(0) << endl;
+    // Sophus::SE3d transformation(previous_frame->rigid_body_transformation_);
+    
+
+    //cout << previous_frame->rigid_body_transformation_ << endl;
+    DebugShowCandidatePoints(current_frame);
+    waitKey(0);
     //cuda::gemm(KGPU, NGPU, 1.0, cuda::GpuMat(), 0.0, ResultGPU);
     //cuda::multiply(KGPU, NGPU, ResultGPU);
 
     previous_frame->candidatePoints_.release();
+    current_frame->candidatePoints_.release();
 
 }   
 
@@ -146,8 +182,8 @@ void Tracker::DebugShowCandidatePoints(Frame* frame){
     
     for( int i=0; i<frame->candidatePoints_.rows; i++) {
         Point2d point;
-        point.x = frame->candidatePoints_.at<double>(i,0) / frame->candidatePoints_.at<double>(i,3);
-        point.y = frame->candidatePoints_.at<double>(i,1) / frame->candidatePoints_.at<double>(i,3);
+        point.x = frame->candidatePoints_.at<double>(i,0);
+        point.y = frame->candidatePoints_.at<double>(i,1);
 
         circle(showPoints, point, 2, Scalar(255,0,0), 1, 8, 0);
     }
@@ -166,6 +202,11 @@ void Tracker::InitializePyramid(int _width, int _height, Mat K) {
     cx_[0] = K.at<double>(0,2);
     cy_[0] = K.at<double>(1,2);
     
+    invfx_[0] = 1 / fx_[0]; 
+    invfy_[0] = 1 / fy_[0]; 
+    invcx_[0] = 1 / cx_[0]; 
+    invcy_[0] = 1 / cy_[0]; 
+
     for (int lvl = 1; lvl < PYRAMID_LEVELS; lvl++) {
         w_[lvl] = _width >> lvl;
         h_[lvl] = _height >> lvl;
@@ -181,11 +222,17 @@ void Tracker::InitializePyramid(int _width, int _height, Mat K) {
         K_[lvl].at<double>(0,2) = cx_[lvl];  
         K_[lvl].at<double>(1,2) = cy_[lvl];    
 
+        invfx_[lvl] = 1 / fx_[lvl];
+        invfy_[lvl] = 1 / fy_[lvl];
+        invcx_[lvl] = 1 / cx_[lvl];
+        invcy_[lvl] = 1 / cy_[lvl];
+
         invK_[lvl] = K_[lvl].inv();
-        invfx_[lvl] = invK_[lvl].at<double>(0,0);
-        invfy_[lvl] = invK_[lvl].at<double>(1,1);
-        invcx_[lvl] = invK_[lvl].at<double>(0,2);
-        invcy_[lvl] = invK_[lvl].at<double>(1,2);
+        // Need review 
+        // invfx_[lvl] = invK_[lvl].at<double>(0,0);
+        // invfy_[lvl] = invK_[lvl].at<double>(1,1);
+        // invcx_[lvl] = invK_[lvl].at<double>(0,2);
+        // invcy_[lvl] = invK_[lvl].at<double>(1,2);
 
     }
 }

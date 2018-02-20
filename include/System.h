@@ -78,7 +78,7 @@ public:
     vector<Mat> image = vector<Mat>(PYRAMID_LEVELS);
     Mat candidatePoints_;
     vector<float> map_;
-    Mat rigid_body_transformation_;
+    Mat44 rigid_body_transformation_;
     int idFrame_;
     bool isKeyFrame_;
 };

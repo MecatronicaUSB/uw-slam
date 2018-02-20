@@ -18,8 +18,19 @@
 * You should have received a copy of the GNU General Public License
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
+#pragma once
+#include "Eigen/Core"
+#include "sophus/sim3.hpp"
+#include "sophus/se3.hpp"
 
 namespace uw{
+
+typedef Sophus::SE3d SE3;
+typedef Sophus::Sim3d Sim3;
+typedef Sophus::SO3d SO3;
+
+typedef Eigen::Matrix<double,3,3> Mat33;
+typedef Eigen::Matrix<double,4,4> Mat44;
 
 // Global constants
 extern const int PYRAMID_LEVELS;
