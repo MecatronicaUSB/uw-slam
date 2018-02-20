@@ -27,7 +27,7 @@ namespace uw
 {
 
 System::System(int argc, char *argv[], int start_index) {
-    ros::init(argc, argv, "uw_slam");
+    ros::init(argc, argv, "uw_slam");  // Initialize ROS
     start_index_ = start_index;
     initialized_ = false;
     rectification_valid_ = false;
@@ -40,8 +40,10 @@ System::~System(void) {
 }
 
 Frame::Frame(void) {
-    rigid_body_transformation_ = Mat44().Identity();
+    rigid_transformation_ = Mat44().Identity();
     idFrame_    = 0;
+
+    obtained_gradients_ = false;
     isKeyFrame_ = false;
 }
 
@@ -84,22 +86,20 @@ void System::InitializeSystem() {
 }
 
 void System::Tracking() {
-    visualizer_->SendVisualization(current_frame_->image[0]);
-    // tracker_->EstimatePose(previous_frame_, current_frame_);
-    tracker_->GetCandidatePoints(previous_frame_);
-    tracker_->WarpFunction(previous_frame_, current_frame_);
+
+
 }
 
 void System::AddFrame(int id) {
     Frame* newFrame   = new Frame();
     newFrame->idFrame_ = id;
-    newFrame->image[0] = imread(images_list_[id], CV_LOAD_IMAGE_GRAYSCALE);
+    newFrame->image_[0] = imread(images_list_[id], CV_LOAD_IMAGE_GRAYSCALE);
 
     if (rectification_valid_)
-        remap(newFrame->image[0], newFrame->image[0], map1_, map2_, INTER_LINEAR);
+        remap(newFrame->image_[0], newFrame->image_[0], map1_, map2_, INTER_LINEAR);
 
     for (int i=1; i<PYRAMID_LEVELS; i++)
-        resize(newFrame->image[i-1], newFrame->image[i], Size(), 0.5, 0.5);
+        resize(newFrame->image_[i-1], newFrame->image_[i], Size(), 0.5, 0.5);
 
     // for (int i=0; i<PYRAMID_LEVELS; i++){
     //     imshow("", newFrame->image[i]);
@@ -132,7 +132,7 @@ void System::AddKeyFrame(int id) {
 }
 
 void System::ShowFrame(int id) {
-    imshow("Show last frame", frames_[id]->image[0]);
+    imshow("Show last frame", frames_[id]->image_[0]);
     waitKey(0);
 }
 

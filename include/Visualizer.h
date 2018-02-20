@@ -53,12 +53,41 @@ class System;
 class Visualizer
 {
 public:
+    /**
+     * @brief Constructor of visualizer. 
+     *        Initializes all nodes, publishers and options necessary to send and visualize
+     *        markers, images and points in Rviz (ROS Kinetic). Also, if given, reads 
+     *        and initialize rigid transformation of ground truth data.
+     *        
+     * @param start_index_ 
+     * @param num_images 
+     * @param ground_truth_path 
+     */
     Visualizer(int start_index_, int num_images, string ground_truth_path);
+
+    /**
+     * @brief Destructor of visualizer.
+     * 
+     */
     ~Visualizer();
-    void InitializeImageMsg();
+
+    /**
+     * @brief Updates messages sended to Rviz (position and orientation of markers and image output)
+     * 
+     * @param image     Image to send to Rviz.
+     */
+    void UpdateMessages(Mat image);
+
+    /**
+     * @brief Reads ground truth poses from a .csv file with the EUROC format.
+     *        EUROC format of .csv file (timestamp; translation components; quaternion rotation):
+     *        #timestamp [ns],  p_RS_R_x [m],  p_RS_R_y [m],  p_RS_R_z [m],  q_RS_w [m],  q_RS_x [m],  q_RS_y [m],  q_RS_z [m]
+     * 
+     * @param start_index 
+     * @param groundtruth_path 
+     */
     void ReadGroundTruthEUROC(int start_index, string groundtruth_path);
-    void ReadTimeStamps();
-    void SendVisualization(Mat image);
+
 
     ros::Publisher publisher_ground_truth_pose_;
     visualization_msgs::Marker ground_truth_pose_;

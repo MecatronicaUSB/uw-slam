@@ -44,6 +44,7 @@
 
 // Sophus
 #include "sophus/se3.hpp"
+#include "sophus/so3.hpp"
 
 /// CUDA specific libraries
 #include <opencv2/cudafilters.hpp>
@@ -70,22 +71,75 @@ public:
 class Tracker
 {
 public:
+    /**
+     * @brief Tracker consturctor.
+     * 
+     */
     Tracker();
+
+    /**
+     * @brief Tracker destructor.
+     * 
+     */
     ~Tracker();
+
+    /**
+     * @brief Obtains camera instrinsic matrix and parameters for each pyramid level available.
+     * 
+     * @param _width    Width of images at finest level.
+     * @param _height   Height of images at finest level.
+     * @param K         Camera intrinsic matrix at finest level.
+     */
     void InitializePyramid(int _width, int _height, Mat K);
+
+    /**
+     * @brief Computes optimal transformation given two input frames.
+     * 
+     * @param previous_frame 
+     * @param current_frame 
+     */
     void EstimatePose(Frame* previous_frame, Frame* current_frame);
-    void GetCandidatePoints(Frame* frame);
-    void DebugShowCandidatePoints(Frame* frame);
 
+    /**
+     * @brief Computes gradient of a frame for each pyramid level available.
+     *        Saves the result gradient images within the frame class.
+     * 
+     * @param frame 
+     */
+    void ApplyGradient(Frame* frame);
 
-    void WarpFunction(Frame* previous_image , Frame* current_image);
+    /**
+     * @brief Obtains candidate points from grandient images of a frame for each pyramid level available.
+     * 
+     * @param frame 
+     */
+    void ObtainCandidatePoints(Frame* frame);
 
+    /**
+     * @brief Computes warp projected points from one frame to another, given a rigid transformation matrix 
+     *        and the depth estimation of those points. Returns matrix of warped points.
+     * 
+     * @param points2warp 
+     * @param depth 
+     * @param rigid_transformation 
+     * @return Mat 
+     */
+    Mat WarpFunction(Mat points2warp, Mat depth, Mat44 rigid_transformation);
+
+    /**
+     * @brief Shows points in an image. Used only for debbugin.
+     * 
+     * @param image 
+     * @param candidatePoints 
+     */
+    void DebugShowCandidatePoints(Mat image, Mat candidatePoints);
 
     // Filters for calculating gradient in images
     Ptr<cuda::Filter> soberX_ = cuda::createSobelFilter(0, CV_32FC1, 1, 0, CV_SCHARR, 1.0, BORDER_DEFAULT);
     Ptr<cuda::Filter> soberY_ = cuda::createSobelFilter(0, CV_32FC1, 0, 1, CV_SCHARR, 1.0, BORDER_DEFAULT);
     Ptr<cuda::Filter> laplacian_ = cuda::createLaplacianFilter(0, 0, 1, 1.0);
 
+    // Width and height of images for each pyramid level available
     vector<int> w_ = vector<int>(PYRAMID_LEVELS);
     vector<int> h_ = vector<int>(PYRAMID_LEVELS);
 

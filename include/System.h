@@ -75,11 +75,15 @@ public:
 
 
     int id;
-    vector<Mat> image = vector<Mat>(PYRAMID_LEVELS);
-    Mat candidatePoints_;
+    vector<Mat> image_    = vector<Mat>(PYRAMID_LEVELS);
+    vector<Mat> gradient_ = vector<Mat>(PYRAMID_LEVELS);
+
+    vector<Mat> candidatePoints_ = vector<Mat>(PYRAMID_LEVELS);
     vector<float> map_;
-    Mat44 rigid_body_transformation_;
+    Mat44 rigid_transformation_;
     int idFrame_;
+
+    bool obtained_gradients_;
     bool isKeyFrame_;
 };
 
