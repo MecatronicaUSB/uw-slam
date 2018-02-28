@@ -75,15 +75,21 @@ public:
 
 
     int id;
-    vector<Mat> image_    = vector<Mat>(PYRAMID_LEVELS);
-    vector<Mat> gradient_ = vector<Mat>(PYRAMID_LEVELS);
-
-    vector<Mat> candidatePoints_ = vector<Mat>(PYRAMID_LEVELS);
+    vector<Mat> image_     = vector<Mat>(PYRAMID_LEVELS);
+    vector<Mat> gradientX_ = vector<Mat>(PYRAMID_LEVELS);
+    vector<Mat> gradientY_ = vector<Mat>(PYRAMID_LEVELS);
+    vector<Mat> gradient_  = vector<Mat>(PYRAMID_LEVELS);
+    
+    
+    vector<Mat> candidatePoints_      = vector<Mat>(PYRAMID_LEVELS);
+    vector<Mat> candidatePointsDepth_ = vector<Mat>(PYRAMID_LEVELS);
+    
     vector<float> map_;
-    Mat44 rigid_transformation_;
+    SE3 rigid_transformation_;
     int idFrame_;
 
     bool obtained_gradients_;
+    bool obtained_candidatePoints_;    
     bool isKeyFrame_;
 };
 
@@ -170,7 +176,7 @@ public:
     int num_frames_;
     int num_keyframes_;
     int w_, h_, w_input_, h_input_;
-    float fx_, fy_, cx_, cy_;
+    double fx_, fy_, cx_, cy_;
 
     Frame* current_frame_;
     Frame* previous_frame_;

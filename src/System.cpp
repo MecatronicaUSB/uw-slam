@@ -40,10 +40,12 @@ System::~System(void) {
 }
 
 Frame::Frame(void) {
-    rigid_transformation_ = Mat44().Identity();
+    rigid_transformation_ = SE3();
     idFrame_    = 0;
 
     obtained_gradients_ = false;
+    obtained_candidatePoints_ = false;
+    
     isKeyFrame_ = false;
 }
 
@@ -87,6 +89,16 @@ void System::InitializeSystem() {
 
 void System::Tracking() {
 
+    if (not previous_frame_->obtained_gradients_)
+        tracker_->ApplyGradient(previous_frame_);
+    
+    if (not previous_frame_->obtained_candidatePoints_)
+        tracker_->ObtainAllPoints(previous_frame_);
+        
+    tracker_->ApplyGradient(current_frame_);
+    tracker_->ObtainAllPoints(current_frame_);
+    tracker_->EstimatePose(previous_frame_, current_frame_);
+    //tracker_->WarpFunction(current_frame_->candidatePoints_[0], Mat(), current_frame_->rigid_transformation_);
 
 }
 
@@ -98,14 +110,17 @@ void System::AddFrame(int id) {
     if (rectification_valid_)
         remap(newFrame->image_[0], newFrame->image_[0], map1_, map2_, INTER_LINEAR);
 
-    for (int i=1; i<PYRAMID_LEVELS; i++)
+    for (int i=1; i<PYRAMID_LEVELS; i++) {      
         resize(newFrame->image_[i-1], newFrame->image_[i], Size(), 0.5, 0.5);
+    }
+
 
     // for (int i=0; i<PYRAMID_LEVELS; i++){
     //     imshow("", newFrame->image[i]);
     //     waitKey(0);
     // }
     if (num_frames_ == 0) {
+        previous_frame_ = newFrame;        
         current_frame_ = newFrame;
     } else {
         previous_frame_ = current_frame_;

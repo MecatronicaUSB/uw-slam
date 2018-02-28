@@ -72,11 +72,11 @@ public:
     ~Visualizer();
 
     /**
-     * @brief Updates messages sended to Rviz (position and orientation of markers and image output)
+     * @brief Sends messages of pose and frame to Rviz
      * 
-     * @param image     Image to send to Rviz.
+     * @param frame 
      */
-    void UpdateMessages(Mat image);
+    void UpdateMessages(Frame* frame);
 
     /**
      * @brief Reads ground truth poses from a .csv file with the EUROC format.

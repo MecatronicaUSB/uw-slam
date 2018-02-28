@@ -72,7 +72,7 @@ void CameraModel::GetCameraModel(string calibration_path) {
     original_intrinsic_camera_.at<double>(1,1) = input_calibration_[1];
     original_intrinsic_camera_.at<double>(0,2) = input_calibration_[2];
     original_intrinsic_camera_.at<double>(1,2) = input_calibration_[3];
-    original_intrinsic_camera_.at<double>(2, 2) = 1;
+    original_intrinsic_camera_.at<double>(2,2) = 1;
 
     // If distCoeff are 0, dont apply rectification
     if (dist_coeffs_.at<double>(0,0) == 0) {
@@ -90,6 +90,7 @@ void CameraModel::GetCameraModel(string calibration_path) {
 		original_intrinsic_camera_.at<double>(0, 2) /= in_width_;
 		original_intrinsic_camera_.at<double>(1, 1) /= in_height_;
 		original_intrinsic_camera_.at<double>(1, 2) /= in_height_;
+        
     }
 }
 

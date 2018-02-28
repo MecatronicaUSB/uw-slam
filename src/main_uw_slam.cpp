@@ -126,9 +126,9 @@ int main (int argc, char *argv[]) {
             uwSystem->AddKeyFrame(i);
         } else {
             uwSystem->AddFrame(i);
-            uwSystem->Tracking();    
+            uwSystem->Tracking();
+            uwSystem->visualizer_->UpdateMessages(uwSystem->previous_frame_);
         }
-        uwSystem->visualizer_->UpdateMessages(uwSystem->current_frame_->image_[0]);
     }
     // delete [] uwSystem;
     return 0;

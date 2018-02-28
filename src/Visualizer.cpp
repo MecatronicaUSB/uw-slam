@@ -126,12 +126,24 @@ Visualizer::Visualizer(int start_index, int num_images, string ground_truth_path
     camera_pose_ = camera_pose;
 };
 
-void Visualizer::UpdateMessages(Mat image){
+void Visualizer::UpdateMessages(Frame* frame){
     // Rate (Hz) of publishing messages
-    ros::Rate r(40);
+    ros::Rate r(60);
 
     // Update image message
-    sensor_msgs::ImagePtr current_frame = cv_bridge::CvImage(std_msgs::Header(), "mono8", image).toImageMsg();
+    sensor_msgs::ImagePtr current_frame = cv_bridge::CvImage(std_msgs::Header(), "mono8", frame->image_[0]).toImageMsg();
+
+    SE3 pose = frame->rigid_transformation_;
+    Mat31 t = pose.translation();
+    Quaternion2 quaternion = pose.unit_quaternion();
+
+    camera_pose_.pose.position.x += t(0);  
+    camera_pose_.pose.position.y += t(1);
+    camera_pose_.pose.position.z += t(2);
+    camera_pose_.pose.orientation.x += 0;
+    camera_pose_.pose.orientation.y += 0;    
+    camera_pose_.pose.orientation.z += 0; 
+    camera_pose_.pose.orientation.w += 0;
 
     // Update ground truth marker position
     if (use_ground_truth_) {
@@ -153,6 +165,7 @@ void Visualizer::UpdateMessages(Mat image){
             exit(0); 
         }
         ROS_WARN_ONCE("Please create a subscriber to the marker/image");
+        sleep(1);
     }
     r.sleep();
 
