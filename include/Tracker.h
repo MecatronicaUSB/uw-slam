@@ -133,7 +133,7 @@ public:
 
     SE3 Mat2SE3(Mat input);
     
-    void DebugShowWarpedPoints(Mat image1, Mat image2, Mat candidatePoints, Mat warped);
+    void DebugShowWarpedPoints(Mat image1, Mat image2, Mat candidatePoints, Mat warped, int _lvl);
 
     double MedianMat(Mat input);
 

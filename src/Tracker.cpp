@@ -142,7 +142,8 @@ void Tracker::EstimatePose(Frame* previous_frame, Frame* current_frame) {
             Mat warpedPoints = Mat(candidatePoints.size(), CV_64FC1);
             warpedPoints = WarpFunction(candidatePoints, candidatePointsDepth, deltaSE3.exp(deltaVector) * current_pose, lvl);
             // Optional - show change of frame with the deltapose update
-            DebugShowWarpedPoints(gradient1, gradient2, candidatePoints, warpedPoints);
+            if (lvl == 0)
+                DebugShowWarpedPoints(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
 
             // Computation of intensities of frame 1 and 2
             // Computation of Jws and Jls
@@ -519,7 +520,9 @@ void Tracker::DebugShowCandidatePoints(Mat image, Mat candidatePoints){
     waitKey(0);
 }
 
-void Tracker::DebugShowWarpedPoints(Mat image1, Mat image2, Mat candidatePoints, Mat warped){
+void Tracker::DebugShowWarpedPoints(Mat image1, Mat image2, Mat candidatePoints, Mat warped, int _lvl) {
+    int lvl = _lvl + 1;
+    double scale = 0.5 * lvl;
     Mat showPoints1, showPoints2;
     Mat substraction;
 
@@ -530,7 +533,6 @@ void Tracker::DebugShowWarpedPoints(Mat image1, Mat image2, Mat candidatePoints,
         int y2 = warped.at<double>(i,1);
 
         int intensity = image1.at<uchar>(y1,x1);
-
     }
 
     //cv::subtract(conv2, conv1, substraction);
@@ -558,8 +560,16 @@ void Tracker::DebugShowWarpedPoints(Mat image1, Mat image2, Mat candidatePoints,
     line(showPoints1,p1,p4,Scalar(255,0,0), 1, 8, 0);
     line(showPoints1,p2,p3,Scalar(255,0,0), 1, 8, 0);
 
-    imshow("First image", showPoints1);
-    imshow("Second image", showPoints2);
+    Mat imShow;
+    hconcat(showPoints1, showPoints2, imShow);
+
+    while (lvl > 1) {
+        resize(imShow, imShow, Size(), 2.0, 2.0);
+        //resize(image1, showPoints2, Size(), 2.0, 2.0);
+        lvl--;        
+    }
+
+    imshow("Result", imShow);
 
     waitKey(0);
     
@@ -617,7 +627,7 @@ void Tracker::DebugVariationIntensity(Frame* previous_frame, Frame* current_fram
 
 
         if (counter % 11 == 0 || i == 0) 
-            DebugShowWarpedPoints(previous_frame->gradient_[lvl], current_frame->gradient_[lvl], candidatePoints, warpedPoints);
+            DebugShowWarpedPoints(previous_frame->gradient_[lvl], current_frame->gradient_[lvl], candidatePoints, warpedPoints, lvl);
 
         // Computation of intensities of frame 1 and 2
         // Computation of Jws and Jls
