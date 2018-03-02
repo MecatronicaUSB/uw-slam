@@ -60,7 +60,7 @@ void CameraModel::GetCameraModel(string calibration_path) {
     // Checking if the intrinsic parameters needs rescaling
     if (input_calibration_[2] < 1 && input_calibration_[3] < 1) {
         cout << "WARNING: cx = " << input_calibration_[2] << " < 1, which should not be the case for normal cameras" << endl;
-        // Rescale. (Maybe will need -0.5 offset)      
+        // Rescale. (Maybe will need to delete -0.5 offset)      
         input_calibration_[0] = input_calibration_[0] * in_width_;
         input_calibration_[1] = input_calibration_[1] * in_height_;
         input_calibration_[2] = input_calibration_[2] * in_width_;
@@ -78,6 +78,8 @@ void CameraModel::GetCameraModel(string calibration_path) {
     if (dist_coeffs_.at<double>(0,0) == 0) {
         cout << "Distortion coefficients not found ... not rectifying" << endl;
         valid_ = false;
+
+        // K_
         output_intrinsic_camera_ = original_intrinsic_camera_;
     }
     if (valid_) {
@@ -86,6 +88,7 @@ void CameraModel::GetCameraModel(string calibration_path) {
         output_intrinsic_camera_ = getOptimalNewCameraMatrix(original_intrinsic_camera_, dist_coeffs_, cv::Size(in_width_, in_height_), 0, cv::Size(out_width_, out_height_), nullptr, false);
         initUndistortRectifyMap(original_intrinsic_camera_, dist_coeffs_, cv::Mat(), output_intrinsic_camera_, cv::Size(out_width_, out_height_), CV_16SC2, map1_, map2_);
         
+        // K_
         original_intrinsic_camera_.at<double>(0, 0) /= in_width_;
 		original_intrinsic_camera_.at<double>(0, 2) /= in_width_;
 		original_intrinsic_camera_.at<double>(1, 1) /= in_height_;

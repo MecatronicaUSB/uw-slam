@@ -23,7 +23,7 @@
 
 namespace uw{
 
-const int PYRAMID_LEVELS  =   4;
+const int PYRAMID_LEVELS  =   5;
 double GRADIENT_THRESHOLD =   7;
 int BLOCK_SIZE            =  32;
 

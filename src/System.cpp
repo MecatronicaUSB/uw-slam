@@ -113,12 +113,13 @@ void System::AddFrame(int id) {
     for (int i=1; i<PYRAMID_LEVELS; i++) {      
         resize(newFrame->image_[i-1], newFrame->image_[i], Size(), 0.5, 0.5);
     }
-
-
-    // for (int i=0; i<PYRAMID_LEVELS; i++){
-    //     imshow("", newFrame->image[i]);
+    // for (int i=0; i<PYRAMID_LEVELS; i++) {
+    //     imshow("Show", newFrame->image_[i]);
+    //     cout << tracker_->K_[i] << endl;
+    //     cout << endl;
     //     waitKey(0);
     // }
+
     if (num_frames_ == 0) {
         previous_frame_ = newFrame;        
         current_frame_ = newFrame;
