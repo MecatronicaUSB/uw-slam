@@ -121,6 +121,7 @@ public:
      */
     Mat WarpFunction(Mat points2warp, Mat depth, SE3 rigid_transformation, int lvl);
 
+    Mat WarpFunction2(vector<Point3f> originalPoints, vector<Point2f> warpedPoitns, Mat K, SE3 rigid_transformation);
     /**
      * @brief Shows points in an image. Used only for debbugin.
      * 
@@ -129,11 +130,15 @@ public:
      */
     void DebugShowCandidatePoints(Mat image, Mat candidatePoints);
 
-    void DebugVariationIntensity(Frame* previous_frame, Frame* current_frame);
-
     SE3 Mat2SE3(Mat input);
+
+    void ObtainImageTransformed(Mat originalImage, Mat candidatePoints, Mat warpedPoints, Mat outputImage);
     
-    void DebugShowWarpedPoints(Mat image1, Mat image2, Mat candidatePoints, Mat warped, int _lvl);
+    void ObtainGradientXY(Mat inputImage, Mat gradientX, Mat gradientY);
+    
+    void DebugShowResidual(Mat image1, Mat image2, Mat candidatePoints, Mat warped, int _lvl);
+
+    void DebugShowWarpedPerspective(Mat image1, Mat image2, Mat candidatePoints, Mat warped, int _lvl);
 
     double MedianMat(Mat input);
 

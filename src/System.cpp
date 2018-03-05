@@ -113,6 +113,8 @@ void System::AddFrame(int id) {
     for (int i=1; i<PYRAMID_LEVELS; i++) {      
         resize(newFrame->image_[i-1], newFrame->image_[i], Size(), 0.5, 0.5);
     }
+    
+    // Debug show of pyramid levels of images
     // for (int i=0; i<PYRAMID_LEVELS; i++) {
     //     imshow("Show", newFrame->image_[i]);
     //     cout << tracker_->K_[i] << endl;

@@ -80,7 +80,7 @@ public:
     vector<Mat> gradientY_ = vector<Mat>(PYRAMID_LEVELS);
     vector<Mat> gradient_  = vector<Mat>(PYRAMID_LEVELS);
     
-    
+    vector<vector<Point3f> > framePoints_ = vector<vector<Point3f> >(PYRAMID_LEVELS);
     vector<Mat> candidatePoints_      = vector<Mat>(PYRAMID_LEVELS);
     vector<Mat> candidatePointsDepth_ = vector<Mat>(PYRAMID_LEVELS);
     
