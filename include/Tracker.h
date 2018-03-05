@@ -121,7 +121,6 @@ public:
      */
     Mat WarpFunction(Mat points2warp, Mat depth, SE3 rigid_transformation, int lvl);
 
-    Mat WarpFunction2(vector<Point3f> originalPoints, vector<Point2f> warpedPoitns, Mat K, SE3 rigid_transformation);
     /**
      * @brief Shows points in an image. Used only for debbugin.
      * 
