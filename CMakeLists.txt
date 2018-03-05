@@ -66,7 +66,7 @@ include_directories(
   ${EIGEN3_INCLUDE_DIRS}
   ${CERES_INCLUDE_DIRS}
   ${PROJECT_SOURCE_DIR}/include
-  ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
+  ${PROJECT_SOURCE_DIR}/thirdparty
 )
 
 add_library(uw ${uw_slam_SOURCE_FILES})
@@ -74,6 +74,6 @@ add_library(uw ${uw_slam_SOURCE_FILES})
 add_executable(main_uw_slam ${PROJECT_SOURCE_DIR}/src/main_uw_slam.cpp)
 
 ## IMPORTANT - TO WORK WITH CUDA AND ROS (CUDA INSTALLED IN ANOTHER OPENCV)
-string(REPLACE "/opt/ros/kinetic/lib/libopencv_core3.so.3.2.0;" "" catkin_LIBRARIES "${catkin_LIBRARIES}")
+string(REPLACE "/opt/ros/kinetic/lib/libopencv_core3.so.3.3;" "" catkin_LIBRARIES "${catkin_LIBRARIES}")
 
 target_link_libraries(main_uw_slam uw ${OpenCV_LIBS} ${CERES_LIBRARIES} ${catkin_LIBRARIES} ${CUDA_LIBRARIES})
