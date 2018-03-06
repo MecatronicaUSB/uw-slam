@@ -199,7 +199,7 @@ public:
     Mat map1_, map2_;
 
     bool initialized_;
-    bool rectification_valid_;
+    bool distortion_valid_;
     
 };
 

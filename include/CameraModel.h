@@ -123,7 +123,7 @@ public:
 	int GetInputHeight() const;
 
 	/**
-	 * @brief Returns if the undistorter was initialized successfully.
+	 * @brief Returns if the input image have distortion parameters
 	 * 
 	 * @return true 	Rectification on.
 	 * @return false 	Rectification off.

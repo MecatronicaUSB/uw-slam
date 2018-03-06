@@ -117,9 +117,9 @@ int main (int argc, char *argv[]) {
     
     // Add list of the dataset images names (optionally ground truth reference)
     uwSystem->AddListImages(images_path, ground_truth_path);
-    
+
     // Start SLAM process
-    // Read images one by one from directory provided
+    // Read images one by one from directory provided 
     for (int i=start_index; i<uwSystem->images_list_.size(); i++) {
         if (not uwSystem->initialized_) {
             uwSystem->InitializeSystem();
@@ -138,7 +138,7 @@ int main (int argc, char *argv[]) {
     }
 
     // Delete system
-    //  uwSystem->~System();
-    
+    uwSystem->~System();
+    delete uwSystem;
     return 0;
 }

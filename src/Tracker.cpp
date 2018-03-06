@@ -33,11 +33,22 @@ class LocalParameterizationSE3;
 Tracker::Tracker() {
     for (Mat K: K_)
         K = Mat(3,3,CV_64FC1, Scalar(0.f));
-    for (Mat invK: invK_)
-        invK = Mat(3,3,CV_64FC1, Scalar(0.f));
 };
 
-Tracker::~Tracker(void) {};
+Tracker::~Tracker() {
+    w_.clear();
+    h_.clear();
+    fx_.clear();
+    fy_.clear();
+    cx_.clear();
+    cy_.clear();
+    invfx_.clear();
+    invfy_.clear();
+    invcx_.clear();
+    invcy_.clear();
+
+    K_.clear();
+};
 
 // TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com)
 // 02-20-2018 - Review: Obtaining the precomputed invK (for each pyramid level) is necessary?
@@ -45,7 +56,7 @@ void Tracker::InitializePyramid(int _width, int _height, Mat _K) {
     w_[0] = _width;
     h_[0] = _height;
     K_[0] = _K;
-    invK_[0] = _K.inv();
+    // invK_[0] = _K.inv();
 
     fx_[0] = _K.at<double>(0,0);
     fy_[0] = _K.at<double>(1,1);
@@ -77,11 +88,11 @@ void Tracker::InitializePyramid(int _width, int _height, Mat _K) {
         invcx_[lvl] = 1 / cx_[lvl];
         invcy_[lvl] = 1 / cy_[lvl];
 
-        invK_[lvl] = K_[lvl].inv();
-        invfx_[lvl] = invK_[lvl].at<double>(0,0); // Needs review
-        invfy_[lvl] = invK_[lvl].at<double>(1,1);
-        invcx_[lvl] = invK_[lvl].at<double>(0,2);
-        invcy_[lvl] = invK_[lvl].at<double>(1,2);
+        // invK_[lvl] = K_[lvl].inv();
+        // invfx_[lvl] = invK_[lvl].at<double>(0,0); // Needs review
+        // invfy_[lvl] = invK_[lvl].at<double>(1,1);
+        // invcx_[lvl] = invK_[lvl].at<double>(0,2);
+        // invcy_[lvl] = invK_[lvl].at<double>(1,2);
     }
 }
 

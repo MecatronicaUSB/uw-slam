@@ -30,23 +30,23 @@ System::System(int argc, char *argv[], int _start_index) {
     ros::init(argc, argv, "uw_slam");  // Initialize ROS
     start_index_ = _start_index;
     initialized_ = false;
-    rectification_valid_ = false;
+    distortion_valid_ = false;
     num_frames_     = 0;
     num_keyframes_  = 0;
 }
 
-System::~System(void) {
+System::~System() {
 
     frames_.clear();
     keyframes_.clear();
 
-    camera_model_->~CameraModel();
-    tracker_->~Tracker();
-    visualizer_->~Visualizer();
+    // camera_model_->~CameraModel();
+    // tracker_->~Tracker();
+    // visualizer_->~Visualizer();
 
-    delete current_frame_;
-    delete previous_frame_;
-    delete current_keyframe_;
+    delete camera_model_;
+    delete tracker_;
+    delete visualizer_;
 
     cout << "SLAM System shutdown ..." << endl;
 }
@@ -101,7 +101,7 @@ void System::InitializeSystem() {
     fy_ = camera_model_->GetK().at<double>(1,1);
     cx_ = camera_model_->GetK().at<double>(0,2);
     cy_ = camera_model_->GetK().at<double>(1,2);
-    rectification_valid_ = camera_model_->IsValid();
+    distortion_valid_ = camera_model_->IsValid();
 
     tracker_ = new Tracker();
     tracker_->InitializePyramid(w_, h_, K_);
@@ -118,10 +118,10 @@ void System::Tracking() {
         tracker_->ApplyGradient(previous_frame_);
     
     if (not previous_frame_->obtained_candidatePoints_)
-        tracker_->ObtainAllPoints(previous_frame_);
+        //tracker_->ObtainAllPoints(previous_frame_);
         
     tracker_->ApplyGradient(current_frame_);
-    tracker_->ObtainAllPoints(current_frame_);
+    //tracker_->ObtainAllPoints(current_frame_);
     //tracker_->EstimatePose(previous_frame_, current_frame_);
     //tracker_->WarpFunction(current_frame_->candidatePoints_[0], Mat(), current_frame_->rigid_transformation_);
 
@@ -132,7 +132,7 @@ void System::AddFrame(int _id) {
     newFrame->idFrame_ = _id;
     newFrame->images_[0] = imread(images_list_[_id], CV_LOAD_IMAGE_GRAYSCALE);
 
-    if (rectification_valid_)
+    if (distortion_valid_)
         remap(newFrame->images_[0], newFrame->images_[0], map1_, map2_, INTER_LINEAR);
 
     for (int i=1; i<PYRAMID_LEVELS; i++) 
