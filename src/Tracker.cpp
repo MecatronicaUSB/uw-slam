@@ -271,7 +271,7 @@ void Tracker::EstimatePose(Frame* previous_frame, Frame* current_frame) {
                 // Show results of optimization at lvl 0
                 if (lvl == 0){
                     // DebugShowResidual(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
-                    DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
+                    //DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
                 }
                 break;
             }
@@ -281,7 +281,7 @@ void Tracker::EstimatePose(Frame* previous_frame, Frame* current_frame) {
 
             // Update new pose with delta
             current_pose = deltaSE3.exp(deltaVector) * current_pose;
-            DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);   
+            //DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);   
 
             // Computation of new delta
             Mat JacobianW = Jacobian.clone();

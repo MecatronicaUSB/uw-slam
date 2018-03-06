@@ -49,7 +49,20 @@ Frame::Frame(void) {
     isKeyFrame_ = false;
 }
 
-Frame::~Frame(void) {}
+Frame::~Frame(void) {
+
+    for (vector<Point3f> point : framePoints_)
+        point.clear();
+
+    image_.clear();
+    gradientX_.clear();
+    gradientY_.clear();
+    gradient_.clear();
+    candidatePoints_.clear();
+    candidatePointsDepth_.clear();
+    map_.clear();
+
+}
 
 
 void System::Calibration(string calibration_path) {
@@ -97,7 +110,7 @@ void System::Tracking() {
         
     tracker_->ApplyGradient(current_frame_);
     tracker_->ObtainAllPoints(current_frame_);
-    tracker_->EstimatePose(previous_frame_, current_frame_);
+    //tracker_->EstimatePose(previous_frame_, current_frame_);
     //tracker_->WarpFunction(current_frame_->candidatePoints_[0], Mat(), current_frame_->rigid_transformation_);
 
 }
@@ -191,5 +204,9 @@ void System::AddListImages(string path, string ground_truth_path) {
     images_list_ = file_names;
 }
 
+void System::FreeFrames() {
+    frames_[0]->~Frame();
+    frames_.erase(frames_.begin());
+}
 
 }

@@ -119,6 +119,7 @@ int main (int argc, char *argv[]) {
     uwSystem->AddListImages(images_path, ground_truth_path);
     
     // Start SLAM process
+    // Read images one by one from directory provided
     for (int i=start_index; i<uwSystem->images_list_.size(); i++) {
         if (not uwSystem->initialized_) {
             uwSystem->InitializeSystem();
@@ -129,7 +130,13 @@ int main (int argc, char *argv[]) {
             uwSystem->Tracking();
             uwSystem->visualizer_->UpdateMessages(uwSystem->previous_frame_);
         }
+
+        // Delete oldest frame
+        if (uwSystem->num_frames_> 10) {
+            uwSystem->FreeFrames();
+        }
     }
-    // delete [] uwSystem;
+    // Delete system
+    uwSystem->~System();
     return 0;
 }

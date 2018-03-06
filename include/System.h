@@ -167,6 +167,11 @@ public:
      */
     void ShowFrame(int id);
 
+    /**
+     * @brief Deletes oldest frame of list to mantain memory consumption
+     * 
+     */
+    void FreeFrames();
 
     CameraModel* camera_model_;
     Tracker* tracker_;

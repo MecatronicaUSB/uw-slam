@@ -128,7 +128,7 @@ Visualizer::Visualizer(int start_index, int num_images, string ground_truth_path
 
 void Visualizer::UpdateMessages(Frame* frame){
     // Rate (Hz) of publishing messages
-    ros::Rate r(60);
+    ros::Rate r(200);
 
     // Update image message
     sensor_msgs::ImagePtr current_frame = cv_bridge::CvImage(std_msgs::Header(), "mono8", frame->image_[0]).toImageMsg();
