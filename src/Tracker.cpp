@@ -87,9 +87,10 @@ void Tracker::InitializePyramid(int _width, int _height, Mat _K) {
         invfy_[lvl] = 1 / fy_[lvl];
         invcx_[lvl] = 1 / cx_[lvl];
         invcy_[lvl] = 1 / cy_[lvl];
-
+        
+        // Needs review
         // invK_[lvl] = K_[lvl].inv();
-        // invfx_[lvl] = invK_[lvl].at<double>(0,0); // Needs review
+        // invfx_[lvl] = invK_[lvl].at<double>(0,0); 
         // invfy_[lvl] = invK_[lvl].at<double>(1,1);
         // invcx_[lvl] = invK_[lvl].at<double>(0,2);
         // invcy_[lvl] = invK_[lvl].at<double>(1,2);
@@ -282,7 +283,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                 // Show results of optimization at lvl 0
                 if (lvl == 0){
                     // DebugShowResidual(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
-                    //DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
+                    DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
                 }
                 break;
             }

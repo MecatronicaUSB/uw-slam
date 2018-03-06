@@ -36,19 +36,16 @@ System::System(int argc, char *argv[], int _start_index) {
 }
 
 System::~System() {
-
+    cout << "SLAM System shutdown ..." << endl;
     frames_.clear();
     keyframes_.clear();
-
-    // camera_model_->~CameraModel();
-    // tracker_->~Tracker();
-    // visualizer_->~Visualizer();
+    camera_model_->~CameraModel();
+    tracker_->~Tracker();
+    visualizer_->~Visualizer();
 
     delete camera_model_;
     delete tracker_;
     delete visualizer_;
-
-    cout << "SLAM System shutdown ..." << endl;
 }
 
 Frame::Frame(void) {
@@ -103,6 +100,9 @@ void System::InitializeSystem() {
     cy_ = camera_model_->GetK().at<double>(1,2);
     distortion_valid_ = camera_model_->IsValid();
 
+    if (distortion_valid_)
+        CalculateROI();
+
     tracker_ = new Tracker();
     tracker_->InitializePyramid(w_, h_, K_);
 
@@ -112,17 +112,55 @@ void System::InitializeSystem() {
     initialized_ = true;
 }
 
+void System::CalculateROI() {
+    // Load first image
+    Mat distorted, undistorted;
+    distorted = imread(images_list_[0], CV_LOAD_IMAGE_GRAYSCALE);
+    remap(distorted, undistorted, map1_, map2_, INTER_LINEAR);
+    
+    // Find middle x and y of image (supposing a symmetrical distortion)
+    int x_middle = (undistorted.cols - 1) * 0.5;
+    int y_middle = (undistorted.rows - 1) * 0.5;
+    
+    Point p1, p2;    
+    p1.x = 0;
+    p1.y = 0;
+    p2.x = undistorted.cols - 1;
+    p2.y = undistorted.rows - 1;
+
+    // Search x1_ROI distance to crop
+    while (undistorted.at<uchar>(y_middle, p1.x) == 0)
+        p1.x++;
+
+    // Search x2_ROI distance to crop
+    while (undistorted.at<uchar>(y_middle, p2.x) == 0)
+        p2.x--;
+
+    // Search y1_ROI distance to crop
+    while (undistorted.at<uchar>(p1.y, x_middle) == 0)
+        p1.y++;
+
+    // Search y2_ROI distance to crop
+    while (undistorted.at<uchar>(p2.y, x_middle) == 0)
+        p2.y--;
+
+    ROI = Rect(p1,p2);
+    // rectangle(undistorted, ROI, Scalar(255,0,0), 2, 0);
+    // imshow("Undistorted image", undistorted);
+    // waitKey(0);
+}
+
 void System::Tracking() {
 
     if (not previous_frame_->obtained_gradients_)
         tracker_->ApplyGradient(previous_frame_);
     
     if (not previous_frame_->obtained_candidatePoints_)
-        //tracker_->ObtainAllPoints(previous_frame_);
+        tracker_->ObtainAllPoints(previous_frame_);
         
     tracker_->ApplyGradient(current_frame_);
-    //tracker_->ObtainAllPoints(current_frame_);
-    //tracker_->EstimatePose(previous_frame_, current_frame_);
+    tracker_->ObtainAllPoints(current_frame_);
+    tracker_->EstimatePose(previous_frame_, current_frame_);
     //tracker_->WarpFunction(current_frame_->candidatePoints_[0], Mat(), current_frame_->rigid_transformation_);
 
 }
@@ -132,8 +170,14 @@ void System::AddFrame(int _id) {
     newFrame->idFrame_ = _id;
     newFrame->images_[0] = imread(images_list_[_id], CV_LOAD_IMAGE_GRAYSCALE);
 
-    if (distortion_valid_)
-        remap(newFrame->images_[0], newFrame->images_[0], map1_, map2_, INTER_LINEAR);
+    if (distortion_valid_) {
+        Mat distortion;
+        remap(newFrame->images_[0], distortion, map1_, map2_, INTER_LINEAR);
+        newFrame->images_[0] = distortion(ROI);
+        imshow("Undistorted", distortion);
+        imshow("Croped", newFrame->images_[0]);
+        waitKey(0);
+    }
 
     for (int i=1; i<PYRAMID_LEVELS; i++) 
         resize(newFrame->images_[i-1], newFrame->images_[i], Size(), 0.5, 0.5);
@@ -196,7 +240,7 @@ void System::AddListImages(string _path, string _ground_truth_path) {
         closedir (dir);
     } else {
         // If the directory could not be opened
-        cout << "Could not open directory: " << _path << endl;
+        cout << "Could not open directory of images: " << _path << endl;
         cout << "Exiting..." << endl;
         exit(0);
     }

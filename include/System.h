@@ -120,6 +120,13 @@ public:
     void Calibration(string _calibration_path);
 
     /**
+     * @brief Calculates ROI of images (that are inside of frame after undistortion)
+     *        A list of images must exist before executing this function.
+     *        Assumes that every image in the dataset have same width and height
+     */
+    void CalculateROI();
+
+    /**
      * @brief Initializes necessary variables to start SLAM system.
      *        Call after Calibration() but before adding the first frame to the system.
      */
@@ -197,7 +204,8 @@ public:
 
     Mat K_;
     Mat map1_, map2_;
-
+    Rect ROI;
+    
     bool initialized_;
     bool distortion_valid_;
     
