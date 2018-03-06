@@ -85,7 +85,7 @@ void CameraModel::GetCameraModel(string _calibration_path) {
     if (valid_) {
         cout << "Distortion coefficients found ... rectifying" << endl;
         // Obtaining new intrinsic camera matrix with undistorted images
-        output_intrinsic_camera_ = getOptimalNewCameraMatrix(original_intrinsic_camera_, dist_coeffs_, cv::Size(in_width_, in_height_), 0, cv::Size(out_width_, out_height_), nullptr, false);
+        output_intrinsic_camera_ = getOptimalNewCameraMatrix(original_intrinsic_camera_, dist_coeffs_, cv::Size(in_width_, in_height_), 1, cv::Size(out_width_, out_height_), nullptr, false);
         initUndistortRectifyMap(original_intrinsic_camera_, dist_coeffs_, cv::Mat(), output_intrinsic_camera_, cv::Size(out_width_, out_height_), CV_16SC2, map1_, map2_);
         
         // K_

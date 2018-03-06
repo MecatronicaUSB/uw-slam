@@ -81,6 +81,8 @@ void System::Calibration(string _calibration_path) {
     cout << "Reading calibration xml file";
     camera_model_ = new CameraModel();
     camera_model_->GetCameraModel(_calibration_path);
+    w_ = camera_model_->GetOutputWidth();
+    h_ = camera_model_->GetOutputHeight();
 
     if (w_%16!=0 || h_%16!=0) {
 		cout << "Output image dimensions must be multiples of 32. Choose another output dimentions" << endl;
@@ -93,8 +95,6 @@ void System::InitializeSystem() {
     K_ = camera_model_->GetK();
     w_input_ = camera_model_->GetInputHeight();
     h_input_ = camera_model_->GetInputWidth();
-    w_ = camera_model_->GetOutputWidth();
-    h_ = camera_model_->GetOutputHeight();
     map1_ = camera_model_->GetMap1();
     map2_ = camera_model_->GetMap2();
     fx_ = camera_model_->GetK().at<double>(0,0);

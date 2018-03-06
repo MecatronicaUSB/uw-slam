@@ -138,7 +138,7 @@ int main (int argc, char *argv[]) {
     }
 
     // Delete system
-    uwSystem->~System();
+    //  uwSystem->~System();
     
     return 0;
 }
