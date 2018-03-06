@@ -24,7 +24,7 @@
 namespace uw
 {
 
-Visualizer::Visualizer(int start_index, int num_images, string ground_truth_path){
+Visualizer::Visualizer(int start_index, int num_images, string ground_truth_path) {
     
     use_ground_truth_ = false;
     num_images_ = num_images;
@@ -126,12 +126,14 @@ Visualizer::Visualizer(int start_index, int num_images, string ground_truth_path
     camera_pose_ = camera_pose;
 };
 
+Visualizer::~Visualizer() {};
+
 void Visualizer::UpdateMessages(Frame* frame){
     // Rate (Hz) of publishing messages
     ros::Rate r(200);
 
     // Update image message
-    sensor_msgs::ImagePtr current_frame = cv_bridge::CvImage(std_msgs::Header(), "mono8", frame->image_[0]).toImageMsg();
+    sensor_msgs::ImagePtr current_frame = cv_bridge::CvImage(std_msgs::Header(), "mono8", frame->images_[0]).toImageMsg();
 
     SE3 pose = frame->rigid_transformation_;
     Mat31 t = pose.translation();

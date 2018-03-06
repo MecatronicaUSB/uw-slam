@@ -82,71 +82,96 @@ public:
      * 
      * @param _width    Width of images at finest level.
      * @param _height   Height of images at finest level.
-     * @param K         Camera intrinsic matrix at finest level.
+     * @param _K        Camera intrinsic matrix at finest level.
      */
-    void InitializePyramid(int _width, int _height, Mat K);
+    void InitializePyramid(int _width, int _height, Mat _K);
     
     /**
      * @brief Computes optimal transformation given two input frames.
      * 
-     * @param previous_frame 
-     * @param current_frame 
+     * @param _previous_frame 
+     * @param _current_frame 
      */
-    void EstimatePose(Frame* previous_frame, Frame* current_frame);
+    void EstimatePose(Frame* _previous_frame, Frame* _current_frame);
 
     /**
      * @brief Computes gradient of a frame for each pyramid level available.
      *        Saves the result gradient images within the frame class.
      * 
-     * @param frame 
+     * @param _frame 
      */
-    void ApplyGradient(Frame* frame);
+    void ApplyGradient(Frame* _frame);
 
     /**
-     * @brief Obtains candidate points from grandient images of a frame for each pyramid level available.
+     * @brief Obtains candidate points from gradient images of a frame for each pyramid level available (Sparse).
+     *        _frame must have gradients precomputed for each pyramid level available *see ApplyGradient().
      * 
      * @param frame 
      */
-    void ObtainCandidatePoints(Frame* frame);
+    void ObtainCandidatePoints(Frame* _frame);
 
-    void ObtainAllPoints(Frame* frame);
+    /**
+     * @brief Obtains all points from image to future warping for each pyramid level available (Dense).
+     *        _frame must have gradients precomputed for each pyramid level available *see ApplyGradient().
+     * 
+     * @param _frame 
+     */
+    void ObtainAllPoints(Frame* _frame);
+
     /**
      * @brief Computes warp projected points from one frame to another, given a rigid transformation matrix 
      *        and the depth estimation of those points. Returns matrix of warped points.
      * 
-     * @param points2warp 
-     * @param depth 
-     * @param rigid_transformation 
+     * @param _points2warp 
+     * @param _depth 
+     * @param _rigid_transformation 
      * @return Mat 
      */
-    Mat WarpFunction(Mat points2warp, Mat depth, SE3 rigid_transformation, int lvl);
+    Mat WarpFunction(Mat _points2warp, Mat _depth, SE3 _rigid_transformation, int _lvl);
+
+    /**
+     * @brief Transforms Mat of six parameters (Lie algebra group) to SE3 Sophus pose structure
+     * 
+     * @param _input 
+     * @return SE3 
+     */
+    SE3 Mat2SE3(Mat _input);
+
+
+    void ObtainImageTransformed(Mat _originalImage, Mat _candidatePoints, Mat _warpedPoints, Mat _outputImage);
+    
+    void ObtainGradientXY(Mat _inputImage, Mat _gradientX, Mat _gradientY);
+    
+    void DebugShowResidual(Mat _image1, Mat _image2, Mat _candidatePoints, Mat _warped, int _lvl);
+
+
+    double MedianMat(Mat _input);
+
+    double MedianAbsoluteDeviation(double _c, Mat _input);
+
+    /**
+     * @brief Returns a _num_residuals x 1 Mat of ones.
+     * 
+     * @param _input 
+     * @return Mat 
+     */
+    Mat IdentityWeights(int _num_residuals);
+
+    Mat TukeyFunctionWeights(Mat _residuals);
 
     /**
      * @brief Shows points in an image. Used only for debbugin.
      * 
-     * @param image 
-     * @param candidatePoints 
+     * @param _image 
+     * @param _candidatePoints 
      */
-    void DebugShowCandidatePoints(Mat image, Mat candidatePoints);
+    void DebugShowCandidatePoints(Mat _image, Mat _candidatePoints);
 
-    SE3 Mat2SE3(Mat input);
-
-    void ObtainImageTransformed(Mat originalImage, Mat candidatePoints, Mat warpedPoints, Mat outputImage);
+    void DebugShowWarpedPerspective(Mat _image1, Mat _image2, Mat _candidatePoints, Mat _warped, int _lvl);
     
-    void ObtainGradientXY(Mat inputImage, Mat gradientX, Mat gradientY);
-    
-    void DebugShowResidual(Mat image1, Mat image2, Mat candidatePoints, Mat warped, int _lvl);
 
-    void DebugShowWarpedPerspective(Mat image1, Mat image2, Mat candidatePoints, Mat warped, int _lvl);
-
-    double MedianMat(Mat input);
-
-    double MedianAbsoluteDeviation(double c, Mat input);
-
-    Mat TukeyFunctionWeights(Mat input);
-
-    Mat IdentityWeights(Mat input);
-
+    // TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com)
+    // 03-05-2018 - Review: Ceres usage in UW-SLAM ?
     template<int kNumResiduals, int N1 = 0>
     class ResidualIntensity : public ceres::SizedCostFunction<kNumResiduals, N1>
     {

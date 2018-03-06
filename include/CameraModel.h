@@ -50,50 +50,51 @@ public:
 	~CameraModel();
 
 	/**
-	 * @brief Creates an CameraModel by reading the distortion parameters from a file
-	 * 			Please refer to calibration.xml file to see the format
-	 * @param calibrationPath String with calibration .xml file
+	 * @brief Creates an CameraModel by reading the distortion parameters from a file.
+	 * 		  Please refer to calibration.xml file to see the format.
+	 * 
+	 * @param _calibrationPath 		String with calibration .xml file
 	 */
-    void GetCameraModel(string calibrationPath);
+    void GetCameraModel(string _calibrationPath);
     
 	/**
 	 * @brief Undistorts the given image and returns the result image
 	 * 
-	 * @param image Image to undistorts
-	 * @param result Result image
+	 * @param _image 		Image to undistorts
+	 * @param _result 		Output image
 	 */
-	void Undistort(const cv::Mat& image, cv::OutputArray result) const;
+	void Undistort(const cv::Mat& _image, cv::OutputArray _result) const;
 	
 	/**
-	 * @brief Returns the intrinsic parameter matrix of the undistorted images
+	 * @brief Returns the intrinsic parameter matrix of the undistorted images.
 	 * 
-	 * @return const cv::Mat& getK Intrinsic parameter matrix of undistorted images
+	 * @return const cv::Mat& getK 	Intrinsic parameter matrix of undistorted images.
 	 */
 	const cv::Mat& GetK() const;
 	
 	/**
-	 * @brief Returns the intrinsic parameter matrix of the original images
+	 * @brief Returns the intrinsic parameter matrix of the original images.
 	 * 
-	 * @return const cv::Mat& getOriginalK Intrinsic parameter matrix of distorted images
+	 * @return const cv::Mat& getOriginalK Intrinsic parameter matrix of distorted images.
 	 */
 	const cv::Mat& GetOriginalK() const;
 	
 	/**
-	 * @brief Returns the map1 computed for undistortion
+	 * @brief Returns the map1 computed for undistortion.
 	 * 
-	 * @return const cv::Mat& getMap1 Map1 computed for undistortion
+	 * @return const cv::Mat& getMap1 Map1 computed for undistortion.
 	 */
 	const cv::Mat& GetMap1() const;
 	
 	/**
-	 * @brief Returns the map2 computed for undistortion
+	 * @brief Returns the map2 computed for undistortion.
 	 * 
-	 * @return const cv::Mat& getMap2 Map2 computed for undistortion
+	 * @return const cv::Mat& getMap2 Map2 computed for undistortion.
 	 */
 	const cv::Mat& GetMap2() const;
 
 	/**
-	 * @brief Returns the width of the undistorted images in pixels
+	 * @brief Returns the width of the undistorted images in pixels.
 	 * 
 	 * @return int getOutputWidth 
 	 */
@@ -101,7 +102,7 @@ public:
 
 
 	/**
-	 * @brief Returns the height of the undistorted images in pixels
+	 * @brief Returns the height of the undistorted images in pixels.
 	 * 
 	 * @return int getOutputHeight 
 	 */
@@ -124,8 +125,8 @@ public:
 	/**
 	 * @brief Returns if the undistorter was initialized successfully.
 	 * 
-	 * @return true 	Rectification was made
-	 * @return false 	Rectification wasn't made
+	 * @return true 	Rectification on.
+	 * @return false 	Rectification off.
 	 */
 	bool IsValid() const;
 

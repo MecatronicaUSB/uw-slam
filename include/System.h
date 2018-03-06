@@ -75,18 +75,18 @@ public:
 
 
     int id;
-    vector<Mat> image_     = vector<Mat>(PYRAMID_LEVELS);
+    vector<Mat> images_    = vector<Mat>(PYRAMID_LEVELS);
     vector<Mat> gradientX_ = vector<Mat>(PYRAMID_LEVELS);
     vector<Mat> gradientY_ = vector<Mat>(PYRAMID_LEVELS);
     vector<Mat> gradient_  = vector<Mat>(PYRAMID_LEVELS);
     
-    vector<vector<Point3f> > framePoints_ = vector<vector<Point3f> >(PYRAMID_LEVELS);
     vector<Mat> candidatePoints_      = vector<Mat>(PYRAMID_LEVELS);
     vector<Mat> candidatePointsDepth_ = vector<Mat>(PYRAMID_LEVELS);
-    
+    vector<vector<Point3f> > framePoints_ = vector<vector<Point3f> >(PYRAMID_LEVELS);
+
+    int idFrame_;
     vector<float> map_;
     SE3 rigid_transformation_;
-    int idFrame_;
 
     bool obtained_gradients_;
     bool obtained_candidatePoints_;    
@@ -98,8 +98,11 @@ public:
     /**
      * @brief Constructor of System. Contains args from parser for ROS initialization.
      * 
+     * @param argc 
+     * @param argv 
+     * @param _start_index 
      */
-    System(int argc, char *argv[], int start_index);
+    System(int argc, char *argv[], int _start_index);
 
     /**
      * @brief Destructor of System.
@@ -112,9 +115,9 @@ public:
      *        the calibration .xml file. Refer to sample/calibration.xml for file structure.
      *        Camera Models supported: Pinhole, RadTan / Equidistant.
      * 
-     * @param calibration_path 
+     * @param _calibration_path 
      */
-    void Calibration(string calibration_path);
+    void Calibration(string _calibration_path);
 
     /**
      * @brief Initializes necessary variables to start SLAM system.
@@ -132,40 +135,41 @@ public:
     /**
      * @brief Adds the frame corresponding on the id position from all the dataset.
      * 
-     * @param id 
+     * @param _id 
      */
-    void AddFrame(int id);
+    void AddFrame(int _id);
 
     /**
      * @brief Adds num_images frames to the system, starting from the id position from
      *        all the dataset. Only used for debuggin purposes.
      * 
-     * @param nImages 
+     * @param _id 
+     * @param _num_images 
      */
-    void AddFramesGroup(int id, int num_images);
+    void AddFramesGroup(int _id, int _num_images);
 
     /**
      * @brief Adds the keyframe corresponding on the id position from all the dataset.
      * 
-     * @param id 
+     * @param _id 
      */
-    void AddKeyFrame(int id);
+    void AddKeyFrame(int _id);
 
     /**
      * @brief Adds a list of images path to the system, for future reading of the frames.
      *        Propagates ground_truth_path to later use of Visualizer (optional).
      * 
-     * @param path 
-     * @param ground_truth_path 
+     * @param _path 
+     * @param _ground_truth_path 
      */
-    void AddListImages(string path, string ground_truth_path);
+    void AddListImages(string _path, string _ground_truth_path);
 
     /**
      * @brief Fast function to show an id frame. Only used for debuggin purposes.
      * 
-     * @param id 
+     * @param _id 
      */
-    void ShowFrame(int id);
+    void ShowFrame(int _id);
 
     /**
      * @brief Deletes oldest frame of list to mantain memory consumption

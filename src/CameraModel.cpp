@@ -27,13 +27,13 @@ namespace uw
 CameraModel::~CameraModel() {}
 
 // TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com) 02-13-2018 - Implement other camera models to UWSLAM (FOV)
-void CameraModel::GetCameraModel(string calibration_path) {
+void CameraModel::GetCameraModel(string _calibration_path) {
     valid_ = true;
 
     // Reading intrinsic parameters and distortion coefficients from file
     Mat calibration_values = Mat(1, 4, CV_64FC1, Scalar(0.0));
     Mat distortion_values  = Mat(1, 4, CV_64FC1, Scalar(0.0));
-    FileStorage opencv_file(calibration_path, cv::FileStorage::READ);
+    FileStorage opencv_file(_calibration_path, cv::FileStorage::READ);
     if (opencv_file.isOpened()) {
         cout << " ... found" << endl;
         opencv_file["in_width"] >> in_width_;
@@ -97,8 +97,8 @@ void CameraModel::GetCameraModel(string calibration_path) {
     }
 }
 
-void CameraModel::Undistort(const cv::Mat& image, cv::OutputArray result) const {
-	cv::remap(image, result, map1_, map2_, cv::INTER_LINEAR);
+void CameraModel::Undistort(const cv::Mat& _image, cv::OutputArray _result) const {
+	cv::remap(_image, _result, map1_, map2_, cv::INTER_LINEAR);
 }
 
 const cv::Mat& CameraModel::GetMap1() const {

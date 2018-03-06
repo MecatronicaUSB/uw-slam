@@ -26,9 +26,9 @@
 namespace uw
 {
 
-System::System(int argc, char *argv[], int start_index) {
+System::System(int argc, char *argv[], int _start_index) {
     ros::init(argc, argv, "uw_slam");  // Initialize ROS
-    start_index_ = start_index;
+    start_index_ = _start_index;
     initialized_ = false;
     rectification_valid_ = false;
     num_frames_     = 0;
@@ -36,7 +36,19 @@ System::System(int argc, char *argv[], int start_index) {
 }
 
 System::~System(void) {
-    cout << "System deleted" << endl;
+
+    frames_.clear();
+    keyframes_.clear();
+
+    camera_model_->~CameraModel();
+    tracker_->~Tracker();
+    visualizer_->~Visualizer();
+
+    delete current_frame_;
+    delete previous_frame_;
+    delete current_keyframe_;
+
+    cout << "SLAM System shutdown ..." << endl;
 }
 
 Frame::Frame(void) {
@@ -54,7 +66,7 @@ Frame::~Frame(void) {
     for (vector<Point3f> point : framePoints_)
         point.clear();
 
-    image_.clear();
+    images_.clear();
     gradientX_.clear();
     gradientY_.clear();
     gradient_.clear();
@@ -65,10 +77,10 @@ Frame::~Frame(void) {
 }
 
 
-void System::Calibration(string calibration_path) {
+void System::Calibration(string _calibration_path) {
     cout << "Reading calibration xml file";
     camera_model_ = new CameraModel();
-    camera_model_->GetCameraModel(calibration_path);
+    camera_model_->GetCameraModel(_calibration_path);
 
     if (w_%16!=0 || h_%16!=0) {
 		cout << "Output image dimensions must be multiples of 32. Choose another output dimentions" << endl;
@@ -115,21 +127,20 @@ void System::Tracking() {
 
 }
 
-void System::AddFrame(int id) {
+void System::AddFrame(int _id) {
     Frame* newFrame   = new Frame();
-    newFrame->idFrame_ = id;
-    newFrame->image_[0] = imread(images_list_[id], CV_LOAD_IMAGE_GRAYSCALE);
+    newFrame->idFrame_ = _id;
+    newFrame->images_[0] = imread(images_list_[_id], CV_LOAD_IMAGE_GRAYSCALE);
 
     if (rectification_valid_)
-        remap(newFrame->image_[0], newFrame->image_[0], map1_, map2_, INTER_LINEAR);
+        remap(newFrame->images_[0], newFrame->images_[0], map1_, map2_, INTER_LINEAR);
 
-    for (int i=1; i<PYRAMID_LEVELS; i++) {      
-        resize(newFrame->image_[i-1], newFrame->image_[i], Size(), 0.5, 0.5);
-    }
+    for (int i=1; i<PYRAMID_LEVELS; i++) 
+        resize(newFrame->images_[i-1], newFrame->images_[i], Size(), 0.5, 0.5);
     
     // Debug show of pyramid levels of images
     // for (int i=0; i<PYRAMID_LEVELS; i++) {
-    //     imshow("Show", newFrame->image_[i]);
+    //     imshow("Show", newFrame->images_[i]);
     //     cout << tracker_->K_[i] << endl;
     //     cout << endl;
     //     waitKey(0);
@@ -146,9 +157,9 @@ void System::AddFrame(int id) {
     num_frames_++;
 }
 
-void System::AddKeyFrame(int id) {
-    if(id > current_frame_->idFrame_){
-        cout << "Can not add keyframe because frame " << id << " is not part of the systems frames" << endl;
+void System::AddKeyFrame(int _id) {
+    if(_id > current_frame_->idFrame_){
+        cout << "Can not add keyframe because frame " << _id << " is not part of the systems frames" << endl;
         cout << "Exiting ..." << endl;
         exit(0);
     }
@@ -162,30 +173,30 @@ void System::AddKeyFrame(int id) {
     keyframes_.push_back(newKeyFrame);
 }
 
-void System::ShowFrame(int id) {
-    imshow("Show last frame", frames_[id]->image_[0]);
+void System::ShowFrame(int _id) {
+    imshow("Show last frame", frames_[_id]->images_[0]);
     waitKey(0);
 }
 
-void System::AddFramesGroup(int id, int num_images) {
-    for (int i = id; i < num_images; i++)
+void System::AddFramesGroup(int _id, int _num_images) {
+    for (int i = _id; i < _num_images; i++)
         System::AddFrame(i);
 }
 
-void System::AddListImages(string path, string ground_truth_path) {
+void System::AddListImages(string _path, string _ground_truth_path) {
     vector<string> file_names;
     DIR *dir;
     struct dirent *ent;
 
     cout << "Searching images files in directory ... ";
-    if ((dir = opendir(path.c_str())) != NULL) {
+    if ((dir = opendir(_path.c_str())) != NULL) {
         while ((ent = readdir (dir)) != NULL) {
-            file_names.push_back(path + string(ent->d_name));
+            file_names.push_back(_path + string(ent->d_name));
         }
         closedir (dir);
     } else {
         // If the directory could not be opened
-        cout << "can not find directory" << endl;
+        cout << "Could not open directory: " << _path << endl;
         cout << "Exiting..." << endl;
         exit(0);
     }
@@ -200,7 +211,7 @@ void System::AddListImages(string path, string ground_truth_path) {
     }
     cout << file_names.size() << " found"  << endl;
 
-    ground_truth_path_ = ground_truth_path;
+    ground_truth_path_ = _ground_truth_path;
     images_list_ = file_names;
 }
 
