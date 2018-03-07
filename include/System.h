@@ -130,7 +130,7 @@ public:
      * @brief Initializes necessary variables to start SLAM system.
      *        Call after Calibration() but before adding the first frame to the system.
      */
-    void InitializeSystem();
+    void InitializeSystem(string _images_path, string _ground_truth_dataset, string _ground_truth_path);
 
     /**
      * @brief Starts tracking thread of the next frame. 
@@ -167,9 +167,8 @@ public:
      *        Propagates ground_truth_path to later use of Visualizer (optional).
      * 
      * @param _path 
-     * @param _ground_truth_path 
      */
-    void AddListImages(string _path, string _ground_truth_path);
+    void AddLists(string _path);
 
     /**
      * @brief Fast function to show an id frame. Only used for debuggin purposes.
@@ -200,6 +199,7 @@ public:
     vector<Frame*> frames_;
     vector<Frame*> keyframes_;
     vector<string> images_list_;
+    string ground_truth_dataset_;    
     string ground_truth_path_;
 
     Mat K_;

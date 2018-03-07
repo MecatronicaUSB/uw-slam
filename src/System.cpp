@@ -81,14 +81,18 @@ void System::Calibration(string _calibration_path) {
     w_ = camera_model_->GetOutputWidth();
     h_ = camera_model_->GetOutputHeight();
 
-    if (w_%16!=0 || h_%16!=0) {
+    if (w_%2!=0 || h_%2!=0) {
 		cout << "Output image dimensions must be multiples of 32. Choose another output dimentions" << endl;
         cout << "Exiting..." << endl;
 		exit(0);
 	}
 }
 
-void System::InitializeSystem() {
+void System::InitializeSystem(string _images_path, string _ground_truth_dataset, string _ground_truth_path) {
+    // Add list of the dataset images names
+    AddLists(_images_path);
+
+    // Obtain parameters of camera_model
     K_ = camera_model_->GetK();
     w_input_ = camera_model_->GetInputHeight();
     h_input_ = camera_model_->GetInputWidth();
@@ -100,13 +104,18 @@ void System::InitializeSystem() {
     cy_ = camera_model_->GetK().at<double>(1,2);
     distortion_valid_ = camera_model_->IsValid();
 
+    // Obtain ROI for distorted images
     if (distortion_valid_)
         CalculateROI();
 
+    // Initialize tracker system
     tracker_ = new Tracker();
     tracker_->InitializePyramid(w_, h_, K_);
 
-    visualizer_ = new Visualizer(start_index_, images_list_.size(), ground_truth_path_);
+    // Initialize output visualizer
+    ground_truth_path_    = _ground_truth_path;
+    ground_truth_dataset_ = _ground_truth_dataset;
+    visualizer_ = new Visualizer(start_index_, images_list_.size(), _ground_truth_dataset, ground_truth_path_);
 
     cout << "Initializing system ... done" << endl;
     initialized_ = true;
@@ -156,11 +165,11 @@ void System::Tracking() {
         tracker_->ApplyGradient(previous_frame_);
     
     if (not previous_frame_->obtained_candidatePoints_)
-        tracker_->ObtainAllPoints(previous_frame_);
+        //tracker_->ObtainAllPoints(previous_frame_);
         
     tracker_->ApplyGradient(current_frame_);
-    tracker_->ObtainAllPoints(current_frame_);
-    tracker_->EstimatePose(previous_frame_, current_frame_);
+    //tracker_->ObtainAllPoints(current_frame_);
+    //tracker_->EstimatePose(previous_frame_, current_frame_);
     //tracker_->WarpFunction(current_frame_->candidatePoints_[0], Mat(), current_frame_->rigid_transformation_);
 
 }
@@ -227,7 +236,7 @@ void System::AddFramesGroup(int _id, int _num_images) {
         System::AddFrame(i);
 }
 
-void System::AddListImages(string _path, string _ground_truth_path) {
+void System::AddLists(string _path) {
     vector<string> file_names;
     DIR *dir;
     struct dirent *ent;
@@ -255,7 +264,6 @@ void System::AddListImages(string _path, string _ground_truth_path) {
     }
     cout << file_names.size() << " found"  << endl;
 
-    ground_truth_path_ = _ground_truth_path;
     images_list_ = file_names;
 }
 

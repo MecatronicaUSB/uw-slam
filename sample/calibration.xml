@@ -1,13 +1,14 @@
 <?xml version="1.0"?>
+<!-- TUM-DATASET RGBD -->
 <opencv_storage>
 <calibrationDate>"Thu 07 Apr 2016 04:23:03 PM MSK"</calibrationDate>
 
 <!-- Images dimensions (Input)-->
-<in_width  type_id="integer"> 752 </in_width>
+<in_width  type_id="integer"> 680 </in_width>
 <in_height type_id="integer"> 480 </in_height>
 
 <!-- Images dimensions (Output)-->
-<out_width  type_id="integer"> 736 </out_width>
+<out_width  type_id="integer"> 680 </out_width>
 <out_height type_id="integer"> 480 </out_height>
 
 <!-- Calibration Values of Dataset-->
@@ -16,13 +17,43 @@
   <cols>4</cols>
   <dt>d</dt>
   <data>
-    458.654	 457.296  367.215  248.375 </data></calibration_values>
+    525	 525  319.5  239.5 </data></calibration_values>
 
 <rectification type_id="opencv-matrix">
   <rows>1</rows>
   <cols>4</cols>
   <dt>d</dt>
   <data>
-    -0.28340811 0.07395907  0.00019359  1.76187114e-05 </data></rectification>
+    0 0 0 1 </data></rectification>
 
 </opencv_storage>
+
+<!-- EUROC DATASET -->
+<!-- <?xml version="1.0"?>
+<opencv_storage>
+<calibrationDate>"Thu 07 Apr 2016 04:23:03 PM MSK"</calibrationDate> -->
+
+<!-- Images dimensions (Input)
+<in_width  type_id="integer"> 752 </in_width>
+<in_height type_id="integer"> 480 </in_height> -->
+
+<!-- Images dimensions (Output)
+<out_width  type_id="integer"> 736 </out_width>
+<out_height type_id="integer"> 480 </out_height> -->
+
+<!-- Calibration Values of Dataset
+<calibration_values type_id="opencv-matrix">
+  <rows>1</rows>
+  <cols>4</cols>
+  <dt>d</dt>
+  <data>
+    458.654	 457.296  367.215  248.375 </data></calibration_values> -->
+
+<!-- <rectification type_id="opencv-matrix">
+  <rows>1</rows>
+  <cols>4</cols>
+  <dt>d</dt>
+  <data>
+    -0.28340811 0.07395907  0.00019359  1.76187114e-05 </data></rectification> -->
+
+<!-- </opencv_storage> -->

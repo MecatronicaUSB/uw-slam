@@ -63,7 +63,7 @@ public:
      * @param num_images 
      * @param ground_truth_path 
      */
-    Visualizer(int start_index_, int num_images, string ground_truth_path);
+    Visualizer(int start_index_, int num_images, string _ground_truth_dataset, string ground_truth_path);
 
     /**
      * @brief Destructor of visualizer.
@@ -88,6 +88,9 @@ public:
      */
     void ReadGroundTruthEUROC(int start_index, string groundtruth_path);
 
+    void ReadGroundTruthTUM(int start_index, string groundtruth_path);
+    
+
 
     ros::Publisher publisher_ground_truth_pose_;
     visualization_msgs::Marker ground_truth_pose_;
@@ -98,6 +101,7 @@ public:
     image_transport::Publisher publisher_current_frame_;
 
     string ground_truth_path_;
+    string ground_truth_dataset_;   
     vector<vector<double> > ground_truth_poses_;
     int num_images_, num_ground_truth_poses_;
     int ground_truth_step_;

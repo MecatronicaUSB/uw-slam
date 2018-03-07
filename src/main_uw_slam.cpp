@@ -42,6 +42,7 @@ using namespace cv::cuda;
 int start_index;
 string images_path;
 string calibration_path;
+string ground_truth_dataset;
 string ground_truth_path;
 cuda::DeviceInfo device_info;
 
@@ -90,9 +91,15 @@ int main (int argc, char *argv[]) {
     } else {
         images_path = args::get(dir_dataset);
     }
-    if (dir_groundtruth) {
-        ground_truth_path = args::get(dir_groundtruth);
+    if (ground_truth_EUROC) {
+        ground_truth_dataset = "EUROC";
+        ground_truth_path = args::get(ground_truth_EUROC);
+    } 
+    if (ground_truth_TUM) {
+        ground_truth_dataset = "TUM";
+        ground_truth_path = args::get(ground_truth_TUM);
     } else {
+        ground_truth_dataset = "";
         ground_truth_path = "";  // Need to change for final release
     }
     if (parse_calibration) {
@@ -115,22 +122,17 @@ int main (int argc, char *argv[]) {
     // Calibrates system with certain Camera Model (currently only RadTan) 
     uwSystem->Calibration(calibration_path);
     
-    // Add list of the dataset images names (optionally ground truth reference)
-    uwSystem->AddListImages(images_path, ground_truth_path);
-
+    // Initialize SLAM system
+    uwSystem->InitializeSystem(images_path, ground_truth_dataset, ground_truth_path);
+    
     // Start SLAM process
     // Read images one by one from directory provided 
     for (int i=start_index; i<uwSystem->images_list_.size(); i++) {
-        if (not uwSystem->initialized_) {
-            uwSystem->InitializeSystem();
-            uwSystem->AddFrame(i);
-            uwSystem->AddKeyFrame(i);
-        } else {
-            uwSystem->AddFrame(i);
-            uwSystem->Tracking();
-            uwSystem->visualizer_->UpdateMessages(uwSystem->previous_frame_);
-        }
 
+        uwSystem->AddFrame(i);
+        uwSystem->Tracking();
+        uwSystem->visualizer_->UpdateMessages(uwSystem->previous_frame_);
+        
         // Delete oldest frame (keeping 10 frames)
         if (uwSystem->num_frames_> 10) {
             uwSystem->FreeFrames();

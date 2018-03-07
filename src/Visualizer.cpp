@@ -24,7 +24,7 @@
 namespace uw
 {
 
-Visualizer::Visualizer(int start_index, int num_images, string ground_truth_path) {
+Visualizer::Visualizer(int start_index, int num_images, string _ground_truth_dataset, string ground_truth_path) {
     
     use_ground_truth_ = false;
     num_images_ = num_images;
@@ -55,13 +55,13 @@ Visualizer::Visualizer(int start_index, int num_images, string ground_truth_path
     // If ground truth is used
     if (not (ground_truth_path == "")) {
         use_ground_truth_ = true;
-        ReadGroundTruthEUROC(start_index, ground_truth_path);
+        ground_truth_dataset_ = _ground_truth_dataset;
 
         // Ground truth marker initialization
         ros::NodeHandle nodehandle_ground_truth_pose;
         ros::Publisher publisher_ground_truth_pose = nodehandle_ground_truth_pose.advertise<visualization_msgs::Marker>("ground_truth", 50);
         visualization_msgs::Marker ground_truth_pose;
-
+        
         // Ground truth marker options
         ground_truth_pose.id = 0;
         ground_truth_pose.header.frame_id = "/world";            
@@ -80,33 +80,58 @@ Visualizer::Visualizer(int start_index, int num_images, string ground_truth_path
         ground_truth_pose.color.b = 1.0f;
         ground_truth_pose.color.a = 1.0;
             
-        // Initialize the camera pose marker in the same place and orientation as the ground truth marker
-        // This initialization point depends of the start_index argument in SLAM process
 
-        // Initial position and orientation of camera pose marker   
-        camera_pose.pose.position.x = ground_truth_poses_[ground_truth_index_][0];  
-        camera_pose.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
-        camera_pose.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
-        camera_pose.pose.orientation.x = ground_truth_poses_[ground_truth_index_][4];
-        camera_pose.pose.orientation.y = ground_truth_poses_[ground_truth_index_][5];    
-        camera_pose.pose.orientation.z = ground_truth_poses_[ground_truth_index_][6]; 
-        camera_pose.pose.orientation.w = ground_truth_poses_[ground_truth_index_][3]; 
+        if (ground_truth_dataset_ == "EUROC") {
+            ReadGroundTruthEUROC(start_index, ground_truth_path);
+            // EUROC Convention of quaternion: qw, qx, qy, qz
+            // Initial position and orientation of ground truth marker   
+            ground_truth_pose.pose.position.x = ground_truth_poses_[ground_truth_index_][0];    
+            ground_truth_pose.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
+            ground_truth_pose.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
+            ground_truth_pose.pose.orientation.x = ground_truth_poses_[ground_truth_index_][4]; 
+            ground_truth_pose.pose.orientation.y = ground_truth_poses_[ground_truth_index_][5];    
+            ground_truth_pose.pose.orientation.z = ground_truth_poses_[ground_truth_index_][6]; 
+            ground_truth_pose.pose.orientation.w = ground_truth_poses_[ground_truth_index_][3]; 
 
-        // Initial position and orientation of ground truth marker   
-        ground_truth_pose.pose.position.x = ground_truth_poses_[ground_truth_index_][0];    
-        ground_truth_pose.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
-        ground_truth_pose.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
-        ground_truth_pose.pose.orientation.x = ground_truth_poses_[ground_truth_index_][4]; 
-        ground_truth_pose.pose.orientation.y = ground_truth_poses_[ground_truth_index_][5];    
-        ground_truth_pose.pose.orientation.z = ground_truth_poses_[ground_truth_index_][6]; 
-        ground_truth_pose.pose.orientation.w = ground_truth_poses_[ground_truth_index_][3]; 
+            // Initialize the camera pose marker in the same place and orientation as the ground truth marker
+            // This initialization point depends of the start_index argument in SLAM process  
+            camera_pose.pose.position.x = ground_truth_poses_[ground_truth_index_][0];  
+            camera_pose.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
+            camera_pose.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
+            camera_pose.pose.orientation.x = ground_truth_poses_[ground_truth_index_][4];
+            camera_pose.pose.orientation.y = ground_truth_poses_[ground_truth_index_][5];    
+            camera_pose.pose.orientation.z = ground_truth_poses_[ground_truth_index_][6]; 
+            camera_pose.pose.orientation.w = ground_truth_poses_[ground_truth_index_][3]; 
+        }
+
+        if (ground_truth_dataset_ == "TUM") {
+            ReadGroundTruthTUM(start_index, ground_truth_path);
+            // TUM Convention of quaternion: qx, qy, qz, qw
+            ground_truth_pose.pose.position.x = ground_truth_poses_[ground_truth_index_][0];    
+            ground_truth_pose.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
+            ground_truth_pose.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
+            ground_truth_pose.pose.orientation.x = ground_truth_poses_[ground_truth_index_][3]; 
+            ground_truth_pose.pose.orientation.y = ground_truth_poses_[ground_truth_index_][4];    
+            ground_truth_pose.pose.orientation.z = ground_truth_poses_[ground_truth_index_][5]; 
+            ground_truth_pose.pose.orientation.w = ground_truth_poses_[ground_truth_index_][6]; 
+
+            // Initialize the camera pose marker in the same place and orientation as the ground truth marker
+            // This initialization point depends of the start_index argument in SLAM process  
+            camera_pose.pose.position.x = ground_truth_poses_[ground_truth_index_][0];  
+            camera_pose.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
+            camera_pose.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
+            camera_pose.pose.orientation.x = ground_truth_poses_[ground_truth_index_][3];
+            camera_pose.pose.orientation.y = ground_truth_poses_[ground_truth_index_][4];    
+            camera_pose.pose.orientation.z = ground_truth_poses_[ground_truth_index_][5]; 
+            camera_pose.pose.orientation.w = ground_truth_poses_[ground_truth_index_][6]; 
+        }
 
         // Saving ground truth marker configuration
         publisher_ground_truth_pose_ = publisher_ground_truth_pose;
         ground_truth_pose_ = ground_truth_pose;
 
     } else {
-        // Initial position and orientation of camera pose marker (origin)
+        // Initialize the camera pose marker in the same place and orientation as the ground truth marker
         camera_pose.pose.position.x = 0;  
         camera_pose.pose.position.y = 0;
         camera_pose.pose.position.z = 0;
@@ -149,13 +174,27 @@ void Visualizer::UpdateMessages(Frame* frame){
 
     // Update ground truth marker position
     if (use_ground_truth_) {
-        ground_truth_pose_.pose.position.x = ground_truth_poses_[ground_truth_index_][0];
-        ground_truth_pose_.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
-        ground_truth_pose_.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
-        ground_truth_pose_.pose.orientation.x = ground_truth_poses_[ground_truth_index_][4];           
-        ground_truth_pose_.pose.orientation.y = ground_truth_poses_[ground_truth_index_][5];        
-        ground_truth_pose_.pose.orientation.z = ground_truth_poses_[ground_truth_index_][6];      
-        ground_truth_pose_.pose.orientation.w = ground_truth_poses_[ground_truth_index_][3]; 
+        // EUROC Convention: x, y, z, qw, qx, qy, qz
+        if (ground_truth_dataset_ == "EUROC") {
+            ground_truth_pose_.pose.position.x = ground_truth_poses_[ground_truth_index_][0];
+            ground_truth_pose_.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
+            ground_truth_pose_.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
+            ground_truth_pose_.pose.orientation.x = ground_truth_poses_[ground_truth_index_][4];           
+            ground_truth_pose_.pose.orientation.y = ground_truth_poses_[ground_truth_index_][5];        
+            ground_truth_pose_.pose.orientation.z = ground_truth_poses_[ground_truth_index_][6];      
+            ground_truth_pose_.pose.orientation.w = ground_truth_poses_[ground_truth_index_][3];
+        }
+        // TUM Convention: x, y, z, qx, qy, qz, qw (changed translation)
+        if (ground_truth_dataset_ == "TUM") {
+            ground_truth_pose_.pose.position.x = ground_truth_poses_[ground_truth_index_][0];
+            ground_truth_pose_.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
+            ground_truth_pose_.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
+            ground_truth_pose_.pose.orientation.x = ground_truth_poses_[ground_truth_index_][3];           
+            ground_truth_pose_.pose.orientation.y = ground_truth_poses_[ground_truth_index_][4];        
+            ground_truth_pose_.pose.orientation.z = ground_truth_poses_[ground_truth_index_][5];      
+            ground_truth_pose_.pose.orientation.w = ground_truth_poses_[ground_truth_index_][6];
+        }
+        
         ground_truth_index_ += ground_truth_step_;
     }
 
@@ -179,6 +218,36 @@ void Visualizer::UpdateMessages(Frame* frame){
 
     ros::spinOnce();
 
+};
+
+void Visualizer::ReadGroundTruthTUM(int start_index, string groundtruth_path) {
+    string delimiter = ",";
+    string line = "";
+    ifstream file(groundtruth_path);
+    if (!file.is_open()) {
+        cerr << "Could not read file " << groundtruth_path << "\n";
+        cerr << "Exiting.." << endl;
+        return;
+    }
+    getline(file, line);
+    getline(file, line);    
+    getline(file, line);        
+    while (getline(file, line)) {
+        vector<double> timestamp_values;
+        stringstream iss(line);
+        string val;
+        getline(iss, val, ' ');
+        for (int i=0; i<7; i++) {
+            string val;
+            getline(iss, val, ' ');       
+            timestamp_values.push_back(stod(val));
+        }
+        ground_truth_poses_.push_back(timestamp_values);
+    }
+    file.close();
+    num_ground_truth_poses_ = ground_truth_poses_.size();
+    ground_truth_step_ = num_ground_truth_poses_ / num_images_ ;
+    ground_truth_index_ = start_index * ground_truth_step_;  // + 600 is a temporarly fix for syncronous video and pose of ground truth (for EUROC V1_02_medium)
 };
 
 void Visualizer::ReadGroundTruthEUROC(int start_index, string groundtruth_path) {
