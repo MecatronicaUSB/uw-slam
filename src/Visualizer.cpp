@@ -67,13 +67,9 @@ Visualizer::Visualizer(int start_index, int num_images, string _ground_truth_dat
         ground_truth_pose.header.frame_id = "/world";            
         ground_truth_pose.header.stamp = ros::Time::now();
         ground_truth_pose.ns = "uw_slam";                                                   
-        ground_truth_pose.type = visualization_msgs::Marker::ARROW;                         
         ground_truth_pose.action = visualization_msgs::Marker::ADD;
         ground_truth_pose.lifetime = ros::Duration();    
-        // Dimentions of ground truth marker   
-        ground_truth_pose.scale.x = 0.1;                             
-        ground_truth_pose.scale.y = 0.15;
-        ground_truth_pose.scale.z = 0.15;
+
         // Color of ground truth marker
         ground_truth_pose.color.r = 0.12f;                             
         ground_truth_pose.color.g = 0.56f;
@@ -83,6 +79,13 @@ Visualizer::Visualizer(int start_index, int num_images, string _ground_truth_dat
 
         if (ground_truth_dataset_ == "EUROC") {
             ReadGroundTruthEUROC(start_index, ground_truth_path);
+
+            ground_truth_pose.type = visualization_msgs::Marker::ARROW;                         
+
+            // Dimentions of ground truth marker   
+            ground_truth_pose.scale.x = 0.1;                             
+            ground_truth_pose.scale.y = 0.15;
+            ground_truth_pose.scale.z = 0.15;
             // EUROC Convention of quaternion: qw, qx, qy, qz
             // Initial position and orientation of ground truth marker   
             ground_truth_pose.pose.position.x = ground_truth_poses_[ground_truth_index_][0];    
@@ -106,6 +109,12 @@ Visualizer::Visualizer(int start_index, int num_images, string _ground_truth_dat
 
         if (ground_truth_dataset_ == "TUM") {
             ReadGroundTruthTUM(start_index, ground_truth_path);
+            
+            ground_truth_pose.type = visualization_msgs::Marker::CUBE;                         
+            // Dimentions of ground truth marker   
+            ground_truth_pose.scale.x = 0.35;                             
+            ground_truth_pose.scale.y = 0.2;
+            ground_truth_pose.scale.z = 0.025;
             // TUM Convention of quaternion: qx, qy, qz, qw
             ground_truth_pose.pose.position.x = ground_truth_poses_[ground_truth_index_][0];    
             ground_truth_pose.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
