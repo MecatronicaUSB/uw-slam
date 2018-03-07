@@ -105,7 +105,7 @@ int main (int argc, char *argv[]) {
     if (parse_calibration) {
         calibration_path = args::get(parse_calibration);
     } else {
-        calibration_path = "/home/fabiomorales/catkin_ws/src/uw-slam/sample/calibration.xml";  // Need to change for final release
+        calibration_path = "/home/fabiomorales/catkin_ws/src/uw-slam/sample/calibrationTUM.xml";  // Need to change for final release
     }
     if (start_i) {
         start_index = args::get(start_i);
@@ -126,9 +126,9 @@ int main (int argc, char *argv[]) {
     uwSystem->InitializeSystem(images_path, ground_truth_dataset, ground_truth_path);
     
     // Start SLAM process
-    // Read images one by one from directory provided 
-    for (int i=start_index; i<uwSystem->images_list_.size(); i++) {
-
+    // Read images one by one from directory provided
+    uwSystem->AddFrame(start_index);
+    for (int i=start_index+1; i<uwSystem->images_list_.size(); i++) {
         uwSystem->AddFrame(i);
         uwSystem->Tracking();
         uwSystem->visualizer_->UpdateMessages(uwSystem->previous_frame_);

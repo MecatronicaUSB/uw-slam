@@ -126,7 +126,7 @@ void System::CalculateROI() {
     Mat distorted, undistorted;
     distorted = imread(images_list_[0], CV_LOAD_IMAGE_GRAYSCALE);
     remap(distorted, undistorted, map1_, map2_, INTER_LINEAR);
-    
+
     // Find middle x and y of image (supposing a symmetrical distortion)
     int x_middle = (undistorted.cols - 1) * 0.5;
     int y_middle = (undistorted.rows - 1) * 0.5;
@@ -153,10 +153,17 @@ void System::CalculateROI() {
     while (undistorted.at<uchar>(p2.y, x_middle) == 0)
         p2.y--;
 
+    // Considering an error margin
+    p1.x += 5;
+    p2.x -= 5;
+    p1.y += 5;
+    p2.y -= 5;
+
     ROI = Rect(p1,p2);
-    // rectangle(undistorted, ROI, Scalar(255,0,0), 2, 0);
-    // imshow("Undistorted image", undistorted);
-    // waitKey(0);
+    
+    // Update w_ and h_ with ROI dimentions
+    w_ = p2.x - p1.x;
+    h_ = p2.y - p1.y;
 }
 
 void System::Tracking() {
@@ -165,11 +172,11 @@ void System::Tracking() {
         tracker_->ApplyGradient(previous_frame_);
     
     if (not previous_frame_->obtained_candidatePoints_)
-        //tracker_->ObtainAllPoints(previous_frame_);
+        tracker_->ObtainAllPoints(previous_frame_);
         
     tracker_->ApplyGradient(current_frame_);
-    //tracker_->ObtainAllPoints(current_frame_);
-    //tracker_->EstimatePose(previous_frame_, current_frame_);
+    tracker_->ObtainAllPoints(current_frame_);
+    tracker_->EstimatePose(previous_frame_, current_frame_);
     //tracker_->WarpFunction(current_frame_->candidatePoints_[0], Mat(), current_frame_->rigid_transformation_);
 
 }
@@ -188,7 +195,7 @@ void System::AddFrame(int _id) {
         waitKey(0);
     }
 
-    for (int i=1; i<PYRAMID_LEVELS; i++) 
+    for (int i=1; i<PYRAMID_LEVELS; i++)
         resize(newFrame->images_[i-1], newFrame->images_[i], Size(), 0.5, 0.5);
     
     // Debug show of pyramid levels of images

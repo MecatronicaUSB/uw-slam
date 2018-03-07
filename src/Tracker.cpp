@@ -113,13 +113,14 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     Mat deltaMat = Mat::zeros(6,1,CV_64FC1);
     Sophus::Vector<double, SE3::DoF> deltaVector;
 
-    SE3 current_pose = SE3(SO3::exp(SE3::Point(0.001, 0.001, 0.001)), SE3::Point(0.01, 0.01, 0.01));
+    SE3 current_pose = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
 
     cout << endl;
     cout << "------------------------------------------" << endl;
     // Sparse to Fine iteration
     for (int lvl=PYRAMID_LEVELS-1; lvl>=0; lvl--) {
         cout << "----------- Iteration level: " << lvl << " -----------" << endl;
+        lvl = 0;
         // Initialize error   
         error = 0.0;
         last_error = 50000.0;
@@ -162,8 +163,9 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             SE3 deltaSE3;
             Mat warpedPoints = Mat(candidatePoints.size(), CV_64FC1);
             SE3 prueba = deltaSE3.exp(deltaVector) * current_pose;
-            //cout << prueba.matrix() << endl;
+
             warpedPoints = WarpFunction(candidatePoints, candidatePointsDepth, deltaSE3.exp(deltaVector) * current_pose, lvl);
+            DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
 
             // Mat imageWarped = Mat(gradient2.size(), CV_8UC1);
             // ObtainImageTransformed(image1, candidatePoints, warpedPoints, imageWarped);
@@ -176,6 +178,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             // imshow("GradientX", gradientX2);
             // imshow("GradientY", gradientY2);
             // waitKey(0);
+
             // Computation of Jacobian
             Mat Jacobian;
             for (int i=0; i<candidatePoints.rows; i++) {
@@ -202,8 +205,8 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                     intensity1 = image1.at<uchar>(y1,x1);
                     intensity2 = image2.at<uchar>(y2,x2);
 
-                    Jl.at<double>(0,0) = gradientX2.at<uchar>(y2,x2);
-                    Jl.at<double>(0,1) = gradientY2.at<uchar>(y2,x2);
+                    Jl.at<double>(0,0) = gradientX1.at<uchar>(y1,x1);
+                    Jl.at<double>(0,1) = gradientY1.at<uchar>(y1,x1);
 
                     double inv_z2 = 1 / z2;
 
@@ -251,8 +254,8 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             Residuals = abs(I2 - I1);
 
             // Computation of Weights (Identity or Tukey function)
-            // Mat W = IdentityWeights(Residuals.rows);
-            Mat W = TukeyFunctionWeights(Residuals);
+            Mat W = IdentityWeights(Residuals.rows);
+            // Mat W = TukeyFunctionWeights(Residuals);
 
             // Computation of error
             double inv_num_residuals = 1.0 / Residuals.rows;
@@ -369,7 +372,7 @@ void Tracker::ApplyGradient(Frame* _frame) {
 void Tracker::ObtainAllPoints(Frame* _frame) {
     for (int lvl=0; lvl< PYRAMID_LEVELS; lvl++) {
         _frame->candidatePoints_[lvl] = Mat::ones(w_[lvl] * h_[lvl], 4, CV_64FC1);
-        _frame->candidatePointsDepth_[lvl] = 1 * Mat::ones(w_[lvl] * h_[lvl], 1, CV_64FC1);
+        _frame->candidatePointsDepth_[lvl] = 300 * Mat::ones(w_[lvl] * h_[lvl], 1, CV_64FC1);
         for (int x=0; x<w_[lvl]; x++) {
             for (int y =0; y<h_[lvl]; y++) {
                 Point3f point;
@@ -449,7 +452,6 @@ Mat Tracker::WarpFunction(Mat _points2warp, Mat _depth, SE3 _rigid_transformatio
     // cout << "cy: " << cy << endl;
     
     int prueba = 1;
-    //cout << "_input point: " << projected_points.row(prueba) << endl;
 
     projected_points.col(0) = ((projected_points.col(0) - cx) * invfx);
     projected_points.col(0) = projected_points.col(0).mul(_depth);
@@ -642,7 +644,6 @@ void Tracker::DebugShowResidual(Mat _image1, Mat _image2, Mat _candidatePoints, 
 
 void Tracker::DebugShowWarpedPerspective(Mat _image1, Mat _image2, Mat _candidatePoints, Mat _warped, int _lvl) {
     int lvl = _lvl + 1;
-    double scale = 0.5 * lvl;
     Mat warpImage = Mat::zeros(_image1.size(), CV_8UC1);
     Mat noalign = Mat::zeros(_image2.size(), CV_8UC1);
     Mat showPoints1, showPoints2;
@@ -681,7 +682,7 @@ void Tracker::DebugShowWarpedPerspective(Mat _image1, Mat _image2, Mat _candidat
 
     p4.x = _warped.at<double>(_warped.rows-1,0);
     p4.y = _warped.at<double>(_warped.rows-1,1);
-    
+
     line(showPoints1,p1,p2,Scalar(255,0,0), 1, 8, 0);
     line(showPoints1,p2,p4,Scalar(255,0,0), 1, 8, 0);
     line(showPoints1,p4,p3,Scalar(255,0,0), 1, 8, 0);
