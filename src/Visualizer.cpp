@@ -98,7 +98,7 @@ Visualizer::Visualizer(int start_index, int num_images, string _ground_truth_dat
 
             // Initialize the camera pose marker in the same place and orientation as the ground truth marker
             // This initialization point depends of the start_index argument in SLAM process  
-            camera_pose.pose.position.x = ground_truth_poses_[ground_truth_index_][0];  
+            camera_pose.pose.position.x = ground_truth_poses_[ground_truth_index_][0] - 2;  
             camera_pose.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
             camera_pose.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
             camera_pose.pose.orientation.x = ground_truth_poses_[ground_truth_index_][4];
