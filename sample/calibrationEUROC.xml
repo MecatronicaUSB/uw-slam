@@ -3,11 +3,11 @@
 <opencv_storage>
 <calibrationDate>"Thu 07 Apr 2016 04:23:03 PM MSK"</calibrationDate>
 
-Images dimensions (Input)
+<!-- Images dimensions (Input) -->
 <in_width  type_id="integer"> 752 </in_width>
 <in_height type_id="integer"> 480 </in_height>
 
-Images dimensions (Output)
+<!-- Images dimensions (Output) -->
 <out_width  type_id="integer"> 736 </out_width>
 <out_height type_id="integer"> 480 </out_height>
 

@@ -3,9 +3,9 @@
     <!-- UW-SLAM main thread-->
     <node pkg="uw_slam" type="main_uw_slam" name="main"  
         args="-d /home/fabiomorales/Documents/datasets/TUM-DATASET/rgbd_dataset_freiburg2_xyz/rgb/
-              -c /home/fabiomorales/catkin_ws/src/uw-slam/sample/calibrationTUM.xml  
-              --TUM /home/fabiomorales/Documents/datasets/TUM-DATASET/rgbd_dataset_freiburg2_xyz/groundtruth.txt             
-              -s 0"
+              -c /home/fabiomorales/catkin_ws/src/uw-slam/sample/calibrationTUM.xml
+              --TUM /home/fabiomorales/Documents/datasets/TUM-DATASET/rgbd_dataset_freiburg2_xyz/groundtruth.txt      
+              -s 210"
         clear_params="true" 
         output="screen"/>
         
@@ -14,16 +14,10 @@
 </launch>
 
 <!-- EUROC DATASET -->
-<!-- <launch> -->
-    <!-- UW-SLAM main thread-->
     <!-- <node pkg="uw_slam" type="main_uw_slam" name="main"  
-        args="-d /home/fabiomorales/Documents/datasets/EUROC/V1_02_medium/mav0/cam0/data/
-              -c /home/fabiomorales/catkin_ws/src/uw-slam/sample/calibration.xml
-              -g /home/fabiomorales/Documents/datasets/EUROC/V1_02_medium/mav0/vicon0/data.csv        
+        args="-d /home/fabiomorales/Documents/datasets/TUM-DATASET/rgbd_dataset_freiburg2_xyz/rgb/
+              -c /home/fabiomorales/catkin_ws/src/uw-slam/sample/calibrationTUM.xml
+              --TUM /home/fabiomorales/Documents/datasets/TUM-DATASET/rgbd_dataset_freiburg2_xyz/groundtruth.txt      
               -s 210"
         clear_params="true" 
         output="screen"/> -->
-        
-    <!-- Rviz visualizer-->
-    <!-- <node pkg="rviz" type="rviz" name="rviz"/>
-</launch> -->

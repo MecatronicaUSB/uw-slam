@@ -115,7 +115,7 @@ void System::InitializeSystem(string _images_path, string _ground_truth_dataset,
     // Initialize output visualizer
     ground_truth_path_    = _ground_truth_path;
     ground_truth_dataset_ = _ground_truth_dataset;
-    visualizer_ = new Visualizer(start_index_, images_list_.size(), _ground_truth_dataset, ground_truth_path_);
+    visualizer_ = new Visualizer(start_index_, images_list_.size(), _ground_truth_dataset, _ground_truth_path);
 
     cout << "Initializing system ... done" << endl;
     initialized_ = true;
@@ -185,27 +185,20 @@ void System::AddFrame(int _id) {
     Frame* newFrame   = new Frame();
     newFrame->idFrame_ = _id;
     newFrame->images_[0] = imread(images_list_[_id], CV_LOAD_IMAGE_GRAYSCALE);
-
+    // imshow("Distorted", newFrame->images_[0]);
+    // waitKey(0);
     if (distortion_valid_) {
         Mat distortion;
         remap(newFrame->images_[0], distortion, map1_, map2_, INTER_LINEAR);
         newFrame->images_[0] = distortion(ROI);
-        imshow("Undistorted", distortion);
-        imshow("Croped", newFrame->images_[0]);
-        waitKey(0);
+        // imshow("Undistorted", distortion);
+        // imshow("Croped", newFrame->images_[0]);
+        // waitKey(0);
     }
 
     for (int i=1; i<PYRAMID_LEVELS; i++)
         resize(newFrame->images_[i-1], newFrame->images_[i], Size(), 0.5, 0.5);
     
-    // Debug show of pyramid levels of images
-    // for (int i=0; i<PYRAMID_LEVELS; i++) {
-    //     imshow("Show", newFrame->images_[i]);
-    //     cout << tracker_->K_[i] << endl;
-    //     cout << endl;
-    //     waitKey(0);
-    // }
-
     if (num_frames_ == 0) {
         previous_frame_ = newFrame;        
         current_frame_ = newFrame;

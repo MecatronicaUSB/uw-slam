@@ -94,8 +94,7 @@ int main (int argc, char *argv[]) {
     if (ground_truth_EUROC) {
         ground_truth_dataset = "EUROC";
         ground_truth_path = args::get(ground_truth_EUROC);
-    } 
-    if (ground_truth_TUM) {
+    } else if (ground_truth_TUM) {
         ground_truth_dataset = "TUM";
         ground_truth_path = args::get(ground_truth_TUM);
     } else {

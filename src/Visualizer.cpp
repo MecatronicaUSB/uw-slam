@@ -51,12 +51,12 @@ Visualizer::Visualizer(int start_index, int num_images, string _ground_truth_dat
     camera_pose.color.g = 0.12f;
     camera_pose.color.b = 1.0f;
     camera_pose.color.a = 1.0;
-                  
+    
+    cout << _ground_truth_dataset << endl;
     // If ground truth is used
     if (not (ground_truth_path == "")) {
         use_ground_truth_ = true;
         ground_truth_dataset_ = _ground_truth_dataset;
-
         // Ground truth marker initialization
         ros::NodeHandle nodehandle_ground_truth_pose;
         ros::Publisher publisher_ground_truth_pose = nodehandle_ground_truth_pose.advertise<visualization_msgs::Marker>("ground_truth", 50);

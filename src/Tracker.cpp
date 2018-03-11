@@ -98,10 +98,10 @@ void Tracker::InitializePyramid(int _width, int _height, Mat _K) {
 }
 
 
-// Gauss-Newton using Foward Additive Algorithm
+// Gauss-Newton using Foward Compositional Algorithm
 void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     // Gauss-Newton Options
-    int max_iterations = 5;
+    int max_iterations = 6;
     double error_threshold = 0.005;
 
     // Variables initialization
@@ -109,212 +109,155 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     double last_error = 0.0;
 
     // Initial pose and deltapose (assumes little movement between frames)
-
     Mat deltaMat = Mat::zeros(6,1,CV_64FC1);
     Sophus::Vector<double, SE3::DoF> deltaVector;
 
     SE3 current_pose = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
 
-    cout << endl;
-    cout << "------------------------------------------" << endl;
     // Sparse to Fine iteration
-    for (int lvl=PYRAMID_LEVELS-1; lvl>=0; lvl--) {
-        cout << "----------- Iteration level: " << lvl << " -----------" << endl;
-        lvl = 0;
-        // Initialize error   
-        error = 0.0;
-        last_error = 50000.0;
-        
-        // Obtain points and depth of initial frame 
-        Mat candidatePoints      = _previous_frame->candidatePoints_[lvl].clone();
-        Mat candidatePointsDepth = _previous_frame->candidatePointsDepth_[lvl].clone();
-
-        // Obtain gradients
-        Mat image1 = _previous_frame->images_[lvl].clone();
-        Mat image2 = _current_frame->images_[lvl].clone();
-        Mat gradient1 = _previous_frame->gradient_[lvl].clone();
-        Mat gradient2 = _current_frame->gradient_[lvl].clone();
-        Mat gradientX1 = _previous_frame->gradientX_[lvl].clone();
-        Mat gradientY1 = _previous_frame->gradientY_[lvl].clone();
-        Mat gradientX2 = _current_frame->gradientX_[lvl].clone();
-        Mat gradientY2 = _current_frame->gradientY_[lvl].clone();
-
-        // Obtain intrinsic parameters 
-        Mat K = K_[lvl];
-
-        deltaMat = Mat::zeros(6,1,CV_64FC1);
-        deltaVector(0) = 0;
-        deltaVector(1) = 0;
-        deltaVector(2) = 0;
-        deltaVector(3) = 0;
-        deltaVector(4) = 0;
-        deltaVector(5) = 0;
+    // Create for()
+    int lvl = 0;
+    // Initialize error   
+    error = 0.0;
+    last_error = 50000.0;
     
-        // Optimization iteration
-        for (int k=0; k<max_iterations; k++) {
+    // Obtain points and depth of initial frame 
+    Mat candidatePoints      = _previous_frame->candidatePoints_[lvl].clone();
+    Mat candidatePointsDepth = _previous_frame->candidatePointsDepth_[lvl].clone();
 
-            int num_invalid_pixels = 0;
-            vector<Mat> Jws;    
-            vector<Mat> Jls;
-            vector<uchar> intensities1;        
-            vector<uchar> intensities2;
+    // Obtain gradients
+    Mat image1 = _previous_frame->images_[lvl].clone();
+    Mat gradient1 = _previous_frame->gradient_[lvl].clone();
+    Mat gradient2 = _current_frame->gradient_[lvl].clone();    
+    Mat gradientX1 = _previous_frame->gradientX_[lvl].clone();
+    Mat gradientY1 = _previous_frame->gradientY_[lvl].clone();
 
-            // Warp points with current pose and delta pose (from previous iteration)
-            SE3 deltaSE3;
-            Mat warpedPoints = Mat(candidatePoints.size(), CV_64FC1);
-            SE3 prueba = deltaSE3.exp(deltaVector) * current_pose;
+    // Obtain intrinsic parameters 
+    Mat K = K_[lvl];
 
-            warpedPoints = WarpFunction(candidatePoints, candidatePointsDepth, deltaSE3.exp(deltaVector) * current_pose, lvl);
-            DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
+    // Computation of Jw (constant in Compositional Algorithm)
+    vector<Mat> Jws;
+    for (int i=0; i<candidatePoints.rows; i++) {
 
-            // Mat imageWarped = Mat(gradient2.size(), CV_8UC1);
-            // ObtainImageTransformed(image1, candidatePoints, warpedPoints, imageWarped);
-            // imshow("IMAGE WARPED", imageWarped);
-            // waitKey(0);
+        Mat Jw = Mat(2,6,CV_64FC1);
 
-            // Mat gradientX2, gradientY2;
-            // ObtainGradientXY(imageWarped, gradientX2, gradientY2);
-            // imshow("IMAGE WARPED", imageWarped);
-            // imshow("GradientX", gradientX2);
-            // imshow("GradientY", gradientY2);
-            // waitKey(0);
+        // Points of frame 1
+        double x1 = candidatePoints.at<double>(i,0);
+        double y1 = candidatePoints.at<double>(i,1);
+        double z1 = candidatePoints.at<double>(i,2);
 
-            // Computation of Jacobian
-            Mat Jacobian;
-            for (int i=0; i<candidatePoints.rows; i++) {
+        double inv_z1 = 1 / z1;
 
-                uchar intensity1; 
-                uchar intensity2;
-                Mat Jw = Mat(2,6,CV_64FC1);
-                Mat Jl = Mat(1,2,CV_64FC1);
+        Jw.at<double>(0,0) = fx_[lvl] * inv_z1;
+        Jw.at<double>(0,1) = 0.0;
+        Jw.at<double>(0,2) = -(fx_[lvl] * x1 * inv_z1 * inv_z1);
+        Jw.at<double>(0,3) = -(fx_[lvl] * x1 * y1 * inv_z1 * inv_z1);
+        Jw.at<double>(0,4) = (fx_[lvl] * (1 + x1 * x1 * inv_z1 * inv_z1));   
+        Jw.at<double>(0,5) = - fx_[lvl] * y1 * inv_z1;
 
-                // Points of frame 1
-                double x1 = candidatePoints.at<double>(i,0);
-                double y1 = candidatePoints.at<double>(i,1);
-                double z1 = candidatePoints.at<double>(i,2);
+        Jw.at<double>(1,0) = 0.0;
+        Jw.at<double>(1,1) = fy_[lvl] * inv_z1;
+        Jw.at<double>(1,2) = -(fy_[lvl] * y1 * inv_z1 * inv_z1);
+        Jw.at<double>(1,3) = -(fy_[lvl] * (1 + y1 * y1 * inv_z1 * inv_z1));
+        Jw.at<double>(1,4) = fy_[lvl] * x1 * y1 * inv_z1 * inv_z1;
+        Jw.at<double>(1,5) = fy_[lvl] * x1 * inv_z1;
 
-                // Points of frame 2
-                double x2 = round(warpedPoints.at<double>(i,0));
-                double y2 = round(warpedPoints.at<double>(i,1));
-                double z2 = round(warpedPoints.at<double>(i,2));
-
-                // Check if warped point is in image 2
-                if (x1<gradient1.cols && x1>0 && y1<gradient1.rows && y1>0 &&
-                    x2<gradient2.cols && x2>0 && y2<gradient2.rows && y2>0) {
-
-                    intensity1 = image1.at<uchar>(y1,x1);
-                    intensity2 = image2.at<uchar>(y2,x2);
-
-                    Jl.at<double>(0,0) = gradientX1.at<uchar>(y1,x1);
-                    Jl.at<double>(0,1) = gradientY1.at<uchar>(y1,x1);
-
-                    double inv_z2 = 1 / z2;
-
-                    Jw.at<double>(0,0) = fx_[lvl] * inv_z2;
-                    Jw.at<double>(0,1) = 0.0;
-                    Jw.at<double>(0,2) = -(fx_[lvl] * x2 * inv_z2 * inv_z2);
-                    Jw.at<double>(0,3) = -(fx_[lvl] * x2 * y2 * inv_z2 * inv_z2);
-                    Jw.at<double>(0,4) = (fx_[lvl] * (1 + x2 * x2 * inv_z2 * inv_z2));   
-                    Jw.at<double>(0,5) = - fx_[lvl] * y2 * inv_z2;
-
-                    Jw.at<double>(1,0) = 0.0;
-                    Jw.at<double>(1,1) = fy_[lvl] * inv_z2;
-                    Jw.at<double>(1,2) = -(fy_[lvl] * y2 * inv_z2 * inv_z2);
-                    Jw.at<double>(1,3) = -(fy_[lvl] * (1 + y2 * y2 * inv_z2 * inv_z2));
-                    Jw.at<double>(1,4) = fy_[lvl] * x2 * y2 * inv_z2 * inv_z2;
-                    Jw.at<double>(1,5) = fy_[lvl] * x2 * inv_z2;
-
-                    Jls.push_back(Jl);
-                    Jws.push_back(Jw);
-
-                    intensities1.push_back(intensity1);
-                    intensities2.push_back(intensity2);
-
-                    Mat Jacobian_row = Mat(1,6,CV_64FC1);
-                    Jacobian_row = Jl * Jw;
-
-                    Jacobian.push_back(Jacobian_row);
-                    
-                } else {
-                    num_invalid_pixels++; // Num of pixels out of range
-                }
-            }
-
-            // Computation of Residuals
-            // Workaround to work with double numbers (intensities are in CV_8UC1)  
-            Mat Residuals = Mat(intensities2.size(),1,CV_8UC1);        
-            Mat I1 = Mat(intensities1.size(),1, CV_64FC1);
-            Mat I2 = Mat(intensities2.size(),1, CV_64FC1);
-
-            Mat aux1 = Mat(intensities1);
-            Mat aux2 = Mat(intensities2);
-            aux1.convertTo(I1, CV_64FC1);
-            aux2.convertTo(I2, CV_64FC1);
-
-            Residuals = abs(I2 - I1);
-
-            // Computation of Weights (Identity or Tukey function)
-            Mat W = IdentityWeights(Residuals.rows);
-            // Mat W = TukeyFunctionWeights(Residuals);
-
-            // Computation of error
-            double inv_num_residuals = 1.0 / Residuals.rows;
-            Mat ResidualsW = Residuals.mul(W);
-            Mat errorMat =  inv_num_residuals * Residuals.t() * ResidualsW;
-            error = errorMat.at<double>(0,0);
-
-            // If error didn't change, update delta to 0
-            if (error == last_error) {
-                deltaMat = Mat::zeros(6,1,CV_64FC1);
-                deltaVector(0) = 0;
-                deltaVector(1) = 0;
-                deltaVector(2) = 0;
-                deltaVector(3) = 0;
-                deltaVector(4) = 0;
-                deltaVector(5) = 0;
-            }
-            // Break if error increases
-            if (error > last_error) {
-                deltaMat = Mat::zeros(6,1,CV_64FC1);
-                deltaVector(0) = 0;
-                deltaVector(1) = 0;
-                deltaVector(2) = 0;
-                deltaVector(3) = 0;
-                deltaVector(4) = 0;
-                deltaVector(5) = 0;
-    
-                // Show results of optimization at lvl 0
-                if (lvl == 0){
-                    // DebugShowResidual(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
-                    DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
-                }
-                break;
-            }
-
-            cout << "Error: " << error << endl;
-            last_error = error;
-
-            // Update new pose with delta
-            current_pose = deltaSE3.exp(deltaVector) * current_pose;
-            //DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);   
-
-            // Computation of new delta
-            Mat JacobianW = Jacobian.clone();
-            for (int i=0; i<JacobianW.rows; i++) {
-                JacobianW.row(i) =  W.at<double>(i,0) * Jacobian.row(i);                
-            }
-            deltaMat = -1 * ((Jacobian.t() * JacobianW).inv() * Jacobian.t() * ResidualsW);
-
-            // Apply update
-            deltaVector(0) = deltaMat.at<double>(0,0);
-            deltaVector(1) = deltaMat.at<double>(1,0);
-            deltaVector(2) = deltaMat.at<double>(2,0);
-            deltaVector(3) = deltaMat.at<double>(3,0);
-            deltaVector(4) = deltaMat.at<double>(4,0);
-            deltaVector(5) = deltaMat.at<double>(5,0);
-   
-        }
+        Jws.push_back(Jw);
     }
+
+    // Optimization iteration
+    for (int k=0; k<max_iterations; k++) {
+
+        int num_invalid_pixels = 0;  
+        vector<Mat> Jls;
+        vector<uchar> intensities1;        
+        vector<uchar> intensities2;
+
+        // Warp points with current pose and delta pose (from previous iteration)
+        SE3 deltaSE3;
+        Mat warpedPoints = Mat(candidatePoints.size(), CV_64FC1);
+        warpedPoints = WarpFunction(candidatePoints, candidatePointsDepth, current_pose * deltaSE3.exp(deltaVector), lvl);
+
+        Mat imageWarped = Mat(image1.size(), CV_8UC1);
+        ObtainImageTransformed(image1, candidatePoints, warpedPoints, imageWarped);
+        DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
+
+
+        // Mat gradientX2, gradientY2;
+        // ObtainGradientXY(imageWarped, gradientX2, gradientY2);
+        // imshow("IMAGE WARPED", imageWarped);
+        // imshow("GradientX", gradientX2);
+        // imshow("GradientY", gradientY2);
+        // waitKey(0);
+
+        // Computation of Jacobian
+        Mat Jacobian;
+
+        // Computation of Residuals
+        // Workaround to work with double numbers (intensities are in CV_8UC1)  
+        Mat Residuals = Mat(intensities2.size(),1,CV_8UC1);        
+        Mat I1 = Mat(intensities1.size(),1, CV_64FC1);
+        Mat I2 = Mat(intensities2.size(),1, CV_64FC1);
+
+        Mat aux1 = Mat(intensities1);
+        Mat aux2 = Mat(intensities2);
+        aux1.convertTo(I1, CV_64FC1);
+        aux2.convertTo(I2, CV_64FC1);
+
+        Residuals = abs(I2 - I1);
+
+        // Computation of Weights (Identity or Tukey function)
+        Mat W = IdentityWeights(Residuals.rows);
+        // Mat W = TukeyFunctionWeights(Residuals);
+
+        // Computation of error
+        double inv_num_residuals = 1.0 / Residuals.rows;
+        Mat ResidualsW = Residuals.mul(W);
+        Mat errorMat =  inv_num_residuals * Residuals.t() * ResidualsW;
+        error = errorMat.at<double>(0,0);
+
+        // Break if error increases
+        if (error > last_error) {
+            deltaMat = Mat::zeros(6,1,CV_64FC1);
+            deltaVector(0) = 0;
+            deltaVector(1) = 0;
+            deltaVector(2) = 0;
+            deltaVector(3) = 0;
+            deltaVector(4) = 0;
+            deltaVector(5) = 0;
+
+            // Show results of optimization at lvl 0
+            if (lvl == 0){
+                // DebugShowResidual(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
+                DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
+            }
+            break;
+        }
+
+        cout << "Error: " << error << endl;
+        last_error = error;
+
+        // Update new pose with delta
+        current_pose = deltaSE3.exp(deltaVector) * current_pose;
+        //DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);   
+
+        // Computation of new delta
+        Mat JacobianW = Jacobian.clone();
+        for (int i=0; i<JacobianW.rows; i++) {
+            JacobianW.row(i) =  W.at<double>(i,0) * Jacobian.row(i);                
+        }
+        deltaMat = -1 * ((Jacobian.t() * JacobianW).inv() * Jacobian.t() * ResidualsW);
+
+        // Apply update
+        deltaVector(0) = deltaMat.at<double>(0,0);
+        deltaVector(1) = deltaMat.at<double>(1,0);
+        deltaVector(2) = deltaMat.at<double>(2,0);
+        deltaVector(3) = deltaMat.at<double>(3,0);
+        deltaVector(4) = deltaMat.at<double>(4,0);
+        deltaVector(5) = deltaMat.at<double>(5,0);
+
+    }
+    
 
     // Mat candidatePoints      = _previous_frame->candidatePoints_[0].clone();
     // Mat candidatePointsDepth = _previous_frame->candidatePointsDepth_[0].clone();
@@ -372,7 +315,7 @@ void Tracker::ApplyGradient(Frame* _frame) {
 void Tracker::ObtainAllPoints(Frame* _frame) {
     for (int lvl=0; lvl< PYRAMID_LEVELS; lvl++) {
         _frame->candidatePoints_[lvl] = Mat::ones(w_[lvl] * h_[lvl], 4, CV_64FC1);
-        _frame->candidatePointsDepth_[lvl] = 300 * Mat::ones(w_[lvl] * h_[lvl], 1, CV_64FC1);
+        _frame->candidatePointsDepth_[lvl] = 60 * Mat::ones(w_[lvl] * h_[lvl], 1, CV_64FC1);
         for (int x=0; x<w_[lvl]; x++) {
             for (int y =0; y<h_[lvl]; y++) {
                 Point3f point;
@@ -473,20 +416,17 @@ Mat Tracker::WarpFunction(Mat _points2warp, Mat _depth, SE3 _rigid_transformatio
 }
 
 void Tracker::ObtainImageTransformed(Mat _originalImage, Mat _candidatePoints, Mat _warpedPoints, Mat _outputImage) {
+    Mat show = Mat(_originalImage.size(), CV_8UC1);
     for (int i=0; i<_warpedPoints.rows; i++) {
         int x1 = _candidatePoints.at<double>(i,0);
         int y1 = _candidatePoints.at<double>(i,1);
-        int x2 = _warpedPoints.at<double>(i,0);
-        int y2 = _warpedPoints.at<double>(i,1);
+        int x2 = round(_warpedPoints.at<double>(i,0));
+        int y2 = round(_warpedPoints.at<double>(i,1));
 
-        if (x2<_originalImage.cols && x2>0 && y2<_originalImage.rows && y2>0) {
-            _outputImage.at<uchar>(y2,x2) = _originalImage.at<uchar>(y1,x1);
-        }
+        show.at<uchar>(y2,x2) = _originalImage.at<uchar>(y1,x1);
     }
-    imshow("output", _outputImage);
-    waitKey(0);
-    resize(_outputImage, _outputImage, Size(), 1.0, 1.0, INTER_CUBIC);
-    imshow("output", _outputImage);
+    imshow("input", _originalImage);    
+    imshow("output", show);
     waitKey(0);
 
 }
