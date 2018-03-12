@@ -132,10 +132,10 @@ public:
 
 private:
     Mat output_intrinsic_camera_;
-    Mat original_intrinsic_camera_ = Mat(3, 3, CV_64FC1, Scalar(0));
+    Mat original_intrinsic_camera_ = Mat(3, 3, CV_32FC1, Scalar(0));
 
     float input_calibration_[4];
-    Mat dist_coeffs_ = Mat(4, 1, CV_64FC1, Scalar(0));
+    Mat dist_coeffs_ = Mat(4, 1, CV_32FC1, Scalar(0));
 
     int out_width_, out_height_;
 	int in_width_, in_height_;

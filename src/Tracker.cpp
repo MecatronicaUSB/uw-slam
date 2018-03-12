@@ -32,7 +32,7 @@ class LocalParameterizationSE3;
 
 Tracker::Tracker() {
     for (Mat K: K_)
-        K = Mat(3,3,CV_64FC1, Scalar(0.f));
+        K = Mat(3,3,CV_32FC1, Scalar(0.f));
 };
 
 Tracker::~Tracker() {
@@ -58,10 +58,10 @@ void Tracker::InitializePyramid(int _width, int _height, Mat _K) {
     K_[0] = _K;
     // invK_[0] = _K.inv();
 
-    fx_[0] = _K.at<double>(0,0);
-    fy_[0] = _K.at<double>(1,1);
-    cx_[0] = _K.at<double>(0,2);
-    cy_[0] = _K.at<double>(1,2);
+    fx_[0] = _K.at<float>(0,0);
+    fy_[0] = _K.at<float>(1,1);
+    cx_[0] = _K.at<float>(0,2);
+    cy_[0] = _K.at<float>(1,2);
     
     invfx_[0] = 1 / fx_[0]; 
     invfy_[0] = 1 / fy_[0]; 
@@ -77,11 +77,11 @@ void Tracker::InitializePyramid(int _width, int _height, Mat _K) {
         cx_[lvl] = (cx_[0] + 0.5) / ((int)1<<lvl) - 0.5;
         cy_[lvl] = (cy_[0] + 0.5) / ((int)1<<lvl) - 0.5;
 
-        K_[lvl] = Mat::eye(Size(3,3), CV_64FC1);
-        K_[lvl].at<double>(0,0) = fx_[lvl];
-        K_[lvl].at<double>(1,1) = fy_[lvl];
-        K_[lvl].at<double>(0,2) = cx_[lvl];  
-        K_[lvl].at<double>(1,2) = cy_[lvl];    
+        K_[lvl] = Mat::eye(Size(3,3), CV_32FC1);
+        K_[lvl].at<float>(0,0) = fx_[lvl];
+        K_[lvl].at<float>(1,1) = fy_[lvl];
+        K_[lvl].at<float>(0,2) = cx_[lvl];  
+        K_[lvl].at<float>(1,2) = cy_[lvl];    
 
         invfx_[lvl] = 1 / fx_[lvl];
         invfy_[lvl] = 1 / fy_[lvl];
@@ -90,10 +90,10 @@ void Tracker::InitializePyramid(int _width, int _height, Mat _K) {
         
         // Needs review
         // invK_[lvl] = K_[lvl].inv();
-        // invfx_[lvl] = invK_[lvl].at<double>(0,0); 
-        // invfy_[lvl] = invK_[lvl].at<double>(1,1);
-        // invcx_[lvl] = invK_[lvl].at<double>(0,2);
-        // invcy_[lvl] = invK_[lvl].at<double>(1,2);
+        // invfx_[lvl] = invK_[lvl].at<float>(0,0); 
+        // invfy_[lvl] = invK_[lvl].at<float>(1,1);
+        // invcx_[lvl] = invK_[lvl].at<float>(0,2);
+        // invcy_[lvl] = invK_[lvl].at<float>(1,2);
     }
 }
 
@@ -102,15 +102,15 @@ void Tracker::InitializePyramid(int _width, int _height, Mat _K) {
 void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     // Gauss-Newton Options
     int max_iterations = 6;
-    double error_threshold = 0.005;
+    float error_threshold = 0.005;
 
     // Variables initialization
-    double error = 0.0;
-    double last_error = 0.0;
+    float error = 0.0;
+    float last_error = 0.0;
 
     // Initial pose and deltapose (assumes little movement between frames)
-    Mat deltaMat = Mat::zeros(6,1,CV_64FC1);
-    Sophus::Vector<double, SE3::DoF> deltaVector;
+    Mat deltaMat = Mat::zeros(6,1,CV_32FC1);
+    Sophus::Vector<float, SE3::DoF> deltaVector;
     deltaVector(0) = 0;
     deltaVector(1) = 0;
     deltaVector(2) = 0;
@@ -145,33 +145,33 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     vector<Mat> Jws;
     for (int i=0; i<candidatePoints.rows; i++) {
 
-        Mat Jw = Mat(2,6,CV_64FC1);
+        Mat Jw = Mat(2,6,CV_32FC1);
 
         // Points of frame 1
-        double x1 = candidatePoints.at<double>(i,0);
-        double y1 = candidatePoints.at<double>(i,1);
-        double z1 = candidatePoints.at<double>(i,2);
+        float x1 = candidatePoints.at<float>(i,0);
+        float y1 = candidatePoints.at<float>(i,1);
+        float z1 = candidatePoints.at<float>(i,2);
 
-        double inv_z1 = 1 / z1;
+        float inv_z1 = 1 / z1;
 
-        Jw.at<double>(0,0) = fx_[lvl] * inv_z1;
-        Jw.at<double>(0,1) = 0.0;
-        Jw.at<double>(0,2) = -(fx_[lvl] * x1 * inv_z1 * inv_z1);
-        Jw.at<double>(0,3) = -(fx_[lvl] * x1 * y1 * inv_z1 * inv_z1);
-        Jw.at<double>(0,4) = (fx_[lvl] * (1 + x1 * x1 * inv_z1 * inv_z1));   
-        Jw.at<double>(0,5) = - fx_[lvl] * y1 * inv_z1;
+        Jw.at<float>(0,0) = fx_[lvl] * inv_z1;
+        Jw.at<float>(0,1) = 0.0;
+        Jw.at<float>(0,2) = -(fx_[lvl] * x1 * inv_z1 * inv_z1);
+        Jw.at<float>(0,3) = -(fx_[lvl] * x1 * y1 * inv_z1 * inv_z1);
+        Jw.at<float>(0,4) = (fx_[lvl] * (1 + x1 * x1 * inv_z1 * inv_z1));   
+        Jw.at<float>(0,5) = - fx_[lvl] * y1 * inv_z1;
 
-        Jw.at<double>(1,0) = 0.0;
-        Jw.at<double>(1,1) = fy_[lvl] * inv_z1;
-        Jw.at<double>(1,2) = -(fy_[lvl] * y1 * inv_z1 * inv_z1);
-        Jw.at<double>(1,3) = -(fy_[lvl] * (1 + y1 * y1 * inv_z1 * inv_z1));
-        Jw.at<double>(1,4) = fy_[lvl] * x1 * y1 * inv_z1 * inv_z1;
-        Jw.at<double>(1,5) = fy_[lvl] * x1 * inv_z1;
+        Jw.at<float>(1,0) = 0.0;
+        Jw.at<float>(1,1) = fy_[lvl] * inv_z1;
+        Jw.at<float>(1,2) = -(fy_[lvl] * y1 * inv_z1 * inv_z1);
+        Jw.at<float>(1,3) = -(fy_[lvl] * (1 + y1 * y1 * inv_z1 * inv_z1));
+        Jw.at<float>(1,4) = fy_[lvl] * x1 * y1 * inv_z1 * inv_z1;
+        Jw.at<float>(1,5) = fy_[lvl] * x1 * inv_z1;
 
         
         Jws.push_back(Jw);
     }
-    Mat66d A;
+    Mat66f A;
     // Optimization iteration
     for (int k=0; k<max_iterations; k++) {
 
@@ -179,7 +179,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
         // Warp points with current pose and delta pose (from previous iteration)
         SE3 deltaSE3;
-        Mat warpedPoints = Mat(candidatePoints.size(), CV_64FC1);
+        Mat warpedPoints = Mat(candidatePoints.size(), CV_32FC1);
         warpedPoints = WarpFunction(candidatePoints, candidatePointsDepth, SE3::exp(deltaVector) * current_pose, lvl);
 
         Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
@@ -197,15 +197,15 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         vector<uchar> intensities2;
         for (int i=0; i<candidatePoints.rows; i++) {
             
-            Mat Jl = Mat(1,2,CV_64FC1);
+            Mat Jl = Mat(1,2,CV_32FC1);
             // Point in frame 1            
-            double x1 = candidatePoints.at<double>(i,0);
-            double y1 = candidatePoints.at<double>(i,1);
-            double z1 = candidatePoints.at<double>(i,2);
+            float x1 = candidatePoints.at<float>(i,0);
+            float y1 = candidatePoints.at<float>(i,1);
+            float z1 = candidatePoints.at<float>(i,2);
             // Warped point in frame 2
-            int x2 = round(warpedPoints.at<double>(i,0));
-            int y2 = round(warpedPoints.at<double>(i,1));
-            int z2 = round(warpedPoints.at<double>(i,2));
+            int x2 = round(warpedPoints.at<float>(i,0));
+            int y2 = round(warpedPoints.at<float>(i,1));
+            int z2 = round(warpedPoints.at<float>(i,2));
 
             if (x2>=0 && x2<image2.cols && y2>=0 && y2<image2.rows) {
 
@@ -214,8 +214,8 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                 intensities1.push_back(intensity1);                
                 intensities2.push_back(intensity2);
 
-                Jl.at<double>(0,0) = gradientX2.at<uchar>(y2,x2);
-                Jl.at<double>(0,1) = gradientY2.at<uchar>(y2,x2);
+                Jl.at<float>(0,0) = gradientX2.at<uchar>(y2,x2);
+                Jl.at<float>(0,1) = gradientY2.at<uchar>(y2,x2);
                 Mat Jacobian_row;
                 Jacobian_row = Jl * Jws[i];
                 Jacobian.push_back(Jacobian_row);
@@ -224,15 +224,15 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         }
 
         // Computation of Residuals
-        // Workaround to work with double numbers (intensities are in CV_8UC1)  
+        // Workaround to work with float numbers (intensities are in CV_8UC1)  
         Mat Residuals = Mat(intensities2.size(),1,CV_8UC1);        
-        Mat I1 = Mat(intensities1.size(),1, CV_64FC1);
-        Mat I2 = Mat(intensities2.size(),1, CV_64FC1);
+        Mat I1 = Mat(intensities1.size(),1, CV_32FC1);
+        Mat I2 = Mat(intensities2.size(),1, CV_32FC1);
 
         Mat aux1 = Mat(intensities1);
         Mat aux2 = Mat(intensities2);
-        aux1.convertTo(I1, CV_64FC1);
-        aux2.convertTo(I2, CV_64FC1);
+        aux1.convertTo(I1, CV_32FC1);
+        aux2.convertTo(I2, CV_32FC1);
 
         Residuals = abs(I2 - I1);
 
@@ -241,14 +241,14 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         Mat W = TukeyFunctionWeights(Residuals);
 
         // Computation of error
-        double inv_num_residuals = 1.0 / Residuals.rows;
+        float inv_num_residuals = 1.0 / Residuals.rows;
         Mat ResidualsW = Residuals.mul(W);
         Mat errorMat =  inv_num_residuals * Residuals.t() * ResidualsW;
-        error = errorMat.at<double>(0,0);
+        error = errorMat.at<float>(0,0);
 
         // Break if error increases
         if (error > last_error) {
-            deltaMat = Mat::zeros(6,1,CV_64FC1);
+            deltaMat = Mat::zeros(6,1,CV_32FC1);
             deltaVector(0) = 0;
             deltaVector(1) = 0;
             deltaVector(2) = 0;
@@ -275,24 +275,24 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         // Computation of new delta
         Mat JacobianW = Jacobian.clone();
         for (int i=0; i<JacobianW.rows; i++) {
-            JacobianW.row(i) =  W.at<double>(i,0) * Jacobian.row(i);                
+            JacobianW.row(i) =  W.at<float>(i,0) * Jacobian.row(i);                
         }
         
         // deltaMat = -1 * ((Jacobian.t() * JacobianW).inv() * Jacobian.t() * ResidualsW);
 
         // Apply update
-        deltaVector(0) = deltaMat.at<double>(0,0);
-        deltaVector(1) = deltaMat.at<double>(1,0);
-        deltaVector(2) = deltaMat.at<double>(2,0);
-        deltaVector(3) = deltaMat.at<double>(3,0);
-        deltaVector(4) = deltaMat.at<double>(4,0);
-        deltaVector(5) = deltaMat.at<double>(5,0);
+        deltaVector(0) = deltaMat.at<float>(0,0);
+        deltaVector(1) = deltaMat.at<float>(1,0);
+        deltaVector(2) = deltaMat.at<float>(2,0);
+        deltaVector(3) = deltaMat.at<float>(3,0);
+        deltaVector(4) = deltaMat.at<float>(4,0);
+        deltaVector(5) = deltaMat.at<float>(5,0);
     }
     
 
     // Mat candidatePoints      = _previous_frame->candidatePoints_[0].clone();
     // Mat candidatePointsDepth = _previous_frame->candidatePointsDepth_[0].clone();
-    // Mat warpedPoints = Mat(candidatePoints.size(), CV_64FC1);
+    // Mat warpedPoints = Mat(candidatePoints.size(), CV_32FC1);
     // warpedPoints = WarpFunction(candidatePoints, candidatePointsDepth, current_pose, 0);
     // DebugShowWarpedPoints(_previous_frame->gradient_[0], _current_frame->gradient_[0], candidatePoints, warpedPoints);
     _previous_frame->rigid_transformation_ = current_pose;
@@ -345,8 +345,8 @@ void Tracker::ApplyGradient(Frame* _frame) {
 
 void Tracker::ObtainAllPoints(Frame* _frame) {
     for (int lvl=0; lvl< PYRAMID_LEVELS; lvl++) {
-        _frame->candidatePoints_[lvl] = Mat::ones(w_[lvl] * h_[lvl], 4, CV_64FC1);
-        _frame->candidatePointsDepth_[lvl] = 2000 * Mat::ones(w_[lvl] * h_[lvl], 1, CV_64FC1);
+        _frame->candidatePoints_[lvl] = Mat::ones(w_[lvl] * h_[lvl], 4, CV_32FC1);
+        _frame->candidatePointsDepth_[lvl] = 2000 * Mat::ones(w_[lvl] * h_[lvl], 1, CV_32FC1);
         for (int x=0; x<w_[lvl]; x++) {
             for (int y =0; y<h_[lvl]; y++) {
                 Point3f point;
@@ -354,8 +354,8 @@ void Tracker::ObtainAllPoints(Frame* _frame) {
                 point.y = y;
                 point.z = 1;
                 _frame->framePoints_[lvl].push_back(point);
-                _frame->candidatePoints_[lvl].at<double>(y+h_[lvl]*x,0) = x;
-                _frame->candidatePoints_[lvl].at<double>(y+h_[lvl]*x,1) = y;
+                _frame->candidatePoints_[lvl].at<float>(y+h_[lvl]*x,0) = x;
+                _frame->candidatePoints_[lvl].at<float>(y+h_[lvl]*x,1) = y;
             }
         } 
     }
@@ -372,19 +372,19 @@ void Tracker::ObtainCandidatePoints(Frame* _frame) {
         cuda::GpuMat frameGPU(_frame->gradient_[i]);
         for (int x=0; x<w_[i]-block_size; x+=block_size) {
             for (int y =0; y<h_[i]-block_size; y+=block_size) {
-                Mat point = Mat::ones(1,4,CV_64FC1);
-                Mat depth = Mat::ones(1,1,CV_64FC1);                
+                Mat point = Mat::ones(1,4,CV_32FC1);
+                Mat depth = Mat::ones(1,1,CV_32FC1);                
                 Scalar mean, stdev;
                 Point min_loc, max_loc;
                 double min, max;
                 cuda::GpuMat block(frameGPU, Rect(x,y,block_size,block_size));
                 block.convertTo(block, CV_8UC1);
                 cuda::meanStdDev(block, mean, stdev);
-                cuda::minMaxLoc(block, &min, &max, &min_loc, &max_loc);
+                //cuda::minMaxLoc(block, &min, &max, &min_loc, &max_loc);
                 
                 if (max > mean[0] + GRADIENT_THRESHOLD) {
-                    point.at<double>(0,0) = (double) (x + max_loc.x);
-                    point.at<double>(0,1) = (double) (y + max_loc.y);
+                    point.at<float>(0,0) = (float) (x + max_loc.x);
+                    point.at<float>(0,1) = (float) (y + max_loc.y);
 
                     _frame->candidatePoints_[i].push_back(point);
                     _frame->candidatePointsDepth_[i].push_back(depth);
@@ -402,24 +402,24 @@ void Tracker::ObtainCandidatePoints(Frame* _frame) {
 
 Mat Tracker::WarpFunction(Mat _points2warp, Mat _depth, SE3 _rigid_transformation, int _lvl) {
     int lvl = _lvl;
-    Mat33d R = _rigid_transformation.rotationMatrix();
-    Mat31d t = _rigid_transformation.translation();
+    Mat33f R = _rigid_transformation.rotationMatrix();
+    Mat31f t = _rigid_transformation.translation();
     Quaternion2 quaternion = _rigid_transformation.unit_quaternion();
 
-    Mat projected_points = Mat(_points2warp.size(), CV_64FC1);
+    Mat projected_points = Mat(_points2warp.size(), CV_32FC1);
     projected_points = _points2warp.clone();
 
-    Mat44d rigidEigen = _rigid_transformation.matrix();
-    Mat rigid = Mat(4,4,CV_64FC1);
+    Mat44f rigidEigen = _rigid_transformation.matrix();
+    Mat rigid = Mat(4,4,CV_32FC1);
     eigen2cv(rigidEigen, rigid);
     //cout << rigid << endl;
 
-    double fx = fx_[lvl];
-    double fy = fy_[lvl];
-    double invfx = invfx_[lvl];
-    double invfy = invfy_[lvl];
-    double cx = cx_[lvl];
-    double cy = cy_[lvl];
+    float fx = fx_[lvl];
+    float fy = fy_[lvl];
+    float invfx = invfx_[lvl];
+    float invfy = invfy_[lvl];
+    float cx = cx_[lvl];
+    float cy = cy_[lvl];
     // cout << "fx: " << fx << endl;
     // cout << "fy: " << fy << endl;
     // cout << "cx: " << cx << endl;
@@ -451,10 +451,10 @@ void Tracker::ObtainImageTransformed(Mat _originalImage, Mat _candidatePoints, M
     // Obtaining warped image from warpedpoints
     Mat validPixel = Mat::zeros(_outputImage.size(), CV_8UC1);
     for (int i=0; i<_warpedPoints.rows; i++) {
-        int x1 = _candidatePoints.at<double>(i,0);
-        int y1 = _candidatePoints.at<double>(i,1);
-        int x2 = round(_warpedPoints.at<double>(i,0));
-        int y2 = round(_warpedPoints.at<double>(i,1));
+        int x1 = _candidatePoints.at<float>(i,0);
+        int y1 = _candidatePoints.at<float>(i,1);
+        int x2 = round(_warpedPoints.at<float>(i,0));
+        int y2 = round(_warpedPoints.at<float>(i,1));
 
         if (y2>0 && y2<_originalImage.rows && x2>0 && x2<_originalImage.cols){
             _outputImage.at<uchar>(y2,x2) = _originalImage.at<uchar>(y1,x1);
@@ -539,13 +539,13 @@ void Tracker::ObtainGradientXY(Mat _inputImage, Mat _gradientX, Mat _gradientY) 
     absY.download(_gradientY);
 }
 
-double Tracker::MedianMat(Mat _input) {
+float Tracker::MedianMat(Mat _input) {
     Mat channel = Mat(_input.rows, _input.cols, CV_8UC1);
     _input.convertTo(channel, CV_8UC1);
 
-    double m = (channel.rows*channel.cols) / 2;
+    float m = (channel.rows*channel.cols) / 2;
     int bin = 0;
-    double med = -1.0;
+    float med = -1.0;
 
     int histSize = 256;
     float range[] = { 0, 256 };
@@ -565,58 +565,58 @@ double Tracker::MedianMat(Mat _input) {
 }
 
 SE3 Tracker::Mat2SE3(Mat _input) {
-    double w1 = _input.at<double>(0,0);
-    double w2 = _input.at<double>(1,0);
-    double w3 = _input.at<double>(2,0);
-    double x1 = _input.at<double>(3,0);
-    double x2 = _input.at<double>(4,0);
-    double x3 = _input.at<double>(5,0);
+    float w1 = _input.at<float>(0,0);
+    float w2 = _input.at<float>(1,0);
+    float w3 = _input.at<float>(2,0);
+    float x1 = _input.at<float>(3,0);
+    float x2 = _input.at<float>(4,0);
+    float x3 = _input.at<float>(5,0);
     
     return SE3(SO3::exp(SE3::Point(w1, w2, w3)), SE3::Point(x1, x2, x3));
 }
 
-double Tracker::MedianAbsoluteDeviation(double _c, Mat _input) {
+float Tracker::MedianAbsoluteDeviation(float _c, Mat _input) {
 
-    Mat deviation = Mat(_input.rows, _input.cols, CV_64FC1);
-    double median = MedianMat(_input);
+    Mat deviation = Mat(_input.rows, _input.cols, CV_32FC1);
+    float median = MedianMat(_input);
     // Absolute Deviation from the _input's median
     deviation = abs(_input - median);
 
     // Median of deviation
-    double MAD = MedianMat(deviation);
+    float MAD = MedianMat(deviation);
 
     return _c * MAD;
 }
 
 Mat Tracker::IdentityWeights(int _num_residuals) {
-    Mat W = Mat::ones(_num_residuals,1,CV_64FC1);    
+    Mat W = Mat::ones(_num_residuals,1,CV_32FC1);    
     return W;
 }
 
 Mat Tracker::TukeyFunctionWeights(Mat _input) {
     int num_residuals = _input.rows;
-    double c = 1.4826;
-    double b = 4.6851; // Achieve 95% efficiency if assumed Gaussian distribution for outliers
-    Mat W = Mat(num_residuals,1,CV_64FC1);    
-    double MAD = c * MedianAbsoluteDeviation(c, _input);
+    float c = 1.4826;
+    float b = 4.6851; // Achieve 95% efficiency if assumed Gaussian distribution for outliers
+    Mat W = Mat(num_residuals,1,CV_32FC1);    
+    float MAD = c * MedianAbsoluteDeviation(c, _input);
     if (MAD == 0) {
         cout << "Median Absolute Deviation (MAD) is 0" << endl;
         cout << "Exiting ..." << endl;
         exit(0);
     }
 
-    double inv_MAD = 1.0 / MAD;
-    double inv_b2 = 1.0 / (b * b);
+    float inv_MAD = 1.0 / MAD;
+    float inv_b2 = 1.0 / (b * b);
 
     for (int i=0; i<num_residuals; i++) {
-        double prueba = _input.at<double>(i,0);
-        double x = _input.at<double>(i,0) * inv_MAD;
+        float prueba = _input.at<float>(i,0);
+        float x = _input.at<float>(i,0) * inv_MAD;
 
         if (abs(x) <= b) {
-            double tukey = (1.0 - (x * x) * inv_b2);
-            W.at<double>(i,0) = tukey * tukey;
+            float tukey = (1.0 - (x * x) * inv_b2);
+            W.at<float>(i,0) = tukey * tukey;
         } else {
-            W.at<double>(i,0) = 0.0;
+            W.at<float>(i,0) = 0.0;
         }
     }
 
@@ -630,8 +630,8 @@ void Tracker::DebugShowCandidatePoints(Mat _image, Mat _candidatePoints){
 
     for( int i=0; i<_candidatePoints.rows; i++) {
         Point2d point;
-        point.x = _candidatePoints.at<double>(i,0);
-        point.y = _candidatePoints.at<double>(i,1);
+        point.x = _candidatePoints.at<float>(i,0);
+        point.y = _candidatePoints.at<float>(i,1);
 
         circle(showPoints, point, 2, Scalar(255,0,0), 1, 8, 0);
     }
@@ -644,10 +644,10 @@ void Tracker::DebugShowResidual(Mat _image1, Mat _image2, Mat _candidatePoints, 
     Mat showResidual = _image2.clone();
     
     for (int i=0; i<_candidatePoints.rows; i++) {
-        int x1 = _candidatePoints.at<double>(i,0);
-        int y1 = _candidatePoints.at<double>(i,1);
-        int x2 = _warpedPoints.at<double>(i,0);
-        int y2 = _warpedPoints.at<double>(i,1);
+        int x1 = _candidatePoints.at<float>(i,0);
+        int y1 = _candidatePoints.at<float>(i,1);
+        int x2 = _warpedPoints.at<float>(i,0);
+        int y2 = _warpedPoints.at<float>(i,1);
 
         int intensity1 = _image1.at<uchar>(y1,x1);
         int intensity2 = _image2.at<uchar>(y2,x2);
@@ -669,10 +669,10 @@ void Tracker::DebugShowWarpedPerspective(Mat _image1, Mat _image2, Mat _candidat
     Mat substraction;
 
     for (int i=0; i<_candidatePoints.rows; i++) {
-        int x1 = _candidatePoints.at<double>(i,0);
-        int y1 = _candidatePoints.at<double>(i,1);
-        int x2 = round(_warped.at<double>(i,0));
-        int y2 = round(_warped.at<double>(i,1));
+        int x1 = _candidatePoints.at<float>(i,0);
+        int y1 = _candidatePoints.at<float>(i,1);
+        int x2 = round(_warped.at<float>(i,0));
+        int y2 = round(_warped.at<float>(i,1));
 
         if (x2<_image2.cols && x2>=0 && y2<_image2.rows && y2>=0) {
             warpImage.at<uchar>(y2,x2) = _image1.at<uchar>(y1,x1);
@@ -690,17 +690,17 @@ void Tracker::DebugShowWarpedPerspective(Mat _image1, Mat _image2, Mat _candidat
     addWeighted(showPoints1, 0.5, showPoints2, 0.5, 1.0, substraction);
 
     Point2d p1, p2, p3 ,p4;
-    p1.x = _warped.at<double>(0,0);
-    p1.y = _warped.at<double>(0,1);
+    p1.x = _warped.at<float>(0,0);
+    p1.y = _warped.at<float>(0,1);
     
-    p2.x = _warped.at<double>(_image2.rows-1,0);
-    p2.y = _warped.at<double>(_image2.rows-1,1);
+    p2.x = _warped.at<float>(_image2.rows-1,0);
+    p2.y = _warped.at<float>(_image2.rows-1,1);
 
-    p3.x = _warped.at<double>(_image2.rows*(_image2.cols-1),0);
-    p3.y = _warped.at<double>(_image2.rows*(_image2.cols-1),1);
+    p3.x = _warped.at<float>(_image2.rows*(_image2.cols-1),0);
+    p3.y = _warped.at<float>(_image2.rows*(_image2.cols-1),1);
 
-    p4.x = _warped.at<double>(_warped.rows-1,0);
-    p4.y = _warped.at<double>(_warped.rows-1,1);
+    p4.x = _warped.at<float>(_warped.rows-1,0);
+    p4.y = _warped.at<float>(_warped.rows-1,1);
 
     line(showPoints1,p1,p2,Scalar(255,0,0), 1, 8, 0);
     line(showPoints1,p2,p4,Scalar(255,0,0), 1, 8, 0);
@@ -729,14 +729,14 @@ void Tracker::DebugShowWarpedPerspective(Mat _image1, Mat _image2, Mat _candidat
 }
 
     // CERES CODE -- FOR REVIEW
-    // double initial_x = _previous_frame->id;
-    // double x = initial_x;
+    // float initial_x = _previous_frame->id;
+    // float x = initial_x;
     // int num_residuals = _previous_frame->images_[2].rows * _previous_frame->images_[2].cols;
     // cout << num_residuals << endl;
     // _previous_frame->rigid_transformation_ = SE3(Sophus::SO3d::exp(SE3::Point(0.2, 0.5, 0.0)), SE3::Point(10, 0, 0));
     // Optimization parameter
-    // Sophus::Vector<double, 7> pose = _previous_frame->rigid_transformation_.params();
-    // Sophus::Vector<double, 6> lie_algebra = _previous_frame->rigid_transformation_.log();
+    // Sophus::Vector<float, 7> pose = _previous_frame->rigid_transformation_.params();
+    // Sophus::Vector<float, 6> lie_algebra = _previous_frame->rigid_transformation_.log();
     
     // Build problem
     // ceres::Problem problem;
@@ -763,8 +763,8 @@ void Tracker::DebugShowWarpedPerspective(Mat _image1, Mat _image2, Mat _candidat
     // problem.AddResidualBlock(cost_function, NULL, _previous_frame->rigid_transformation_.data());
     
     // ceres::Solver::Options options;
-    // options.gradient_tolerance = 0.01 * Sophus::Constants<double>::epsilon();
-    // options.function_tolerance = 0.01 * Sophus::Constants<double>::epsilon();
+    // options.gradient_tolerance = 0.01 * Sophus::Constants<float>::epsilon();
+    // options.function_tolerance = 0.01 * Sophus::Constants<float>::epsilon();
     // options.linear_solver_type = ceres::DENSE_QR;
 
     // Solve

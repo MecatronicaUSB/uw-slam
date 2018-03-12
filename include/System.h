@@ -191,7 +191,7 @@ public:
     int num_frames_;
     int num_keyframes_;
     int w_, h_, w_input_, h_input_;
-    double fx_, fy_, cx_, cy_;
+    float fx_, fy_, cx_, cy_;
 
     Frame* current_frame_;
     Frame* previous_frame_;

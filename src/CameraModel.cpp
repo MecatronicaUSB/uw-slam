@@ -31,9 +31,9 @@ void CameraModel::GetCameraModel(string _calibration_path) {
     valid_ = true;
 
     // Reading intrinsic parameters and distortion coefficients from file
-    Mat calibration_values = Mat(1, 4, CV_64FC1, Scalar(0.0));
-    Mat distortion_values  = Mat(1, 4, CV_64FC1, Scalar(0.0));
-    FileStorage opencv_file(_calibration_path, cv::FileStorage::READ);
+    Mat calibration_values = Mat(1, 4, CV_32FC1, Scalar(0.0));
+    Mat distortion_values  = Mat(1, 4, CV_32FC1, Scalar(0.0));
+    FileStorage opencv_file(_calibration_path, FileStorage::READ);
     if (opencv_file.isOpened()) {
         cout << " ... found" << endl;
         opencv_file["in_width"] >> in_width_;
@@ -53,8 +53,8 @@ void CameraModel::GetCameraModel(string _calibration_path) {
 
     // Saving parameters and distCoeffs
     for (int i = 0; i < 4; i++) {
-        input_calibration_[i] = calibration_values.at<double>(0,i);
-		dist_coeffs_.at<double>(i,0) = distortion_values.at<double>(0,i);
+        input_calibration_[i] = calibration_values.at<float>(0,i);
+		dist_coeffs_.at<float>(i,0) = distortion_values.at<float>(0,i);
     }
 
     // Checking if the intrinsic parameters needs rescaling
@@ -68,14 +68,14 @@ void CameraModel::GetCameraModel(string _calibration_path) {
     }
 
     // Saving parameters in original_intrinsic_camera_
-    original_intrinsic_camera_.at<double>(0,0) = input_calibration_[0];
-    original_intrinsic_camera_.at<double>(1,1) = input_calibration_[1];
-    original_intrinsic_camera_.at<double>(0,2) = input_calibration_[2];
-    original_intrinsic_camera_.at<double>(1,2) = input_calibration_[3];
-    original_intrinsic_camera_.at<double>(2,2) = 1;
+    original_intrinsic_camera_.at<float>(0,0) = input_calibration_[0];
+    original_intrinsic_camera_.at<float>(1,1) = input_calibration_[1];
+    original_intrinsic_camera_.at<float>(0,2) = input_calibration_[2];
+    original_intrinsic_camera_.at<float>(1,2) = input_calibration_[3];
+    original_intrinsic_camera_.at<float>(2,2) = 1;
 
     // If distCoeff are 0, dont apply rectification
-    if (dist_coeffs_.at<double>(0,0) == 0) {
+    if (dist_coeffs_.at<float>(0,0) == 0) {
         cout << "Distortion coefficients not found ... not rectifying" << endl;
         valid_ = false;
 
@@ -85,35 +85,35 @@ void CameraModel::GetCameraModel(string _calibration_path) {
     if (valid_) {
         cout << "Distortion coefficients found ... rectifying" << endl;
         // Obtaining new intrinsic camera matrix with undistorted images
-        output_intrinsic_camera_ = getOptimalNewCameraMatrix(original_intrinsic_camera_, dist_coeffs_, cv::Size(in_width_, in_height_), 1, cv::Size(out_width_, out_height_), nullptr, false);
-        initUndistortRectifyMap(original_intrinsic_camera_, dist_coeffs_, cv::Mat(), output_intrinsic_camera_, cv::Size(out_width_, out_height_), CV_16SC2, map1_, map2_);
+        output_intrinsic_camera_ = getOptimalNewCameraMatrix(original_intrinsic_camera_, dist_coeffs_, Size(in_width_, in_height_), 1.0, Size(out_width_, out_height_), nullptr, false);
+        initUndistortRectifyMap(original_intrinsic_camera_, dist_coeffs_, Mat(), output_intrinsic_camera_, Size(out_width_, out_height_), CV_16SC2, map1_, map2_);
         
         // K_
-        original_intrinsic_camera_.at<double>(0, 0) /= in_width_;
-		original_intrinsic_camera_.at<double>(0, 2) /= in_width_;
-		original_intrinsic_camera_.at<double>(1, 1) /= in_height_;
-		original_intrinsic_camera_.at<double>(1, 2) /= in_height_;
+        original_intrinsic_camera_.at<float>(0, 0) /= in_width_;
+		original_intrinsic_camera_.at<float>(0, 2) /= in_width_;
+		original_intrinsic_camera_.at<float>(1, 1) /= in_height_;
+		original_intrinsic_camera_.at<float>(1, 2) /= in_height_;
         
     }
 }
 
-void CameraModel::Undistort(const cv::Mat& _image, cv::OutputArray _result) const {
-	cv::remap(_image, _result, map1_, map2_, cv::INTER_LINEAR);
+void CameraModel::Undistort(const Mat& _image, OutputArray _result) const {
+	remap(_image, _result, map1_, map2_, INTER_LINEAR);
 }
 
-const cv::Mat& CameraModel::GetMap1() const {
+const Mat& CameraModel::GetMap1() const {
     return map1_;
 }
 
-const cv::Mat& CameraModel::GetMap2() const {
+const Mat& CameraModel::GetMap2() const {
     return map2_;
 }
 
-const cv::Mat& CameraModel::GetK() const {
+const Mat& CameraModel::GetK() const {
 	return output_intrinsic_camera_;
 }
 
-const cv::Mat& CameraModel::GetOriginalK() const {
+const Mat& CameraModel::GetOriginalK() const {
 	return original_intrinsic_camera_;
 }
 

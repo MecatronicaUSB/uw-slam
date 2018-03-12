@@ -170,7 +170,7 @@ void Visualizer::UpdateMessages(Frame* frame){
     sensor_msgs::ImagePtr current_frame = cv_bridge::CvImage(std_msgs::Header(), "mono8", frame->images_[0]).toImageMsg();
 
     SE3 pose = frame->rigid_transformation_;
-    Mat31d t = pose.translation();
+    Mat31f t = pose.translation();
     Quaternion2 quaternion = pose.unit_quaternion();
 
     camera_pose_.pose.position.x += t(0);  
@@ -214,7 +214,7 @@ void Visualizer::UpdateMessages(Frame* frame){
             cout << "Exiting..." << endl;
             exit(0); 
         }
-        ROS_WARN_ONCE("Please create a subscriber to the marker/image");
+        ROS_WARN_ONCE("Please open RVIZ to continue...");
         sleep(1);
     }
     r.sleep();

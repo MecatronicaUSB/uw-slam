@@ -125,9 +125,9 @@ namespace uw
 #define SSEE(val,idx) (*(((float*)&val)+idx))
 #define ALIGN __attribute__((__aligned__(16)))
 
-typedef Sophus::SE3d SE3;
-typedef Sophus::Sim3d Sim3;
-typedef Sophus::SO3d SO3;
+typedef Sophus::SE3f SE3;
+typedef Sophus::Sim3f Sim3;
+typedef Sophus::SO3f SO3;
 
 typedef Eigen::Vector4d QuaternionVector;
 typedef Eigen::Vector3d TranslationVector;
@@ -140,8 +140,13 @@ typedef Eigen::Matrix<double,6,1> Mat61d;
 typedef Eigen::Matrix<double,6,6> Mat66d;
 typedef Eigen::Matrix<double,6,7> Mat67d;
 
-typedef Eigen::Matrix<float, 6, 6> Mat66f;
-typedef Eigen::Matrix<float, 6, 1> Mat61f;
+typedef Eigen::Matrix<float,3,1> Mat31f;
+typedef Eigen::Matrix<float,3,3> Mat33f;
+typedef Eigen::Matrix<float,4,1> Mat41f;
+typedef Eigen::Matrix<float,4,4> Mat44f;
+typedef Eigen::Matrix<float,6,1> Mat61f;
+typedef Eigen::Matrix<float,6,6> Mat66f;
+typedef Eigen::Matrix<float,6,7> Mat67f;
 
 // Global constants
 extern const int PYRAMID_LEVELS;

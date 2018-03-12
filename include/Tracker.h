@@ -145,9 +145,9 @@ public:
     void DebugShowResidual(Mat _image1, Mat _image2, Mat _candidatePoints, Mat _warped, int _lvl);
 
 
-    double MedianMat(Mat _input);
+    float MedianMat(Mat _input);
 
-    double MedianAbsoluteDeviation(double _c, Mat _input);
+    float MedianAbsoluteDeviation(float _c, Mat _input);
 
     /**
      * @brief Returns a _num_residuals x 1 Mat of ones.
@@ -177,8 +177,8 @@ public:
     // class ResidualIntensity : public ceres::SizedCostFunction<kNumResiduals, N1>
     // {
     // public:
-    //     ResidualIntensity(Mat _image1, Mat _image2, int lvl, double fx, double fy, 
-    //                                 double cx, double cy, double invfx, double invfy) {
+    //     ResidualIntensity(Mat _image1, Mat _image2, int lvl, float fx, float fy, 
+    //                                 float cx, float cy, float invfx, float invfy) {
     //         image1_ = _image1; image2_ = _image2;
     //         lvl_ = lvl;
     //         fx_ = fx; fy_ = fy; cx_ = cx; cy_ = cy;
@@ -186,9 +186,9 @@ public:
     //     }
 
     //     // Calculates Cost Function of Photometric Error between two images
-    //     virtual bool Evaluate(double const* const* pose_in,
-    //                             double* residuals,
-    //                             double** jacobians) const {
+    //     virtual bool Evaluate(float const* const* pose_in,
+    //                             float* residuals,
+    //                             float** jacobians) const {
             
     //         // Initialize residuals with an initial value
     //         for (int i=0; i<image1_.rows; i++) {
@@ -198,29 +198,29 @@ public:
     //         }
 
     //         Eigen Map to manipulate T class with Sophus
-    //         double qx = pose_in[0][0];
-    //         double qy = pose_in[0][1];
-    //         double qz = pose_in[0][2];
-    //         double qw = pose_in[0][3];
-    //         double tx = pose_in[0][4];
-    //         double ty = pose_in[0][5];
-    //         double tz = pose_in[0][6];
+    //         float qx = pose_in[0][0];
+    //         float qy = pose_in[0][1];
+    //         float qz = pose_in[0][2];
+    //         float qw = pose_in[0][3];
+    //         float tx = pose_in[0][4];
+    //         float ty = pose_in[0][5];
+    //         float tz = pose_in[0][6];
             
-    //         SE3 pose1 = SE3(Eigen::Quaternion<double>(qw,qx,qy,qz), SE3::Point(tx, ty, tz));
+    //         SE3 pose1 = SE3(Eigen::Quaternion<float>(qw,qx,qy,qz), SE3::Point(tx, ty, tz));
     //         Mat44 G = pose1.matrix();
 
-    //         double point3D[4];
-    //         double point3DTransformed[3];
-    //         double point2DTransformed[2];
-    //         double intensity_pixel1, intensity_pixel2;
+    //         float point3D[4];
+    //         float point3DTransformed[3];
+    //         float point2DTransformed[2];
+    //         float intensity_pixel1, intensity_pixel2;
             
     //         // Iteration for each pixel of the image
     //         for (int i=0; i<image1_.rows; i++){
     //             for (int j=0; j<image1_.cols; j++){
-    //                 double d = depth_.at<double>(i,j);
-    //                 double d = 1.0;
+    //                 float d = depth_.at<float>(i,j);
+    //                 float d = 1.0;
     //                 if (d>0) {  // For valid depth
-    //                     double inv_depth_ = 1.0 / d;
+    //                     float inv_depth_ = 1.0 / d;
     //                     // Obtain local 3D coordinates of pixel (i,j) of image 1
     //                     point3D[2] = inv_depth_;
     //                     point3D[0] = (i-cx_) * inv_depth_ * invfx_;
@@ -248,8 +248,8 @@ public:
     //                         int j_projected = (int)(point2DTransformed[1]);
 
     //                         // Obtain intensities from images
-    //                         intensity_pixel1 = image1_.at<double>(i,j);
-    //                         intensity_pixel2 = image2_.at<double>(i_projected,j_projected);
+    //                         intensity_pixel1 = image1_.at<float>(i,j);
+    //                         intensity_pixel2 = image2_.at<float>(i_projected,j_projected);
                             
     //                         // Compute residual
     //                         residuals[j+i*j] = intensity_pixel1 - intensity_pixel2;
@@ -299,8 +299,8 @@ public:
     //         // Iteration for each pixel of the image
     //         for (int i=0; i<image1_.rows; i++){
     //             for (int j=0; j<image1_.cols; j++){
-    //                 //double d = depth_.at<double>(i,j);
-    //                 double d = 1.0;
+    //                 //float d = depth_.at<float>(i,j);
+    //                 float d = 1.0;
     //                 if (d>0) {  // For valid depth
     //                     T inv_depth = T(1.0) / T(d);
     //                     // Obtain local 3D coordinates of pixel (i,j) of image 1
@@ -324,14 +324,14 @@ public:
     //                     if ((point2DTransformed[0]>=T(0.0) && point2DTransformed[0]< T(image2_.rows)) &&
     //                         (point2DTransformed[1]>=T(0.0) && point2DTransformed[1]< T(image2_.cols))) {
     //                         //Compute the proyected coordinates of the transformed 3D point
-    //                         double x = point2DTransformed[0][0];
+    //                         float x = point2DTransformed[0][0];
                             
     //                         // int i_projected = static_cast<int>(point2DTransformed[0].a());
     //                         //int j_projected = static_cast<int>(ceres::Jet<T,1>::GetScalar(point2DTransformed[1]));
 
     //                         // Obtain intensities from images
-    //                         intensity_pixel1 = T(image1_.at<double>(i,j));
-    //                         //intensity_pixel2 = T(image2.at<double>(i_projected,j_projected));
+    //                         intensity_pixel1 = T(image1_.at<float>(i,j));
+    //                         //intensity_pixel2 = T(image2.at<float>(i_projected,j_projected));
 
     //                         // Compute residual
     //                         residuals[j+i*j] = intensity_pixel1 - intensity_pixel2;
@@ -346,7 +346,7 @@ public:
     //     int lvl_;
     //     Mat image1_, image2_;
     //     Mat depth_;
-    //     double fx_, fy_, cx_, cy_, invfx_, invfy_;
+    //     float fx_, fy_, cx_, cy_, invfx_, invfy_;
     // };
 
     // class LocalParameterizationSE3 : public ceres::LocalParameterization {
@@ -357,8 +357,8 @@ public:
     //     // 
     //     // T * exp(x)
         
-    //     virtual bool Plus(double const* T_raw, double const* delta_raw,
-    //                     double* T_plus_delta_raw) const {
+    //     virtual bool Plus(float const* T_raw, float const* delta_raw,
+    //                     float* T_plus_delta_raw) const {
     //         Eigen::Map<SE3 const> const T(T_raw);
     //         Eigen::Map<Mat61 const> const delta(delta_raw);
     //         Eigen::Map<SE3> T_plus_delta(T_plus_delta_raw);
@@ -370,10 +370,10 @@ public:
     //     //
     //     // Dx T * exp(x)  with  x=0
         
-    //     virtual bool ComputeJacobian(double const* T_raw,
-    //                                 double* jacobian_raw) const {
+    //     virtual bool ComputeJacobian(float const* T_raw,
+    //                                 float* jacobian_raw) const {
     //         Eigen::Map<SE3 const> T(T_raw);
-    //         Eigen::Map<Eigen::Matrix<double, 6, 7> > jacobian(jacobian_raw);
+    //         Eigen::Map<Eigen::Matrix<float, 6, 7> > jacobian(jacobian_raw);
     //         jacobian = T.Dx_this_mul_exp_x_at_0();
     //         return true;
     //     }
@@ -387,14 +387,14 @@ public:
     vector<int> w_ = vector<int>(PYRAMID_LEVELS);
     vector<int> h_ = vector<int>(PYRAMID_LEVELS);
 
-    vector<double> fx_ = vector<double>(PYRAMID_LEVELS);
-    vector<double> fy_ = vector<double>(PYRAMID_LEVELS);
-    vector<double> cx_ = vector<double>(PYRAMID_LEVELS);
-    vector<double> cy_ = vector<double>(PYRAMID_LEVELS);
-    vector<double> invfx_ = vector<double>(PYRAMID_LEVELS);
-    vector<double> invfy_ = vector<double>(PYRAMID_LEVELS);
-    vector<double> invcx_ = vector<double>(PYRAMID_LEVELS);
-    vector<double> invcy_ = vector<double>(PYRAMID_LEVELS);
+    vector<float> fx_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> fy_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> cx_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> cy_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> invfx_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> invfy_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> invcx_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> invcy_ = vector<float>(PYRAMID_LEVELS);
 
     vector<Mat> K_ = vector<Mat>(PYRAMID_LEVELS);
 

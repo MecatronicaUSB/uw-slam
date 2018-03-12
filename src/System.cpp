@@ -98,10 +98,10 @@ void System::InitializeSystem(string _images_path, string _ground_truth_dataset,
     h_input_ = camera_model_->GetInputWidth();
     map1_ = camera_model_->GetMap1();
     map2_ = camera_model_->GetMap2();
-    fx_ = camera_model_->GetK().at<double>(0,0);
-    fy_ = camera_model_->GetK().at<double>(1,1);
-    cx_ = camera_model_->GetK().at<double>(0,2);
-    cy_ = camera_model_->GetK().at<double>(1,2);
+    fx_ = camera_model_->GetK().at<float>(0,0);
+    fy_ = camera_model_->GetK().at<float>(1,1);
+    cx_ = camera_model_->GetK().at<float>(0,2);
+    cy_ = camera_model_->GetK().at<float>(1,2);
     distortion_valid_ = camera_model_->IsValid();
 
     // Obtain ROI for distorted images
@@ -174,9 +174,9 @@ void System::Tracking() {
     if (not previous_frame_->obtained_candidatePoints_)
         tracker_->ObtainAllPoints(previous_frame_);
         
-    tracker_->ApplyGradient(current_frame_);
-    tracker_->ObtainAllPoints(current_frame_);
-    tracker_->EstimatePose(previous_frame_, current_frame_);
+    //tracker_->ApplyGradient(current_frame_);
+    //tracker_->ObtainAllPoints(current_frame_);
+    //tracker_->EstimatePose(previous_frame_, current_frame_);
     //tracker_->WarpFunction(current_frame_->candidatePoints_[0], Mat(), current_frame_->rigid_transformation_);
 
 }
