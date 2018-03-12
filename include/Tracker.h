@@ -169,6 +169,7 @@ public:
 
     void DebugShowWarpedPerspective(Mat _image1, Mat _image2, Mat _candidatePoints, Mat _warped, int _lvl);
     
+    bool PixelIsBackground(Mat _intputImage, int y, int x);
 
     // TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com)
     // 03-05-2018 - Review: Ceres usage in UW-SLAM ?

@@ -112,7 +112,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     Mat deltaMat = Mat::zeros(6,1,CV_64FC1);
     Sophus::Vector<double, SE3::DoF> deltaVector;
 
-    SE3 current_pose = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
+    SE3 current_pose = SE3(SO3::exp(SE3::Point(-0.3, 0.19, 0.0)), SE3::Point(0.0, 0.0, 0.0));
 
     // Sparse to Fine iteration
     // Create for()
@@ -178,17 +178,16 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         Mat warpedPoints = Mat(candidatePoints.size(), CV_64FC1);
         warpedPoints = WarpFunction(candidatePoints, candidatePointsDepth, current_pose * deltaSE3.exp(deltaVector), lvl);
 
-        Mat imageWarped = Mat(image1.size(), CV_8UC1);
+        Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
         ObtainImageTransformed(image1, candidatePoints, warpedPoints, imageWarped);
-        DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
 
+        //DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
 
-        // Mat gradientX2, gradientY2;
-        // ObtainGradientXY(imageWarped, gradientX2, gradientY2);
-        // imshow("IMAGE WARPED", imageWarped);
-        // imshow("GradientX", gradientX2);
-        // imshow("GradientY", gradientY2);
-        // waitKey(0);
+        Mat gradientX2, gradientY2;
+        ObtainGradientXY(imageWarped, gradientX2, gradientY2);
+        imshow("GradientX", gradientX2);
+        imshow("GradientY", gradientY2);
+        waitKey(0);
 
         // Computation of Jacobian
         Mat Jacobian;
@@ -416,19 +415,74 @@ Mat Tracker::WarpFunction(Mat _points2warp, Mat _depth, SE3 _rigid_transformatio
 }
 
 void Tracker::ObtainImageTransformed(Mat _originalImage, Mat _candidatePoints, Mat _warpedPoints, Mat _outputImage) {
-    Mat show = Mat(_originalImage.size(), CV_8UC1);
+
+    // Obtaining warped image from warpedpoints
+    Mat validPixel = Mat::zeros(_outputImage.size(), CV_8UC1);
     for (int i=0; i<_warpedPoints.rows; i++) {
         int x1 = _candidatePoints.at<double>(i,0);
         int y1 = _candidatePoints.at<double>(i,1);
         int x2 = round(_warpedPoints.at<double>(i,0));
         int y2 = round(_warpedPoints.at<double>(i,1));
 
-        show.at<uchar>(y2,x2) = _originalImage.at<uchar>(y1,x1);
-    }
-    imshow("input", _originalImage);    
-    imshow("output", show);
+        if (y2>0 && y2<_originalImage.rows && x2>0 && x2<_originalImage.cols){
+            _outputImage.at<uchar>(y2,x2) = _originalImage.at<uchar>(y1,x1);
+            validPixel.at<uchar>(y2,x2) = 1;
+        }
+    } 
+    imshow("Warped transformation", _outputImage);    
     waitKey(0);
+    // Applying bilinear interpolation of resulting waped image
+    for (int x=0; x<_outputImage.cols; x++) {
+        for (int y=0; y<_outputImage.rows; y++) {
+            
+            if (_outputImage.at<uchar>(y,x) == 0) {                
+                int x1 = x - 1;
+                int x2 = x + 1;
+                int y1 = y - 1;
+                int y2 = y + 1;
+                if (x1 < 0) x1 = 0;
+                if (y1 < 0) y1 = 0;
+                if (x2 == _outputImage.cols) x2 = x2-1;   
+                if (y2 == _outputImage.rows) y2 = y2-1;
+                if (validPixel.at<uchar>(y1,x1) == 1 || validPixel.at<uchar>(y1,x) == 1 || validPixel.at<uchar>(y1,x2) == 1 ||
+                    validPixel.at<uchar>(y,x1)  == 1 || validPixel.at<uchar>(y,x)  == 1 || validPixel.at<uchar>(y,x2)  == 1 ||
+                    validPixel.at<uchar>(y2,x1) == 1 || validPixel.at<uchar>(y2,x) == 1 || validPixel.at<uchar>(y2,x2) == 1    ) {
 
+                    int Q11 = _outputImage.at<uchar>(y2,x1);
+                    int Q21 = _outputImage.at<uchar>(y2,x2);
+                    int Q12 = _outputImage.at<uchar>(y1,x1);
+                    int Q22 = _outputImage.at<uchar>(y1,x2);
+
+                    if (Q12 == 0) Q12 = Q22;
+                    if (Q22 == 0) Q22 = Q12;
+                    if (Q11 == 0) Q11 = Q21;
+                    if (Q21 == 0) Q21 = Q11;
+                    
+                    int f_y1 = (Q12 * 0.5) + (Q22 * 0.5);
+                    int f_y2 = (Q11 * 0.5) + (Q21 * 0.5);
+                    
+                    _outputImage.at<uchar>(y,x) = (f_y1 * 0.5) + (f_y2 * 0.5);
+                }
+            }
+        }
+    }
+
+    imshow("Applying bilinear transformation", _outputImage);    
+    waitKey(0);
+}
+
+bool Tracker::PixelIsBackground(Mat _inputImage, int y, int x) {
+    if (_inputImage.at<uchar>(y-1,x-1) == 1) return true;
+    if (_inputImage.at<uchar>(y-1,x+1) == 1) return true;
+    if (_inputImage.at<uchar>(y+1,x-1) == 1) return true;
+    if (_inputImage.at<uchar>(y+1,x+1) == 1) return true;
+
+    if (_inputImage.at<uchar>(y,x+1) == 1) return true;
+    if (_inputImage.at<uchar>(y,x-1) == 1) return true;
+    if (_inputImage.at<uchar>(y-1,x) == 1) return true;
+    if (_inputImage.at<uchar>(y+1,x) == 1) return true;
+    
+    return false;    
 }
 
 void Tracker::ObtainGradientXY(Mat _inputImage, Mat _gradientX, Mat _gradientY) {
