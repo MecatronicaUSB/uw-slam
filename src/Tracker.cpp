@@ -111,8 +111,13 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     // Initial pose and deltapose (assumes little movement between frames)
     Mat deltaMat = Mat::zeros(6,1,CV_64FC1);
     Sophus::Vector<double, SE3::DoF> deltaVector;
-
-    SE3 current_pose = SE3(SO3::exp(SE3::Point(-0.3, 0.19, 0.0)), SE3::Point(0.0, 0.0, 0.0));
+    deltaVector(0) = 0;
+    deltaVector(1) = 0;
+    deltaVector(2) = 0;
+    deltaVector(3) = 0;
+    deltaVector(4) = 0;
+    deltaVector(5) = 0;
+    SE3 current_pose = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
 
     // Sparse to Fine iteration
     // Create for()
@@ -127,6 +132,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
     // Obtain gradients
     Mat image1 = _previous_frame->images_[lvl].clone();
+    Mat image2 = _current_frame->images_[lvl].clone();    
     Mat gradient1 = _previous_frame->gradient_[lvl].clone();
     Mat gradient2 = _current_frame->gradient_[lvl].clone();    
     Mat gradientX1 = _previous_frame->gradientX_[lvl].clone();
@@ -162,35 +168,60 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         Jw.at<double>(1,4) = fy_[lvl] * x1 * y1 * inv_z1 * inv_z1;
         Jw.at<double>(1,5) = fy_[lvl] * x1 * inv_z1;
 
+        
         Jws.push_back(Jw);
     }
-
+    Mat66d A;
     // Optimization iteration
     for (int k=0; k<max_iterations; k++) {
 
         int num_invalid_pixels = 0;  
-        vector<Mat> Jls;
-        vector<uchar> intensities1;        
-        vector<uchar> intensities2;
 
         // Warp points with current pose and delta pose (from previous iteration)
         SE3 deltaSE3;
         Mat warpedPoints = Mat(candidatePoints.size(), CV_64FC1);
-        warpedPoints = WarpFunction(candidatePoints, candidatePointsDepth, current_pose * deltaSE3.exp(deltaVector), lvl);
+        warpedPoints = WarpFunction(candidatePoints, candidatePointsDepth, SE3::exp(deltaVector) * current_pose, lvl);
 
         Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
         ObtainImageTransformed(image1, candidatePoints, warpedPoints, imageWarped);
 
         //DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
 
-        Mat gradientX2, gradientY2;
+        Mat gradientX2 = Mat(imageWarped.size(), CV_8UC1);
+        Mat gradientY2 = Mat(imageWarped.size(), CV_8UC1);
         ObtainGradientXY(imageWarped, gradientX2, gradientY2);
-        imshow("GradientX", gradientX2);
-        imshow("GradientY", gradientY2);
-        waitKey(0);
+    
+        // Computation of Jacobian and Residuals
+        Mat Jacobian;    
+        vector<uchar> intensities1;  
+        vector<uchar> intensities2;
+        for (int i=0; i<candidatePoints.rows; i++) {
+            
+            Mat Jl = Mat(1,2,CV_64FC1);
+            // Point in frame 1            
+            double x1 = candidatePoints.at<double>(i,0);
+            double y1 = candidatePoints.at<double>(i,1);
+            double z1 = candidatePoints.at<double>(i,2);
+            // Warped point in frame 2
+            int x2 = round(warpedPoints.at<double>(i,0));
+            int y2 = round(warpedPoints.at<double>(i,1));
+            int z2 = round(warpedPoints.at<double>(i,2));
 
-        // Computation of Jacobian
-        Mat Jacobian;
+            if (x2>=0 && x2<image2.cols && y2>=0 && y2<image2.rows) {
+
+                int intensity1 = image1.at<uchar>(y1,x1);
+                int intensity2 = image2.at<uchar>(y2,x2);
+                intensities1.push_back(intensity1);                
+                intensities2.push_back(intensity2);
+
+                Jl.at<double>(0,0) = gradientX2.at<uchar>(y2,x2);
+                Jl.at<double>(0,1) = gradientY2.at<uchar>(y2,x2);
+                Mat Jacobian_row;
+                Jacobian_row = Jl * Jws[i];
+                Jacobian.push_back(Jacobian_row);
+                
+            }
+        }
 
         // Computation of Residuals
         // Workaround to work with double numbers (intensities are in CV_8UC1)  
@@ -206,8 +237,8 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         Residuals = abs(I2 - I1);
 
         // Computation of Weights (Identity or Tukey function)
-        Mat W = IdentityWeights(Residuals.rows);
-        // Mat W = TukeyFunctionWeights(Residuals);
+        // Mat W = IdentityWeights(Residuals.rows);
+        Mat W = TukeyFunctionWeights(Residuals);
 
         // Computation of error
         double inv_num_residuals = 1.0 / Residuals.rows;
@@ -237,7 +268,8 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         last_error = error;
 
         // Update new pose with delta
-        current_pose = deltaSE3.exp(deltaVector) * current_pose;
+        current_pose = SE3::exp(deltaVector) * current_pose;
+
         //DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);   
 
         // Computation of new delta
@@ -245,7 +277,8 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         for (int i=0; i<JacobianW.rows; i++) {
             JacobianW.row(i) =  W.at<double>(i,0) * Jacobian.row(i);                
         }
-        deltaMat = -1 * ((Jacobian.t() * JacobianW).inv() * Jacobian.t() * ResidualsW);
+        
+        // deltaMat = -1 * ((Jacobian.t() * JacobianW).inv() * Jacobian.t() * ResidualsW);
 
         // Apply update
         deltaVector(0) = deltaMat.at<double>(0,0);
@@ -254,7 +287,6 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         deltaVector(3) = deltaMat.at<double>(3,0);
         deltaVector(4) = deltaMat.at<double>(4,0);
         deltaVector(5) = deltaMat.at<double>(5,0);
-
     }
     
 
@@ -314,7 +346,7 @@ void Tracker::ApplyGradient(Frame* _frame) {
 void Tracker::ObtainAllPoints(Frame* _frame) {
     for (int lvl=0; lvl< PYRAMID_LEVELS; lvl++) {
         _frame->candidatePoints_[lvl] = Mat::ones(w_[lvl] * h_[lvl], 4, CV_64FC1);
-        _frame->candidatePointsDepth_[lvl] = 60 * Mat::ones(w_[lvl] * h_[lvl], 1, CV_64FC1);
+        _frame->candidatePointsDepth_[lvl] = 2000 * Mat::ones(w_[lvl] * h_[lvl], 1, CV_64FC1);
         for (int x=0; x<w_[lvl]; x++) {
             for (int y =0; y<h_[lvl]; y++) {
                 Point3f point;
@@ -370,14 +402,14 @@ void Tracker::ObtainCandidatePoints(Frame* _frame) {
 
 Mat Tracker::WarpFunction(Mat _points2warp, Mat _depth, SE3 _rigid_transformation, int _lvl) {
     int lvl = _lvl;
-    Mat33 R = _rigid_transformation.rotationMatrix();
-    Mat31 t = _rigid_transformation.translation();
+    Mat33d R = _rigid_transformation.rotationMatrix();
+    Mat31d t = _rigid_transformation.translation();
     Quaternion2 quaternion = _rigid_transformation.unit_quaternion();
 
     Mat projected_points = Mat(_points2warp.size(), CV_64FC1);
     projected_points = _points2warp.clone();
 
-    Mat44 rigidEigen = _rigid_transformation.matrix();
+    Mat44d rigidEigen = _rigid_transformation.matrix();
     Mat rigid = Mat(4,4,CV_64FC1);
     eigen2cv(rigidEigen, rigid);
     //cout << rigid << endl;
@@ -429,8 +461,8 @@ void Tracker::ObtainImageTransformed(Mat _originalImage, Mat _candidatePoints, M
             validPixel.at<uchar>(y2,x2) = 1;
         }
     } 
-    imshow("Warped transformation", _outputImage);    
-    waitKey(0);
+    // imshow("Warped transformation", _outputImage);    
+    // waitKey(0);
     // Applying bilinear interpolation of resulting waped image
     for (int x=0; x<_outputImage.cols; x++) {
         for (int y=0; y<_outputImage.rows; y++) {
@@ -467,8 +499,8 @@ void Tracker::ObtainImageTransformed(Mat _originalImage, Mat _candidatePoints, M
         }
     }
 
-    imshow("Applying bilinear transformation", _outputImage);    
-    waitKey(0);
+    // imshow("Applying bilinear transformation", _outputImage);    
+    // waitKey(0);
 }
 
 bool Tracker::PixelIsBackground(Mat _inputImage, int y, int x) {
@@ -486,8 +518,6 @@ bool Tracker::PixelIsBackground(Mat _inputImage, int y, int x) {
 }
 
 void Tracker::ObtainGradientXY(Mat _inputImage, Mat _gradientX, Mat _gradientY) {
-    imshow("input", _inputImage);
-    waitKey(0);
     // Filters for calculating gradient in images
     cuda::GpuMat frameGPU = cuda::GpuMat(_inputImage);
     Ptr<cv::cuda::Filter> filter = cv::cuda::createGaussianFilter(frameGPU.type(), frameGPU.type(), Size(3,3), 0);
@@ -507,11 +537,6 @@ void Tracker::ObtainGradientXY(Mat _inputImage, Mat _gradientX, Mat _gradientY) 
 
     absX.download(_gradientX);
     absY.download(_gradientY);
-
-    imshow("gradientX", _gradientX);
-    imshow("gradientY", _gradientY);
-    waitKey(0);
-    
 }
 
 double Tracker::MedianMat(Mat _input) {

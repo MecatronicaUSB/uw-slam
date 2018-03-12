@@ -59,6 +59,8 @@ set(uw_slam_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/src/CameraModel.cpp
     ${PROJECT_SOURCE_DIR}/src/Options.cpp 
     ${PROJECT_SOURCE_DIR}/src/Visualizer.cpp 
+    ${PROJECT_SOURCE_DIR}/src/LeastSquares.cpp 
+    
 )
 
 include_directories(

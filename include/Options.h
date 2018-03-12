@@ -25,7 +25,6 @@
 #include "sophus/se3.hpp"
 #include "sophus/so3.hpp"
 
-
 // This workaround creates a template specilization for Eigen's cast_impl,
 // when casting from a ceres::Jet type. It relies on Eigen's internal API and
 // might break with future versions of Eigen.
@@ -120,7 +119,11 @@ struct Chain<FunctionType, kNumArgs, Jet<T, N> > {
 
 }  // namespace ceres
 
-namespace uw{
+namespace uw
+{
+
+#define SSEE(val,idx) (*(((float*)&val)+idx))
+#define ALIGN __attribute__((__aligned__(16)))
 
 typedef Sophus::SE3d SE3;
 typedef Sophus::Sim3d Sim3;
@@ -129,12 +132,16 @@ typedef Sophus::SO3d SO3;
 typedef Eigen::Vector4d QuaternionVector;
 typedef Eigen::Vector3d TranslationVector;
 typedef Eigen::Quaternion<SE3::Scalar> Quaternion2;
-typedef Eigen::Matrix<double,3,1> Mat31;
-typedef Eigen::Matrix<double,3,3> Mat33;
-typedef Eigen::Matrix<double,4,1> Mat41;
-typedef Eigen::Matrix<double,4,4> Mat44;
-typedef Eigen::Matrix<double,6,1> Mat61;
-typedef Eigen::Matrix<double,6,7> Mat67;
+typedef Eigen::Matrix<double,3,1> Mat31d;
+typedef Eigen::Matrix<double,3,3> Mat33d;
+typedef Eigen::Matrix<double,4,1> Mat41d;
+typedef Eigen::Matrix<double,4,4> Mat44d;
+typedef Eigen::Matrix<double,6,1> Mat61d;
+typedef Eigen::Matrix<double,6,6> Mat66d;
+typedef Eigen::Matrix<double,6,7> Mat67d;
+
+typedef Eigen::Matrix<float, 6, 6> Mat66f;
+typedef Eigen::Matrix<float, 6, 1> Mat61f;
 
 // Global constants
 extern const int PYRAMID_LEVELS;
