@@ -174,10 +174,9 @@ void System::Tracking() {
     if (not previous_frame_->obtained_candidatePoints_)
         tracker_->ObtainAllPoints(previous_frame_);
         
-    //tracker_->ApplyGradient(current_frame_);
-    //tracker_->ObtainAllPoints(current_frame_);
-    //tracker_->EstimatePose(previous_frame_, current_frame_);
-    //tracker_->WarpFunction(current_frame_->candidatePoints_[0], Mat(), current_frame_->rigid_transformation_);
+    tracker_->ApplyGradient(current_frame_);
+    tracker_->ObtainAllPoints(current_frame_);
+    tracker_->EstimatePose(previous_frame_, current_frame_);
 
 }
 

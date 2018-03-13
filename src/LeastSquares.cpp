@@ -24,8 +24,10 @@
 
 namespace uw
 {
+	
+LS::~LS() {};
 
-inline void NormalEquationsLeastSquares::initialize(int max_num_constraints) {
+void LS::initialize(const int max_num_constraints) {
     A.setZero();
     b.setZero();
     memset(SSEData,0, sizeof(float)*4*28);
@@ -34,7 +36,7 @@ inline void NormalEquationsLeastSquares::initialize(int max_num_constraints) {
     this->num_constraints = 0;
 };
 
-inline void NormalEquationsLeastSquares::finishNoDivide() {
+void LS::finishNoDivide() {
 	__m128 a;
 
   	a = _mm_load_ps(SSEData+4*0);
@@ -136,14 +138,14 @@ inline void NormalEquationsLeastSquares::finishNoDivide() {
   	error += SSEE(a,0) + SSEE(a,1) + SSEE(a,2) + SSEE(a,3);
 };
 
-void NormalEquationsLeastSquares::finish() {
+void LS::finish() {
     finishNoDivide();
     A /= (float) num_constraints;
     b /= (float) num_constraints;
     error /= (float) num_constraints;
 };
 
-inline void NormalEquationsLeastSquares::updateSSE(const __m128 &J1,const __m128 &J2,const __m128 &J3,const __m128 &J4,
+void LS::updateSSE(const __m128 &J1,const __m128 &J2,const __m128 &J3,const __m128 &J4,
   		                                            const __m128 &J5, const __m128 &J6,const __m128& res, const __m128& weight) {
     //A.noalias() += J * J.transpose() * weight;
     __m128 J1w = _mm_mul_ps(J1,weight);
@@ -199,7 +201,7 @@ inline void NormalEquationsLeastSquares::updateSSE(const __m128 &J1,const __m128
     num_constraints += 6;
 };
 
-inline void NormalEquationsLeastSquares::update(const Mat61f& J, const float& res, const float& weight) {
+void LS::update(const Mat61f& J, const float& res, const float& weight) {
     A.noalias() += J * J.transpose() * weight;
     b.noalias() -= J * (res * weight);
     error += res * res * weight;

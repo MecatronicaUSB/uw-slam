@@ -23,9 +23,9 @@
 
 namespace uw
 {
-class NormalEquationsLeastSquares
+class LS
 {
-
+public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;  
 
     Mat66f A;
@@ -34,15 +34,15 @@ class NormalEquationsLeastSquares
     float error;
     int num_constraints;
 
-    ~NormalEquationsLeastSquares();
+    ~LS();
 
-    inline void initialize(int max_num_constraints);
-    inline void finishNoDivide();
+    void initialize(const int max_num_constraints);
+    void finishNoDivide();
     void finish();
-    inline void updateSSE(const __m128 &J1,const __m128 &J2,const __m128 &J3,const __m128 &J4,
+    void updateSSE(const __m128 &J1,const __m128 &J2,const __m128 &J3,const __m128 &J4,
   		                const __m128 &J5,const __m128 &J6,const __m128& res, const __m128& weight);
     
-    inline void update(const Mat61f& J, const float& res, const float& weight);
+    void update(const Mat61f& J, const float& res, const float& weight);
 
 private:
     // EIGEN_ALIGN16

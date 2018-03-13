@@ -19,14 +19,17 @@
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "LeastSquares.h"
 #include "Tracker.h"
 #include "System.h"
+
 
 #include <opencv2/core/eigen.hpp>
 
 namespace uw
 {
 
+class LS;
 class ResidualIntensity;
 class LocalParameterizationSE3;
 
@@ -171,7 +174,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         
         Jws.push_back(Jw);
     }
-    Mat66f A;
+
     // Optimization iteration
     for (int k=0; k<max_iterations; k++) {
 
@@ -184,13 +187,14 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
         Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
         ObtainImageTransformed(image1, candidatePoints, warpedPoints, imageWarped);
-
+        imshow("Image warped",imageWarped);        
         //DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
 
         Mat gradientX2 = Mat(imageWarped.size(), CV_8UC1);
         Mat gradientY2 = Mat(imageWarped.size(), CV_8UC1);
         ObtainGradientXY(imageWarped, gradientX2, gradientY2);
-    
+        imshow("Gradient X",gradientX2);
+        waitKey(0);
         // Computation of Jacobian and Residuals
         Mat Jacobian;    
         vector<uchar> intensities1;  
@@ -234,11 +238,11 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         aux1.convertTo(I1, CV_32FC1);
         aux2.convertTo(I2, CV_32FC1);
 
-        Residuals = abs(I2 - I1);
+        Residuals = I2 - I1;
 
         // Computation of Weights (Identity or Tukey function)
-        // Mat W = IdentityWeights(Residuals.rows);
-        Mat W = TukeyFunctionWeights(Residuals);
+        Mat W = IdentityWeights(Residuals.rows);
+        //Mat W = TukeyFunctionWeights(Residuals);
 
         // Computation of error
         float inv_num_residuals = 1.0 / Residuals.rows;
@@ -273,20 +277,31 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         //DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);   
 
         // Computation of new delta
-        Mat JacobianW = Jacobian.clone();
-        for (int i=0; i<JacobianW.rows; i++) {
-            JacobianW.row(i) =  W.at<float>(i,0) * Jacobian.row(i);                
+        LS ls;
+        ls.initialize(Residuals.rows);
+        for (int i=0; i<Residuals.rows; i++) {
+            Mat61f jacobian;
+            cv2eigen(Jacobian.row(i), jacobian);
+            ls.update(jacobian, Residuals.at<float>(i,0), W.at<float>(i,0));
         }
-        
+        ls.finish();
+        // Solve LS system
+        float LM_lambda = 0.2;
+        Mat61f b = -ls.b;
+        Mat66f A = ls.A;
+        cout << A << endl;
+        cout << b << endl;
+        deltaVector = A.ldlt().solve(b);
+        cout << deltaVector << endl;
         // deltaMat = -1 * ((Jacobian.t() * JacobianW).inv() * Jacobian.t() * ResidualsW);
 
         // Apply update
-        deltaVector(0) = deltaMat.at<float>(0,0);
-        deltaVector(1) = deltaMat.at<float>(1,0);
-        deltaVector(2) = deltaMat.at<float>(2,0);
-        deltaVector(3) = deltaMat.at<float>(3,0);
-        deltaVector(4) = deltaMat.at<float>(4,0);
-        deltaVector(5) = deltaMat.at<float>(5,0);
+        // deltaVector(0) = deltaMat.at<float>(0,0);
+        // deltaVector(1) = deltaMat.at<float>(1,0);
+        // deltaVector(2) = deltaMat.at<float>(2,0);
+        // deltaVector(3) = deltaMat.at<float>(3,0);
+        // deltaVector(4) = deltaMat.at<float>(4,0);
+        // deltaVector(5) = deltaMat.at<float>(5,0);
     }
     
 
@@ -346,7 +361,7 @@ void Tracker::ApplyGradient(Frame* _frame) {
 void Tracker::ObtainAllPoints(Frame* _frame) {
     for (int lvl=0; lvl< PYRAMID_LEVELS; lvl++) {
         _frame->candidatePoints_[lvl] = Mat::ones(w_[lvl] * h_[lvl], 4, CV_32FC1);
-        _frame->candidatePointsDepth_[lvl] = 2000 * Mat::ones(w_[lvl] * h_[lvl], 1, CV_32FC1);
+        _frame->candidatePointsDepth_[lvl] = 1 * Mat::ones(w_[lvl] * h_[lvl], 1, CV_32FC1);
         for (int x=0; x<w_[lvl]; x++) {
             for (int y =0; y<h_[lvl]; y++) {
                 Point3f point;
