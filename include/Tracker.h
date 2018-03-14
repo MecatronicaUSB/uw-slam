@@ -140,10 +140,11 @@ public:
 
     void ObtainImageTransformed(Mat _originalImage, Mat _candidatePoints, Mat _warpedPoints, Mat _outputImage);
     
-    void ObtainGradientXY(Mat _inputImage, Mat _gradientX, Mat _gradientY);
+    void ObtainGradientXY(Mat _inputImage, Mat& _gradientX, Mat& _gradientY);
     
     void DebugShowResidual(Mat _image1, Mat _image2, Mat _candidatePoints, Mat _warped, int _lvl);
 
+    void DebugShowJacobians(vector<Mat> Jacobians, Mat original);
 
     float MedianMat(Mat _input);
 

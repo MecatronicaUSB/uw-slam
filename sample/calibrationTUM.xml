@@ -15,14 +15,14 @@
 <calibration_values type_id="opencv-matrix">
   <rows>1</rows>
   <cols>4</cols>
-  <dt>d</dt>
+  <dt>f</dt>
   <data>
     525	 525  319.5  239.5 </data></calibration_values>
 
 <rectification type_id="opencv-matrix">
   <rows>1</rows>
   <cols>4</cols>
-  <dt>d</dt>
+  <dt>f</dt>
   <data>
     0 0 0 1 </data></rectification>
 
