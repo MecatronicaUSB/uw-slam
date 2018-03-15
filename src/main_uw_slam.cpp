@@ -104,7 +104,7 @@ int main (int argc, char *argv[]) {
     if (parse_calibration) {
         calibration_path = args::get(parse_calibration);
     } else {
-        calibration_path = "/home/fabiomorales/catkin_ws/src/uw-slam/sample/calibrationTUM.xml";  // Need to change for final release
+        calibration_path = "/home/fabiomorales/catkin_ws/src/uw-slam/calibration/calibrationTUM.xml";  // Need to change for final release
     }
     if (start_i) {
         start_index = args::get(start_i);

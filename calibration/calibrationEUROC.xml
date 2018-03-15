@@ -19,6 +19,7 @@
   <data>
     458.654	 457.296  367.215  248.375 </data></calibration_values> 
 
+<!-- Distortion coefficients -->
 <rectification type_id="opencv-matrix">
   <rows>1</rows>
   <cols>4</cols>

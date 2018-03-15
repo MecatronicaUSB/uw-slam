@@ -57,14 +57,14 @@ catkin_make
 
 Run UW-SLAM on a dataset of images with known calibration parameters and dimentions of images. 
 
-Modify the `calibration.xml` file in `/sample` folder to specify the instrinsic parameters of the camera of the dataset to use. 
+Modify the `calibration.xml` file in `/calibration` folder to specify the instrinsic parameters of the camera of the dataset to use. 
 ```bash
     -d <directory of images files>                  
-    -c <directory of calibration.xml file>          (<uw-slam directory>/sample/calibration.xml)
+    -c <directory of calibration.xml file>          (<uw-slam directory>/calibration/calibration.xml)
     -s <number of starting frame>                   (Default: 0)
 ```
 
-Modify the `uw_slam.launch` file in `/launch` folder to specify the directory of files (Refer to `/sample/calibrationTUM.xml` for proper configuration of the .xml file).
+Modify the `uw_slam.launch` file in `/launch` folder to specify the directory of files (Refer to `/calibration/calibrationTUM.xml` for proper configuration of the .xml file).
 ```bash
     <!-- Images dimensions (Input) -->
     <in_width  type_id="integer"> W </in_width>       (Input dimentions of images)
@@ -93,37 +93,37 @@ Modify the `uw_slam.launch` file in `/launch` folder to specify the directory of
 
 Run UW-SLAM for general datasets:
 ```bash
-    roslaunch uw_slam uw_slam.launch
+roslaunch uw_slam uw_slam.launch
 ```
 ### Usage with EUROC and TUM datasets
 
-Currently, UW-SLAM supports ground-truth visualization along with UW-SLAM results for [TUM](https://vision.in.tum.de/data/datasets/mono-dataset?redirect=1) and [EUROC MAV](https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets) datasets for testing. For these datasets, a corresponding `calbration.xml` file is already created in the `/sample` folder.
+Currently, UW-SLAM supports ground-truth visualization along with UW-SLAM results for [TUM](https://vision.in.tum.de/data/datasets/mono-dataset?redirect=1) and [EUROC MAV](https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets) datasets for testing. For these datasets, a corresponding `calbration.xml` file is already created in the `/calibration` folder.
 
 #### EUROC
 
 For EUROC datasets, modify the args of the `uw_slamEUROC.launch` file in `/launch` folder to specify the directory of the files.
 ```bash
     -d <directory of images files>                  (<EUROC directory>/mav0/cam0/data/)
-    -c <directory of calibrationEUROC.xml file>     (<uw-slam directory>/sample/calibrationEUROC.xml)
+    -c <directory of calibrationEUROC.xml file>     (<uw-slam directory>/calibration/calibrationEUROC.xml)
     -s <number of starting frame>                   (Default: 0)
     --EUROC <directory of ground-truth poses file>  (<EUROC directory>/mav0/vic0/data.csv)
 ```
 Run UW-SLAM for EUROC datasets:
 ```bash
-    roslaunch uw_slam uw_slamEUROC.launch
+roslaunch uw_slam uw_slamEUROC.launch
 ```
 #### TUM
 
 For TUM datasets, modify the args of the `uw_slamTUM.launch` file in `/launch` folder to specify the directory of the files.
 ```bash
     -d <directory of images files>                (<TUM directory>/rgb/)
-    -c <directory of calibrationEUROC.xml file>   (<uw-slam directory>/sample/calibrationTUM.xml)
+    -c <directory of calibrationEUROC.xml file>   (<uw-slam directory>/calibration/calibrationTUM.xml)
     -s <number of starting frame>                 (Default: 0)
     --TUM <directory of ground-truth poses file>  (<TUM directory>/groundtruth.txt)
 ```
 Run UW-SLAM for TUM datasets:
 ```bash
-    roslaunch uw_slam uw_slamTUM.launch
+roslaunch uw_slam uw_slamTUM.launch
 ```
 ## Software Details
 
@@ -148,7 +148,7 @@ Launch files of UW-SLAM for easy ROS Kinetic execution.
 
 [Sophus](https://github.com/strasdat/Sophus) library for Lie-Algebra space. 
 
-#### /sample
+#### /calibration
 
 Calibration files. Included calibration for EUROC and TUM datasets.
 

@@ -112,7 +112,7 @@ public:
 
     /**
      * @brief Configures new Intrinsic Parameters Camera Matrix with the parameters from
-     *        the calibration .xml file. Refer to sample/calibration.xml for file structure.
+     *        the calibration .xml file. Refer to calibration/calibration.xml for file structure.
      *        Camera Models supported: Pinhole, RadTan / Equidistant.
      * 
      * @param _calibration_path 

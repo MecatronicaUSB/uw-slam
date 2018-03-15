@@ -1,10 +1,10 @@
 <launch>
     <!-- UW-SLAM main thread-->
     <node pkg="uw_slam" type="main_uw_slam" name="main"  
-        args="-d /home/fabiomorales/Documents/datasets/EUROC/V1_02_medium/mav0/cam0/data/
-              -c /home/fabiomorales/catkin_ws/src/uw-slam/sample/calibrationEUROC.xml
-              --EUROC /home/fabiomorales/Documents/datasets/EUROC/V1_02_medium/mav0/vicon0/data.csv   
-              -s 210"
+        args="-d <directory of images files>
+              -c <directory of calibration.xml file> 
+              -s <number of starting frame>
+              "
         clear_params="true" 
         output="screen"/>
         
