@@ -55,6 +55,7 @@ Frame::Frame(void) {
 
     obtained_gradients_ = false;
     obtained_candidatePoints_ = false;
+    depth_available_ = false;
     
     isKeyFrame_ = false;
 }
@@ -190,8 +191,6 @@ void System::AddFrame(int _id) {
     newFrame->idFrame_ = _id;
     newFrame->images_[0] = imread(images_list_[_id], CV_LOAD_IMAGE_GRAYSCALE);
 
-    // imshow("Distorted", newFrame->images_[0]);
-    // waitKey(0);
     if (distortion_valid_) {
         Mat distortion;
         remap(newFrame->images_[0], distortion, map1_, map2_, INTER_LINEAR);
@@ -201,8 +200,10 @@ void System::AddFrame(int _id) {
         // waitKey(0);
     }
 
-    if (depth_available_)
+    if (depth_available_) {
+        newFrame->depth_available_ = true;
         newFrame->depths_[0] = imread(depth_list_[_id], CV_LOAD_IMAGE_GRAYSCALE);
+    }
 
     for (int i=1; i<PYRAMID_LEVELS; i++) {
         resize(newFrame->images_[i-1], newFrame->images_[i], Size(), 0.5, 0.5);
@@ -252,7 +253,7 @@ void System::AddLists(string _path, string _depth_path) {
     vector<string> file_names;  
     DIR *dir;
     struct dirent *ent;
-
+    
     cout << "Searching images files in directory ... ";
     if ((dir = opendir(_path.c_str())) != NULL) {
         while ((ent = readdir (dir)) != NULL) {

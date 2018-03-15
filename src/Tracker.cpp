@@ -360,9 +360,9 @@ void Tracker::ApplyGradient(Frame* _frame) {
 
 
 void Tracker::ObtainAllPoints(Frame* _frame) {
+    
     for (int lvl=0; lvl< PYRAMID_LEVELS; lvl++) {
         _frame->candidatePoints_[lvl] = Mat::ones(w_[lvl] * h_[lvl], 4, CV_32FC1);
-        _frame->candidatePointsDepth_[lvl] = 500 * Mat::ones(w_[lvl] * h_[lvl], 1, CV_32FC1);
         for (int x=0; x<w_[lvl]; x++) {
             for (int y =0; y<h_[lvl]; y++) {
                 Point3f point;
@@ -372,12 +372,14 @@ void Tracker::ObtainAllPoints(Frame* _frame) {
                 _frame->framePoints_[lvl].push_back(point);
                 _frame->candidatePoints_[lvl].at<float>(y+h_[lvl]*x,0) = x;
                 _frame->candidatePoints_[lvl].at<float>(y+h_[lvl]*x,1) = y;
+                if (_frame->depth_available_){
+                    _frame->candidatePoints_[lvl].at<float>(y+h_[lvl]*x,2) = _frame->depths_[lvl].at<uchar>(y,x);
+                } else {
+                    _frame->candidatePoints_[lvl].at<float>(y+h_[lvl]*x,2) = 1;
+                }
             }
         } 
     }
-    // cout << _frame->candidatePoints_[0].at<float>((w_[0]/2) * h_[0] - 1,0) << endl;
-    // cout << _frame->candidatePoints_[0].at<float>((w_[0]/2) * h_[0] - 1,1) << endl;
-
     _frame->obtained_candidatePoints_ = true;
 }
 
