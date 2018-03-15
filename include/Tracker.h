@@ -69,7 +69,7 @@ public:
      * @brief Tracker consturctor.
      * 
      */
-    Tracker();
+    Tracker(bool _depth_available);
 
     /**
      * @brief Tracker destructor.
@@ -127,7 +127,7 @@ public:
      * @param _rigid_transformation 
      * @return Mat 
      */
-    Mat WarpFunction(Mat _points2warp, Mat _depth, SE3 _rigid_transformation, int _lvl);
+    Mat WarpFunction(Mat _points2warp, SE3 _rigid_transformation, int _lvl);
 
     /**
      * @brief Transforms Mat of six parameters (Lie algebra group) to SE3 Sophus pose structure
@@ -399,6 +399,7 @@ public:
 
     vector<Mat> K_ = vector<Mat>(PYRAMID_LEVELS);
 
+    bool depth_available_;
 };
 
 

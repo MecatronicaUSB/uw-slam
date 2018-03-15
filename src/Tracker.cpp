@@ -33,7 +33,8 @@ class LS;
 class ResidualIntensity;
 class LocalParameterizationSE3;
 
-Tracker::Tracker() {
+Tracker::Tracker(bool _depth_available) {
+    depth_available_ = _depth_available;
     for (Mat K: K_)
         K = Mat(3,3,CV_32FC1, Scalar(0.f));
 };
@@ -120,7 +121,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     deltaVector(3) = 0;
     deltaVector(4) = 0;
     deltaVector(5) = 0;
-    SE3 current_pose = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0, 0.0, 0));
+    SE3 current_pose = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(-0.0004, 0.0, 0.0003));
 
     // Sparse to Fine iteration
     // Create for()
@@ -180,12 +181,12 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         // Warp points with current pose and delta pose (from previous iteration)
         SE3 deltaSE3;
         Mat warpedPoints = Mat(candidatePoints.size(), CV_32FC1);
-        warpedPoints = WarpFunction(candidatePoints, candidatePointsDepth, SE3::exp(deltaVector) * current_pose, lvl);
+        warpedPoints = WarpFunction(candidatePoints, SE3::exp(deltaVector) * current_pose, lvl);
 
         Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
         ObtainImageTransformed(image1, candidatePoints, warpedPoints, imageWarped);
         imshow("Image warped",imageWarped);
-
+        waitKey(0);
         //DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
 
         Mat gradientX2 = Mat(imageWarped.size(), CV_32FC1);
@@ -360,7 +361,8 @@ void Tracker::ApplyGradient(Frame* _frame) {
 
 
 void Tracker::ObtainAllPoints(Frame* _frame) {
-    
+    // Factor of TUM depth images
+    float factor = 0.0002;
     for (int lvl=0; lvl< PYRAMID_LEVELS; lvl++) {
         _frame->candidatePoints_[lvl] = Mat::ones(w_[lvl] * h_[lvl], 4, CV_32FC1);
         for (int x=0; x<w_[lvl]; x++) {
@@ -373,7 +375,7 @@ void Tracker::ObtainAllPoints(Frame* _frame) {
                 _frame->candidatePoints_[lvl].at<float>(y+h_[lvl]*x,0) = x;
                 _frame->candidatePoints_[lvl].at<float>(y+h_[lvl]*x,1) = y;
                 if (_frame->depth_available_){
-                    _frame->candidatePoints_[lvl].at<float>(y+h_[lvl]*x,2) = _frame->depths_[lvl].at<uchar>(y,x);
+                    _frame->candidatePoints_[lvl].at<float>(y+h_[lvl]*x,2) = _frame->depths_[lvl].at<uchar>(y,x) * factor;
                 } else {
                     _frame->candidatePoints_[lvl].at<float>(y+h_[lvl]*x,2) = 1;
                 }
@@ -420,13 +422,13 @@ void Tracker::ObtainCandidatePoints(Frame* _frame) {
     _frame->obtained_candidatePoints_ = true;
 }
 
-Mat Tracker::WarpFunction(Mat _points2warp, Mat _depth, SE3 _rigid_transformation, int _lvl) {
+Mat Tracker::WarpFunction(Mat _points2warp, SE3 _rigid_transformation, int _lvl) {
     int lvl = _lvl;
     Mat33f R = _rigid_transformation.rotationMatrix();
     Mat31f t = _rigid_transformation.translation();
     Quaternion2 quaternion = _rigid_transformation.unit_quaternion();
 
-    Mat projected_points = Mat(_points2warp.size(), CV_32FC1);
+    Mat projected_points = Mat(_points2warp.size(), CV_64FC1);
     projected_points = _points2warp.clone();
 
     Mat44f rigidEigen = _rigid_transformation.matrix();
@@ -445,24 +447,34 @@ Mat Tracker::WarpFunction(Mat _points2warp, Mat _depth, SE3 _rigid_transformatio
     // cout << "cx: " << cx << endl;
     // cout << "cy: " << cy << endl;
     
-    int prueba = 1;
-
+    // 2D -> 3D
+    // X  = (x - cx) * Z / fx
     projected_points.col(0) = ((projected_points.col(0) - cx) * invfx);
-    projected_points.col(0) = projected_points.col(0).mul(_depth);
+    cout << projected_points.row(0) << endl;
+    projected_points.col(0) = projected_points.col(0).mul(projected_points.col(2));
+    cout << projected_points.row(0) << endl;
+
+    // Y  = (y - cy) * Z / fy    
     projected_points.col(1) = ((projected_points.col(1) - cy) * invfy);
-    projected_points.col(1) = projected_points.col(1).mul(_depth);
-    projected_points.col(2) = projected_points.col(2).mul(_depth);
-    
+    projected_points.col(1) = projected_points.col(1).mul(projected_points.col(2));
+
+    // Z = Z (depth)
+
+    // Transformation of a point rigid body motion
     projected_points = rigid * projected_points.t();
 
+    // 3D -> 2D
+    // x = (X * fx / Z) + cx
     projected_points.row(0) /= projected_points.row(2);
-    projected_points.row(1) /= projected_points.row(2);
     projected_points.row(0) *= fx;
-    projected_points.row(1) *= fy;
     projected_points.row(0) += cx;
+    
+    // x = (Y * fy / Z) + cy    
+    projected_points.row(1) /= projected_points.row(2);
+    projected_points.row(1) *= fy;
     projected_points.row(1) += cy;
     
-    // Check projected_points arrangement
+    // Transposing the points due transformation multiplication
     return projected_points.t();
 }
 

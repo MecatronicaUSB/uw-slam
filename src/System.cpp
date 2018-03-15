@@ -115,7 +115,7 @@ void System::InitializeSystem(string _images_path, string _ground_truth_dataset,
         CalculateROI();
 
     // Initialize tracker system
-    tracker_ = new Tracker();
+    tracker_ = new Tracker(depth_available_);
     tracker_->InitializePyramid(w_, h_, K_);
 
     // Initialize output visualizer
