@@ -76,6 +76,7 @@ public:
 
     int id;
     vector<Mat> images_    = vector<Mat>(PYRAMID_LEVELS);
+    vector<Mat> depths_    = vector<Mat>(PYRAMID_LEVELS);    
     vector<Mat> gradientX_ = vector<Mat>(PYRAMID_LEVELS);
     vector<Mat> gradientY_ = vector<Mat>(PYRAMID_LEVELS);
     vector<Mat> gradient_  = vector<Mat>(PYRAMID_LEVELS);
@@ -112,7 +113,7 @@ public:
 
     /**
      * @brief Configures new Intrinsic Parameters Camera Matrix with the parameters from
-     *        the calibration .xml file. Refer to sample/calibration.xml for file structure.
+     *        the calibration .xml file. Refer to calibration/calibration.xml for file structure.
      *        Camera Models supported: Pinhole, RadTan / Equidistant.
      * 
      * @param _calibration_path 
@@ -130,7 +131,7 @@ public:
      * @brief Initializes necessary variables to start SLAM system.
      *        Call after Calibration() but before adding the first frame to the system.
      */
-    void InitializeSystem(string _images_path, string _ground_truth_dataset, string _ground_truth_path);
+    void InitializeSystem(string _images_path, string _ground_truth_dataset, string _ground_truth_path, string _depth_path);
 
     /**
      * @brief Starts tracking thread of the next frame. 
@@ -167,8 +168,9 @@ public:
      *        Propagates ground_truth_path to later use of Visualizer (optional).
      * 
      * @param _path 
+     * @param _depth_path    
      */
-    void AddLists(string _path);
+    void AddLists(string _path, string _depth_path);
 
     /**
      * @brief Fast function to show an id frame. Only used for debuggin purposes.
@@ -198,7 +200,10 @@ public:
     Frame* current_keyframe_;
     vector<Frame*> frames_;
     vector<Frame*> keyframes_;
+
     vector<string> images_list_;
+    vector<string> depth_list_;
+    
     string ground_truth_dataset_;    
     string ground_truth_path_;
 
@@ -208,7 +213,7 @@ public:
     
     bool initialized_;
     bool distortion_valid_;
-    
+    bool depth_available_;
 };
 
 }

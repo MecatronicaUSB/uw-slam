@@ -3663,6 +3663,7 @@ args::ValueFlag<int> start_i(parser, "start index", "Start in certain frame of t
 args::ValueFlag<std::string> dir_dataset(parser, "images path", "Directory of images files", {'d', "directory"});
 args::ValueFlag<std::string> ground_truth_EUROC(parser, "groundtruth path", "Directory of ground truth poses (EUROC dataset)", {"EUROC"});
 args::ValueFlag<std::string> ground_truth_TUM(parser, "groundtruth path", "Directory of ground truth poses (TUM dataset)", {"TUM"});
+args::ValueFlag<std::string> depth_TUM(parser, "calibration xml", "Directory of depth images for TUM dataset", {'p', "depth"});
 args::ValueFlag<std::string> parse_calibration(parser, "calibration xml", "Name of input .xml calibration file", {'c', "calibration"});
 
 #endif

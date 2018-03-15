@@ -31,6 +31,7 @@ System::System(int argc, char *argv[], int _start_index) {
     start_index_ = _start_index;
     initialized_ = false;
     distortion_valid_ = false;
+    depth_available_ = false;
     num_frames_     = 0;
     num_keyframes_  = 0;
 }
@@ -88,9 +89,13 @@ void System::Calibration(string _calibration_path) {
 	}
 }
 
-void System::InitializeSystem(string _images_path, string _ground_truth_dataset, string _ground_truth_path) {
+void System::InitializeSystem(string _images_path, string _ground_truth_dataset, string _ground_truth_path, string _depth_path) {
+    // Check if depth images are available
+    if (_depth_path != "")
+        depth_available_ = true;
+
     // Add list of the dataset images names
-    AddLists(_images_path);
+    AddLists(_images_path, _depth_path);
 
     // Obtain parameters of camera_model
     K_ = camera_model_->GetK();
@@ -184,6 +189,7 @@ void System::AddFrame(int _id) {
     Frame* newFrame   = new Frame();
     newFrame->idFrame_ = _id;
     newFrame->images_[0] = imread(images_list_[_id], CV_LOAD_IMAGE_GRAYSCALE);
+
     // imshow("Distorted", newFrame->images_[0]);
     // waitKey(0);
     if (distortion_valid_) {
@@ -195,9 +201,16 @@ void System::AddFrame(int _id) {
         // waitKey(0);
     }
 
-    for (int i=1; i<PYRAMID_LEVELS; i++)
+    if (depth_available_)
+        newFrame->depths_[0] = imread(depth_list_[_id], CV_LOAD_IMAGE_GRAYSCALE);
+
+    for (int i=1; i<PYRAMID_LEVELS; i++) {
         resize(newFrame->images_[i-1], newFrame->images_[i], Size(), 0.5, 0.5);
-    
+        if (depth_available_) {
+            resize(newFrame->depths_[i-1], newFrame->depths_[i], Size(), 0.5, 0.5);    
+        }
+    }
+
     if (num_frames_ == 0) {
         previous_frame_ = newFrame;        
         current_frame_ = newFrame;
@@ -235,8 +248,8 @@ void System::AddFramesGroup(int _id, int _num_images) {
         System::AddFrame(i);
 }
 
-void System::AddLists(string _path) {
-    vector<string> file_names;
+void System::AddLists(string _path, string _depth_path) {
+    vector<string> file_names;  
     DIR *dir;
     struct dirent *ent;
 
@@ -264,6 +277,37 @@ void System::AddLists(string _path) {
     cout << file_names.size() << " found"  << endl;
 
     images_list_ = file_names;
+
+    if (depth_available_) {
+        vector<string> depth_names;  
+        DIR *dir_depth;
+        struct dirent *ent_depth;
+
+        cout << "Searching for depth images (TUM dataset) ... ";
+        if ((dir_depth = opendir(_depth_path.c_str())) != NULL) {
+            while ((ent_depth = readdir (dir_depth)) != NULL) {
+                depth_names.push_back(_depth_path + string(ent_depth->d_name));
+            }
+            closedir (dir_depth);
+        } else {
+            // If the directory could not be opened
+            cout << "Could not open directory of depth images: " << _depth_path << endl;
+            cout << "Exiting..." << endl;
+            exit(0);
+        }
+        // Sorting the vector of strings so it is alphabetically ordered
+        sort(depth_names.begin(), depth_names.end());
+        depth_names.erase(depth_names.begin(), depth_names.begin()+2);
+
+        if (depth_names.size() < 15) {
+            cout << "\nInsufficient number of depth images found. Consider not to use -p flag." << endl;
+            cout << "Exiting..." << endl;
+            exit(0);
+        }
+        cout << depth_names.size() << " found"  << endl;
+
+        depth_list_ = depth_names;
+    }
 }
 
 void System::FreeFrames() {

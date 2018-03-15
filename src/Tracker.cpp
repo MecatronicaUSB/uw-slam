@@ -558,7 +558,6 @@ void Tracker::DebugShowJacobians(vector<Mat> Jacobians, Mat original) {
     for (int i=0; i<6; i++) 
         image_jacobians[i] = Mat::zeros(original.size(), CV_8UC1);
 
-    
     int index = 0;
     for (int x=0; x<original.cols; x++) {
         for (int y=0; y<original.rows; y++) {
@@ -573,6 +572,7 @@ void Tracker::DebugShowJacobians(vector<Mat> Jacobians, Mat original) {
             index++;
         }
     }
+
     cout << Jacobians.size() << endl;
     cout << index << endl;
     imshow("Jacobian for v1", image_jacobians[0]);

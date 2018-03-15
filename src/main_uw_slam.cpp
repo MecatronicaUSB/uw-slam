@@ -44,6 +44,7 @@ string images_path;
 string calibration_path;
 string ground_truth_dataset;
 string ground_truth_path;
+string depth_path;
 cuda::DeviceInfo device_info;
 
 void ShowSettings() {
@@ -52,6 +53,8 @@ void ShowSettings() {
     cout << "Directory of images: " << images_path  << endl;
     if (not (ground_truth_path == ""))
         cout << "Directory of ground truth poses: " << ground_truth_path << endl;
+    if (not (depth_path == ""))
+        cout << "Directory of depth images (TUM): " << depth_path << endl;
     cout << endl;
 }
 
@@ -97,14 +100,20 @@ int main (int argc, char *argv[]) {
     } else if (ground_truth_TUM) {
         ground_truth_dataset = "TUM";
         ground_truth_path = args::get(ground_truth_TUM);
+        if (depth_TUM) {
+            depth_path = args::get(depth_TUM); 
+        } else {
+            depth_path = ""; 
+        }
     } else {
+        depth_path = "";
         ground_truth_dataset = "";
         ground_truth_path = "";  // Need to change for final release
     }
     if (parse_calibration) {
         calibration_path = args::get(parse_calibration);
     } else {
-        calibration_path = "/home/fabiomorales/catkin_ws/src/uw-slam/sample/calibrationTUM.xml";  // Need to change for final release
+        calibration_path = "/home/fabiomorales/catkin_ws/src/uw-slam/calibration/calibrationTUM.xml";  // Need to change for final release
     }
     if (start_i) {
         start_index = args::get(start_i);
@@ -122,7 +131,7 @@ int main (int argc, char *argv[]) {
     uwSystem->Calibration(calibration_path);
     
     // Initialize SLAM system
-    uwSystem->InitializeSystem(images_path, ground_truth_dataset, ground_truth_path);
+    uwSystem->InitializeSystem(images_path, ground_truth_dataset, ground_truth_path, depth_path);
     
     // Start SLAM process
     // Read images one by one from directory provided
