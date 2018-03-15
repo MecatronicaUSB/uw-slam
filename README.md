@@ -13,17 +13,22 @@ UW-SLAM is a free and open hardware licensed under the [GPL-3.0 License](https:/
 ## Requirements
 
 - [OpenCV 3.2](http://opencv.org) and extra modules.
-- [CUDA 8.0](https://developer.nvidia.com/cuda-toolkit-archive).
-- [Eigen 3]().
 - [ROS Kinetic](http://wiki.ros.org/kinetic/Installation).
+- [CUDA 8.0](https://developer.nvidia.com/cuda-toolkit-archive).
+- [Eigen 3](http://eigen.tuxfamily.org/index.php?title=Main_Page).
+- [Ceres solver](http://ceres-solver.org/).
 
 ## Getting Started
 
-Install the required dependencies:
+From a fresh Ubuntu 16.04 LTS, install the following dependencies:
 
 #### OpenCV 3.2 with CUDA 8.0
 
-Please refer to [Installation OpenCV and CUDA](https://github.com/MecatronicaUSB/uwimageproc/blob/master/INSTALL.md).
+Refer to [OpenCV and CUDA 8.0 installation instructions](https://github.com/MecatronicaUSB/uwimageproc/blob/master/INSTALL.md).
+
+#### ROS Kinetic
+
+Refer to [ROS Kinetic installation instructions](http://wiki.ros.org/kinetic/Installation).
 
 #### Eigen 3
 
@@ -31,9 +36,13 @@ Please refer to [Installation OpenCV and CUDA](https://github.com/MecatronicaUSB
 sudo apt-get install libsuitesparse-dev libeigen3-dev libboost-all-dev
 ```
 
+#### Ceres solver
+
+Refer to [Ceres solver installation](http://ceres-solver.org/installation.html#linux).
+
 ### Building UW-SLAM
 
-Clone UW-SLAM repository in the /src folder of your catkin workspace:
+Clone UW-SLAM repository in the `/src` folder of your catkin workspace:
 
 ```bash
 cd <catkin_ws_directory>/src
@@ -44,18 +53,18 @@ catkin_make
 
 ## Usage
 
-### Usage with general datasets
+### General datasets
 
 Run UW-SLAM on a dataset of images with known calibration parameters and dimentions of images. 
 
 Modify the `calibration.xml` file in `/sample` folder to specify the instrinsic parameters of the camera of the dataset to use. 
 ```bash
-    -d <directory of images files>
+    -d <directory of images files>                  
     -c <directory of calibration.xml file>          (<uw-slam directory>/sample/calibration.xml)
     -s <number of starting frame>                   (Default: 0)
 ```
 
-Modify the `uw_slam.launch` file in `/launch` folder to specify the directory of files (Refer to /sample/calibrationTUM.xml for proper configuration of the .xml file).
+Modify the `uw_slam.launch` file in `/launch` folder to specify the directory of files (Refer to `/sample/calibrationTUM.xml` for proper configuration of the .xml file).
 ```bash
     <!-- Images dimensions (Input) -->
     <in_width  type_id="integer"> W </in_width>       (Input dimentions of images)
@@ -94,10 +103,10 @@ Currently, UW-SLAM supports ground-truth visualization along with UW-SLAM result
 
 For EUROC datasets, modify the args of the `uw_slamEUROC.launch` file in `/launch` folder to specify the directory of the files.
 ```bash
-    -d <directory of images files>
-    -c <directory of calibrationEUROC.xml file>     (for EUROC, <uw-slam directory>/sample/calibrationEUROC.xml)
+    -d <directory of images files>                  (<EUROC directory>/mav0/cam0/data/)
+    -c <directory of calibrationEUROC.xml file>     (<uw-slam directory>/sample/calibrationEUROC.xml)
     -s <number of starting frame>                   (Default: 0)
-    --EUROC <directory of ground-truth poses file>  (for EUROC, directory of data.csv)
+    --EUROC <directory of ground-truth poses file>  (<EUROC directory>/mav0/vic0/data.csv)
 ```
 Run UW-SLAM for EUROC datasets:
 ```bash
@@ -107,10 +116,10 @@ Run UW-SLAM for EUROC datasets:
 
 For TUM datasets, modify the args of the `uw_slamTUM.launch` file in `/launch` folder to specify the directory of the files.
 ```bash
-    -d <directory of images files>
-    -c <directory of calibrationEUROC.xml file>   (for TUM, <uw-slam directory>/sample/calibrationTUM.xml)
+    -d <directory of images files>                (<TUM directory>/rgb/)
+    -c <directory of calibrationEUROC.xml file>   (<uw-slam directory>/sample/calibrationTUM.xml)
     -s <number of starting frame>                 (Default: 0)
-    --TUM <directory of ground-truth poses file>  (for TUM, directory of groundtruth.txt)
+    --TUM <directory of ground-truth poses file>  (<TUM directory>/groundtruth.txt)
 ```
 Run UW-SLAM for TUM datasets:
 ```bash
@@ -125,12 +134,23 @@ Run UW-SLAM for TUM datasets:
 
 #### /src
 
-Core files of uw-slam.
+Core .cpp files of UW-SLAM.
 
 #### /include
 
-Libraries files of uw-slam.
+Libraries .h files of UW-SLAM.
 
+#### /launch
+
+Launch files of UW-SLAM for easy ROS Kinetic execution.
+
+#### /thirdparty
+
+[Sophus](https://github.com/strasdat/Sophus) library for Lie-Algebra space. 
+
+#### /sample
+
+Calibration files. Included calibration for EUROC and TUM datasets.
 
 ## License
 
