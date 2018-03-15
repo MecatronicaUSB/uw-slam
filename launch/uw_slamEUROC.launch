@@ -1,3 +1,4 @@
+<!-- EUROC DATASET -->
 <launch>
     <!-- UW-SLAM main thread-->
     <node pkg="uw_slam" type="main_uw_slam" name="main"  

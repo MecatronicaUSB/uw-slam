@@ -3,8 +3,7 @@
 * 
 * Copyright 2018.
 * Developed by Fabio Morales,
-* If you use this code, please cite the respective publications as
-* listed on the above website.
+* Email: fabmoraleshidalgo@gmail.com; GitHub: @fmoralesh
 *
 * UW-SLAM is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -19,9 +18,13 @@
 * You should have received a copy of the GNU General Public License
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
+
+// TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com) 02-13-2018 - Clean unused libraries.
 #pragma once
 #include "Options.h"
 #include "CameraModel.h"
+#include "Tracker.h"
+#include "Visualizer.h"
 
 ///Basic C and C++ libraries
 #include <stdlib.h>
@@ -48,59 +51,164 @@
 using namespace cv;
 using namespace std;
 
-
 namespace uw
 {
 
 class CameraModel;
+class Tracker;
+class Map;
+class Visualizer;
 
-class Frame{
+class Frame {
 public:
+    /**
+     * @brief Constructor of Frame.
+     * 
+     */
     Frame();
 
-    int idFrame;
-    Mat data;
-    bool isKeyFrame;
+    /**
+     * @brief Destructor of Frame
+     * 
+     */
+    ~Frame();
 
-    Frame* nextFrame;
-    Frame* prevFrame;
+
+    int id;
+    vector<Mat> images_    = vector<Mat>(PYRAMID_LEVELS);
+    vector<Mat> gradientX_ = vector<Mat>(PYRAMID_LEVELS);
+    vector<Mat> gradientY_ = vector<Mat>(PYRAMID_LEVELS);
+    vector<Mat> gradient_  = vector<Mat>(PYRAMID_LEVELS);
+    
+    vector<Mat> candidatePoints_      = vector<Mat>(PYRAMID_LEVELS);
+    vector<Mat> candidatePointsDepth_ = vector<Mat>(PYRAMID_LEVELS);
+    vector<vector<Point3f> > framePoints_ = vector<vector<Point3f> >(PYRAMID_LEVELS);
+
+    int idFrame_;
+    vector<float> map_;
+    SE3 rigid_transformation_;
+
+    bool obtained_gradients_;
+    bool obtained_candidatePoints_;    
+    bool isKeyFrame_;
 };
 
-
-class System{
+class System {
 public:
-    System();
+    /**
+     * @brief Constructor of System. Contains args from parser for ROS initialization.
+     * 
+     * @param argc 
+     * @param argv 
+     * @param _start_index 
+     */
+    System(int argc, char *argv[], int _start_index);
+
+    /**
+     * @brief Destructor of System.
+     * 
+     */
     ~System();
 
-    void addFrame(int id);
-    void addFrameGroup(int nImages);
-    void addListImages(string path);
-    void Calibration(string calibrationPath);
-    void showFrame(int id);
+    /**
+     * @brief Configures new Intrinsic Parameters Camera Matrix with the parameters from
+     *        the calibration .xml file. Refer to sample/calibration.xml for file structure.
+     *        Camera Models supported: Pinhole, RadTan / Equidistant.
+     * 
+     * @param _calibration_path 
+     */
+    void Calibration(string _calibration_path);
 
-    Mat applyGradient(int id);
+    /**
+     * @brief Calculates ROI of images (that are inside of frame after undistortion)
+     *        A list of images must exist before executing this function.
+     *        Assumes that every image in the dataset have same width and height
+     */
+    void CalculateROI();
 
-    int nFrames;
-    Frame* currentKeyFrame;
-    vector<Frame*> frames;
-    vector<Frame*> keyFrames;
-    vector<string> imagesList;
+    /**
+     * @brief Initializes necessary variables to start SLAM system.
+     *        Call after Calibration() but before adding the first frame to the system.
+     */
+    void InitializeSystem(string _images_path, string _ground_truth_dataset, string _ground_truth_path);
 
-    int w, h, w_inp, h_inp;
-    float fx, fy, cx, cy;
+    /**
+     * @brief Starts tracking thread of the next frame. 
+     *        Computes image alingment and optimization of camera poses given two frames and
+     *        their inverse depth map.
+     */
+    void Tracking();
 
-    Mat K;
-    Mat map1, map2;
-    CameraModel* cameraModel;
+    /**
+     * @brief Adds the frame corresponding on the id position from all the dataset.
+     * 
+     * @param _id 
+     */
+    void AddFrame(int _id);
+
+    /**
+     * @brief Adds num_images frames to the system, starting from the id position from
+     *        all the dataset. Only used for debuggin purposes.
+     * 
+     * @param _id 
+     * @param _num_images 
+     */
+    void AddFramesGroup(int _id, int _num_images);
+
+    /**
+     * @brief Adds the keyframe corresponding on the id position from all the dataset.
+     * 
+     * @param _id 
+     */
+    void AddKeyFrame(int _id);
+
+    /**
+     * @brief Adds a list of images path to the system, for future reading of the frames.
+     *        Propagates ground_truth_path to later use of Visualizer (optional).
+     * 
+     * @param _path 
+     */
+    void AddLists(string _path);
+
+    /**
+     * @brief Fast function to show an id frame. Only used for debuggin purposes.
+     * 
+     * @param _id 
+     */
+    void ShowFrame(int _id);
+
+    /**
+     * @brief Deletes oldest frame of list to mantain memory consumption
+     * 
+     */
+    void FreeFrames();
+
+    CameraModel* camera_model_;
+    Tracker* tracker_;
+    Visualizer* visualizer_;
+
+    int start_index_;
+    int num_frames_;
+    int num_keyframes_;
+    int w_, h_, w_input_, h_input_;
+    float fx_, fy_, cx_, cy_;
+
+    Frame* current_frame_;
+    Frame* previous_frame_;
+    Frame* current_keyframe_;
+    vector<Frame*> frames_;
+    vector<Frame*> keyframes_;
+    vector<string> images_list_;
+    string ground_truth_dataset_;    
+    string ground_truth_path_;
+
+    Mat K_;
+    Mat map1_, map2_;
+    Rect ROI;
     
-    bool rectificationValid;
-    // Filters for calculating gradient in images
-    Ptr<cuda::Filter> soberX = cuda::createSobelFilter(0, 0, 1, 0, CV_SCHARR, 1.0, BORDER_DEFAULT);
-    Ptr<cuda::Filter> soberY = cuda::createSobelFilter(0, 0, 0, 1, CV_SCHARR, 1.0, BORDER_DEFAULT);
+    bool initialized_;
+    bool distortion_valid_;
     
 };
-
-
-
 
 }

@@ -3,8 +3,7 @@
 * 
 * Copyright 2018.
 * Developed by Fabio Morales,
-* If you use this code, please cite the respective publications as
-* listed on the above website.
+* Email: fabmoraleshidalgo@gmail.com; GitHub: @fmoralesh
 *
 * UW-SLAM is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -20,8 +19,19 @@
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "../include/args.hxx"
-#include "../include/System.h"
+#include <args.hxx>
+#include <thread>
+#include <System.h>
+#include <Tracker.h>
+
+#include <thread>
+#include <locale.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include "Eigen/Core"
+
 
 // C++ namespaces
 using namespace uw;
@@ -29,91 +39,107 @@ using namespace cv;
 using namespace std;
 using namespace cv::cuda;
 
-string imagesPath;
-std::string calibrationPath;
-cuda::DeviceInfo deviceInfo;
+int start_index;
+string images_path;
+string calibration_path;
+string ground_truth_dataset;
+string ground_truth_path;
+cuda::DeviceInfo device_info;
 
-void showSettings(){
-    cout << "CUDA enabled devices detected: " << deviceInfo.name() << endl;
-    cout << "Directory of calibration xml file: " << calibrationPath << endl;
-    cout << "Directory of images: " << imagesPath  << "\n" << endl;
+void ShowSettings() {
+    cout << "CUDA enabled devices detected: " << device_info.name() << endl;
+    cout << "Directory of calibration xml file: " << calibration_path << endl;
+    cout << "Directory of images: " << images_path  << endl;
+    if (not (ground_truth_path == ""))
+        cout << "Directory of ground truth poses: " << ground_truth_path << endl;
+    cout << endl;
 }
 
-// Args declarations
-args::ArgumentParser parser("Underwater Simultaneous Localization and Mapping.", "Author: Fabio Morales. GitHub: @fmoralesh");
-args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
-
-args::ValueFlag<std::string> dir_dataset(parser, "images path", "Directory of images files", {'d'});
-args::ValueFlag<std::string> parse_calibration(parser, "calibration xml", "Name of input .xml calibration file", {"calibration"});
-
-int main ( int argc, char *argv[] ){
+int main (int argc, char *argv[]) {
 
     cout << "===================================================" << endl;
-    int nCuda = cuda::getCudaEnabledDeviceCount();
-    if (nCuda > 0){
+    int n_cuda_devices = cuda::getCudaEnabledDeviceCount();
+    if (n_cuda_devices > 0) {
         cuda::setDevice(0);
-    }
-    else {
+    } else {
         cout << "No CUDA device detected" << endl;
         cout << "Exiting..." << endl;
         return -1;
     }
 
     // Parse section
-    try{
+    try {
         parser.ParseCLI(argc, argv);
-    }
-    catch (args::Help){
+    } 
+    catch (args::Help) {
         cout << parser;
         return 0;
-    }
-    catch (args::ParseError e){
+    } 
+    catch (args::ParseError e) {
         cerr << e.what() << endl;
         cerr << parser;
         return 1;
-    }
-    catch (args::ValidationError e){
-        cerr << e.what() << endl;
+    } catch (args::ValidationError e) {
+        cerr <<  e.what() << endl;
         cerr << parser;
         return 1;
     }
     if (!dir_dataset) {
-        cout<< "Introduce path of images as argument" << endl;
-        cerr << "Use -h, --help command to see usage" << endl;
+        cout<< "Introduce path of images as argument." << endl;
+        cerr << "Use -h, --help command to see usage." << endl;
         return 1;
+    } else {
+        images_path = args::get(dir_dataset);
     }
-    else {
-        imagesPath = args::get(dir_dataset);
+    if (ground_truth_EUROC) {
+        ground_truth_dataset = "EUROC";
+        ground_truth_path = args::get(ground_truth_EUROC);
+    } else if (ground_truth_TUM) {
+        ground_truth_dataset = "TUM";
+        ground_truth_path = args::get(ground_truth_TUM);
+    } else {
+        ground_truth_dataset = "";
+        ground_truth_path = "";  // Need to change for final release
     }
-    if(parse_calibration){
-        calibrationPath = args::get(parse_calibration);
-    }else{
-        calibrationPath = "./sample/calibration.xml";
+    if (parse_calibration) {
+        calibration_path = args::get(parse_calibration);
+    } else {
+        calibration_path = "/home/fabiomorales/catkin_ws/src/uw-slam/sample/calibrationTUM.xml";  // Need to change for final release
     }
-
+    if (start_i) {
+        start_index = args::get(start_i);
+    } else {
+        start_index = 0;
+    }
+    
     // Show parser settings and CUDA information
-    showSettings();
+    ShowSettings();
 
     // Create new System
-    System* uwSystem = new System();
+    System* uwSystem = new System(argc, argv, start_index);
 
     // Calibrates system with certain Camera Model (currently only RadTan) 
-    uwSystem->Calibration(calibrationPath);
-
-    // Add list of images names (with path)
-    uwSystem->addListImages(imagesPath);
-
+    uwSystem->Calibration(calibration_path);
+    
+    // Initialize SLAM system
+    uwSystem->InitializeSystem(images_path, ground_truth_dataset, ground_truth_path);
+    
     // Start SLAM process
-    for(int i=0; i<uwSystem->imagesList.size(); i++){
-        // Checks if the process is initializing
-        // If it does, first frame will be first keyFrame with randomly generated depth map 
-        // uwSystem->initializer()
-
-        uwSystem->addFrame(i);
-
+    // Read images one by one from directory provided
+    uwSystem->AddFrame(start_index);
+    for (int i=start_index+1; i<uwSystem->images_list_.size(); i++) {
+        uwSystem->AddFrame(i);
+        uwSystem->Tracking();
+        uwSystem->visualizer_->UpdateMessages(uwSystem->previous_frame_);
+        
+        // Delete oldest frame (keeping 10 frames)
+        if (uwSystem->num_frames_> 10) {
+            uwSystem->FreeFrames();
+        }
     }
 
-    cout << "Finished" << endl;
-    delete [] uwSystem;
+    // Delete system
+    uwSystem->~System();
+    delete uwSystem;
     return 0;
 }

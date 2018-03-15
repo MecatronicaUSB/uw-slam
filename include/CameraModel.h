@@ -3,8 +3,7 @@
 * 
 * Copyright 2018.
 * Developed by Fabio Morales,
-* If you use this code, please cite the respective publications as
-* listed on the above website.
+* Email: fabmoraleshidalgo@gmail.com; GitHub: @fmoralesh
 *
 * UW-SLAM is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -21,27 +20,17 @@
 */
 
 #pragma once
-#include "Options.h"
 ///Basic C and C++ libraries
 #include <stdlib.h>
 #include <iostream>
 #include <iomanip>
-#include <sstream>
 #include <string>
 #include <dirent.h>
 
-/// OpenCV libraries. May need review for the final release
-#include <opencv2/core.hpp>
+/// OpenCV libraries. 
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include "opencv2/calib3d.hpp"
-
-/// CUDA specific libraries
-#include <opencv2/cudafilters.hpp>
-#include "opencv2/cudafeatures2d.hpp"
-#include "opencv2/xfeatures2d/cuda.hpp"
-#include "opencv2/cudaimgproc.hpp"
-#include "opencv2/cudaarithm.hpp"
 
 // Namespaces
 using namespace cv;
@@ -53,6 +42,7 @@ namespace uw
 class CameraModel
 {
 public:
+
     /**
      * @brief Destructor of CameraModel
      * 
@@ -60,97 +50,98 @@ public:
 	~CameraModel();
 
 	/**
-	 * @brief Creates an CameraModel by reading the distortion parameters from a file
-	 * 			Please refer to calibration.xml file to see the format
-	 * @param calibrationPath String with calibration .xml file
+	 * @brief Creates an CameraModel by reading the distortion parameters from a file.
+	 * 		  Please refer to calibration.xml file to see the format.
+	 * 
+	 * @param _calibrationPath 		String with calibration .xml file
 	 */
-    void getCameraModel(string calibrationPath);
+    void GetCameraModel(string _calibrationPath);
     
 	/**
 	 * @brief Undistorts the given image and returns the result image
 	 * 
-	 * @param image Image to undistorts
-	 * @param result Result image
+	 * @param _image 		Image to undistorts
+	 * @param _result 		Output image
 	 */
-	void undistort(const cv::Mat& image, cv::OutputArray result) const;
+	void Undistort(const cv::Mat& _image, cv::OutputArray _result) const;
 	
 	/**
-	 * @brief Returns the intrinsic parameter matrix of the undistorted images
+	 * @brief Returns the intrinsic parameter matrix of the undistorted images.
 	 * 
-	 * @return const cv::Mat& getK Intrinsic parameter matrix of undistorted images
+	 * @return const cv::Mat& getK 	Intrinsic parameter matrix of undistorted images.
 	 */
-	const cv::Mat& getK() const;
+	const cv::Mat& GetK() const;
 	
 	/**
-	 * @brief Returns the intrinsic parameter matrix of the original images
+	 * @brief Returns the intrinsic parameter matrix of the original images.
 	 * 
-	 * @return const cv::Mat& getOriginalK Intrinsic parameter matrix of distorted images
+	 * @return const cv::Mat& getOriginalK Intrinsic parameter matrix of distorted images.
 	 */
-	const cv::Mat& getOriginalK() const;
+	const cv::Mat& GetOriginalK() const;
 	
 	/**
-	 * @brief Returns the map1 computed for undistortion
+	 * @brief Returns the map1 computed for undistortion.
 	 * 
-	 * @return const cv::Mat& getMap1 Map1 computed for undistortion
+	 * @return const cv::Mat& getMap1 Map1 computed for undistortion.
 	 */
-	const cv::Mat&  getMap1() const;
+	const cv::Mat& GetMap1() const;
 	
 	/**
-	 * @brief Returns the map2 computed for undistortion
+	 * @brief Returns the map2 computed for undistortion.
 	 * 
-	 * @return const cv::Mat& getMap2 Map2 computed for undistortion
+	 * @return const cv::Mat& getMap2 Map2 computed for undistortion.
 	 */
-	const cv::Mat&  getMap2() const;
+	const cv::Mat& GetMap2() const;
 
 	/**
-	 * @brief Returns the width of the undistorted images in pixels
+	 * @brief Returns the width of the undistorted images in pixels.
 	 * 
 	 * @return int getOutputWidth 
 	 */
-	int getOutputWidth() const;
+	int GetOutputWidth() const;
 
 
 	/**
-	 * @brief Returns the height of the undistorted images in pixels
+	 * @brief Returns the height of the undistorted images in pixels.
 	 * 
 	 * @return int getOutputHeight 
 	 */
-	int getOutputHeight() const;
+	int GetOutputHeight() const;
 	
 	/**
 	 * @brief Returns the width of the input images in pixels.
 	 * 
 	 * @return int getInputWidth 
 	 */
-	int getInputWidth() const;
+	int GetInputWidth() const;
 
 	/**
 	 * @brief Returns the height of the input images in pixels.
 	 * 
 	 * @return int getInputHeight 
 	 */
-	int getInputHeight() const;
+	int GetInputHeight() const;
 
 	/**
-	 * @brief Returns if the undistorter was initialized successfully.
+	 * @brief Returns if the input image have distortion parameters
 	 * 
-	 * @return true 	Rectification was made
-	 * @return false 	Rectification wasn't made
+	 * @return true 	Rectification on.
+	 * @return false 	Rectification off.
 	 */
-	bool isValid() const;
+	bool IsValid() const;
 
 private:
-    Mat K_;
-    Mat originalK_ = cv::Mat(3, 3, CV_64F, cv::Scalar(0));
+    Mat output_intrinsic_camera_;
+    Mat original_intrinsic_camera_ = Mat(3, 3, CV_32FC1, Scalar(0));
 
-    float inputCalibration[4];
-    Mat distCoeffs = cv::Mat::zeros(4, 1, CV_32F);
+    float input_calibration_[4];
+    Mat dist_coeffs_ = Mat(4, 1, CV_32FC1, Scalar(0));
 
-    int out_width, out_height;
-	int in_width, in_height;
-	cv::Mat map1, map2;
+    int out_width_, out_height_;
+	int in_width_, in_height_;
+	cv::Mat map1_, map2_;
 
-    bool valid;
+    bool valid_;
 };
 
 
