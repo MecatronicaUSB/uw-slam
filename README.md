@@ -40,7 +40,11 @@ sudo apt-get install libsuitesparse-dev libeigen3-dev libboost-all-dev
 
 Refer to [Ceres solver installation](http://ceres-solver.org/installation.html#linux).
 
+<<<<<<< HEAD
 ## Building UW-SLAM
+=======
+### Building UW-SLAM
+>>>>>>> 921b137bd687aef4616835e0e6ac5627d642def3
 
 Clone UW-SLAM repository in the `/src` folder of your catkin workspace:
 
