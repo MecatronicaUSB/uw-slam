@@ -138,7 +138,7 @@ Core .cpp files of UW-SLAM.
 
 #### /include
 
-Libraries .h files of UW-SLAM.
+Libraries .h files of UW-SLAM.  
 Argument parser library args.hxx ([Taywee/args](https://github.com/Taywee/args)).
 
 #### /launch
