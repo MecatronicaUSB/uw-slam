@@ -95,7 +95,7 @@ Run UW-SLAM for general datasets:
 ```bash
 roslaunch uw_slam uw_slam.launch
 ```
-### Usage with EUROC and TUM datasets
+### EUROC and TUM datasets
 
 Currently, UW-SLAM supports ground-truth visualization along with UW-SLAM results for [TUM](https://vision.in.tum.de/data/datasets/mono-dataset?redirect=1) and [EUROC MAV](https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets) datasets for testing. For these datasets, a corresponding `calbration.xml` file is already created in the `/calibration` folder.
 
@@ -139,6 +139,7 @@ Core .cpp files of UW-SLAM.
 #### /include
 
 Libraries .h files of UW-SLAM.
+Argument parser library args.hxx ([Taywee/args](https://github.com/Taywee/args)).
 
 #### /launch
 
