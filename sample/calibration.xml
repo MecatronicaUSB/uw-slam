@@ -4,26 +4,27 @@
 <calibrationDate>"Thu 07 Apr 2016 04:23:03 PM MSK"</calibrationDate>
 
 <!-- Images dimensions (Input) -->
-<in_width  type_id="integer"> X </in_width>
-<in_height type_id="integer"> X </in_height>
+<in_width  type_id="integer"> W </in_width>      
+<in_height type_id="integer"> H </in_height>     
 
 <!-- Images dimensions (Output) -->
-<out_width  type_id="integer"> X </out_width>
-<out_height type_id="integer"> X </out_height>
+<out_width  type_id="integer"> W </out_width>     
+<out_height type_id="integer"> H </out_height>  
 
 <!-- Calibration Values of Dataset -->
-<calibration_values type_id="opencv-matrix">
-  <rows>1</rows>
-  <cols>4</cols>
-  <dt>f</dt>
-  <data>
-    X	 X  X  X </data></calibration_values> 
+<calibration_values type_id="opencv-matrix">      
+<rows>1</rows>                                    
+<cols>4</cols>
+<dt>f</dt>
+<data>
+    fx  fy  cx  cy </data></calibration_values> 
 
-<rectification type_id="opencv-matrix">
-  <rows>1</rows>
-  <cols>4</cols>
-  <dt>f</dt>
-  <data>
-    X	 X  X  X </data></rectification>
+<!-- Distortion coefficients -->
+<rectification type_id="opencv-matrix">          
+<rows>1</rows>                                  
+<cols>4</cols>                                   
+<dt>f</dt>  
+<data>
+    k1  k2  k3  k4 </data></rectification>
 
 </opencv_storage>

@@ -21,11 +21,11 @@ UW-SLAM is a free and open hardware licensed under the [GPL-3.0 License](https:/
 
 Install the required dependencies:
 
-### OpenCV 3.2 with CUDA 8.0
+#### OpenCV 3.2 with CUDA 8.0
 
 Please refer to [Installation OpenCV and CUDA](https://github.com/MecatronicaUSB/uwimageproc/blob/master/INSTALL.md).
 
-### Eigen 3
+#### Eigen 3
 
 ```bash
 sudo apt-get install libsuitesparse-dev libeigen3-dev libboost-all-dev
@@ -48,8 +48,39 @@ catkin_make
 
 Run UW-SLAM on a dataset of images with known calibration parameters and dimentions of images. 
 
-Modify the `calibration.xml` file in the `/sample` folder to specify the instrinsic parameters of the camera of the dataset to use.
-Modify the `uw_slam.launch` file in the `/launch` folder to specify the directory of files. 
+Modify the `calibration.xml` file in `/sample` folder to specify the instrinsic parameters of the camera of the dataset to use. 
+```bash
+    -d <directory of images files>
+    -c <directory of calibration.xml file>          (<uw-slam directory>/sample/calibration.xml)
+    -s <number of starting frame>                   (Default: 0)
+```
+
+Modify the `uw_slam.launch` file in `/launch` folder to specify the directory of files (Refer to /sample/calibrationTUM.xml for proper configuration of the .xml file).
+```bash
+    <!-- Images dimensions (Input) -->
+    <in_width  type_id="integer"> W </in_width>       (Input dimentions of images)
+    <in_height type_id="integer"> H </in_height>      (Replace W: width, H: height)
+
+    <!-- Images dimensions (Output) -->
+    <out_width  type_id="integer"> W </out_width>     (Output desired dimentions of images)
+    <out_height type_id="integer"> H </out_height>    (Replace W: width, H: height)
+
+    <!-- Calibration Values of Dataset -->
+    <calibration_values type_id="opencv-matrix">      (Intrinsic camera parameters)
+    <rows>1</rows>                                    (Replace fx fy cx cy)
+    <cols>4</cols>
+    <dt>f</dt>
+    <data>
+        fx  fy  cx  cy </data></calibration_values> 
+
+    <!-- Distortion coefficients -->
+    <rectification type_id="opencv-matrix">          (Distortion parameters, optional)
+    <rows>1</rows>                                   (Replace k1 k2 k3 k4)
+    <cols>4</cols>                                   (If not: 0  0  0  1)
+    <dt>f</dt>  
+    <data>
+        k1  k2  k3  k4 </data></rectification>
+```
 
 Run UW-SLAM for general datasets:
 ```bash
@@ -58,6 +89,8 @@ Run UW-SLAM for general datasets:
 ### Usage with EUROC and TUM datasets
 
 Currently, UW-SLAM supports ground-truth visualization along with UW-SLAM results for [TUM](https://vision.in.tum.de/data/datasets/mono-dataset?redirect=1) and [EUROC MAV](https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets) datasets for testing. For these datasets, a corresponding `calbration.xml` file is already created in the `/sample` folder.
+
+#### EUROC
 
 For EUROC datasets, modify the args of the `uw_slamEUROC.launch` file in `/launch` folder to specify the directory of the files.
 ```bash
@@ -70,6 +103,7 @@ Run UW-SLAM for EUROC datasets:
 ```bash
     roslaunch uw_slam uw_slamEUROC.launch
 ```
+#### TUM
 
 For TUM datasets, modify the args of the `uw_slamTUM.launch` file in `/launch` folder to specify the directory of the files.
 ```bash
