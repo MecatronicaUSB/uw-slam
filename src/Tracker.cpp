@@ -121,11 +121,11 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     deltaVector(3) = 0;
     deltaVector(4) = 0;
     deltaVector(5) = 0;
-    SE3 current_pose = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(-0.0004, 0.0, 0.0003));
+    SE3 current_pose = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
 
     // Sparse to Fine iteration
     // Create for()
-    int lvl = 1;
+    int lvl = 4;
     // Initialize error   
     error = 0.0;
     last_error = 50000.0;
@@ -149,30 +149,35 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     vector<Mat> Jws;
     for (int i=0; i<candidatePoints.rows; i++) {
 
-        Mat Jw = Mat(2,6,CV_32FC1);
+        Mat Jw = Mat::zeros(2,6,CV_32FC1);
 
         // Points of frame 1
         float x1 = candidatePoints.at<float>(i,0);
         float y1 = candidatePoints.at<float>(i,1);
         float z1 = candidatePoints.at<float>(i,2);
 
-        float inv_z1 = 1 / z1;
+        if (z1!=0){
 
-        Jw.at<float>(0,0) = fx_[lvl] * inv_z1;
-        Jw.at<float>(0,1) = 0.0;
-        Jw.at<float>(0,2) = -(fx_[lvl] * x1 * inv_z1 * inv_z1);
-        Jw.at<float>(0,3) = -(fx_[lvl] * x1 * y1 * inv_z1 * inv_z1);
-        Jw.at<float>(0,4) = (fx_[lvl] * (1 + x1 * x1 * inv_z1 * inv_z1));   
-        Jw.at<float>(0,5) = - fx_[lvl] * y1 * inv_z1;
+            float inv_z1 = 1 / z1;
+            
+            Jw.at<float>(0,0) = fx_[lvl] * inv_z1;
+            Jw.at<float>(0,1) = 0.0;
+            Jw.at<float>(0,2) = -(fx_[lvl] * x1 * inv_z1 * inv_z1);
+            Jw.at<float>(0,3) = -(fx_[lvl] * x1 * y1 * inv_z1 * inv_z1);
+            Jw.at<float>(0,4) = (fx_[lvl] * (1 + x1 * x1 * inv_z1 * inv_z1));   
+            Jw.at<float>(0,5) = - fx_[lvl] * y1 * inv_z1;
 
-        Jw.at<float>(1,0) = 0.0;
-        Jw.at<float>(1,1) = fy_[lvl] * inv_z1;
-        Jw.at<float>(1,2) = -(fy_[lvl] * y1 * inv_z1 * inv_z1);
-        Jw.at<float>(1,3) = -(fy_[lvl] * (1 + y1 * y1 * inv_z1 * inv_z1));
-        Jw.at<float>(1,4) = fy_[lvl] * x1 * y1 * inv_z1 * inv_z1;
-        Jw.at<float>(1,5) = fy_[lvl] * x1 * inv_z1;
+            Jw.at<float>(1,0) = 0.0;
+            Jw.at<float>(1,1) = fy_[lvl] * inv_z1;
+            Jw.at<float>(1,2) = -(fy_[lvl] * y1 * inv_z1 * inv_z1);
+            Jw.at<float>(1,3) = -(fy_[lvl] * (1 + y1 * y1 * inv_z1 * inv_z1));
+            Jw.at<float>(1,4) = fy_[lvl] * x1 * y1 * inv_z1 * inv_z1;
+            Jw.at<float>(1,5) = fy_[lvl] * x1 * inv_z1;
+
+        }
 
         Jws.push_back(Jw);
+        
     }
     
     // Optimization iteration
@@ -185,8 +190,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
         Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
         ObtainImageTransformed(image1, candidatePoints, warpedPoints, imageWarped);
-        imshow("Image warped",imageWarped);
-        waitKey(0);
+  
         //DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
 
         Mat gradientX2 = Mat(imageWarped.size(), CV_32FC1);
@@ -211,23 +215,21 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
             int intensity1 = image1.at<uchar>(y1,x1);
             int intensity2;
-            if (x2>=0 && x2<image2.cols && y2>=0 && y2<image2.rows) {
-                intensity2 = image2.at<uchar>(y2,x2);
-            } else {
-                intensity2 = 0;   
-            }
+
+            intensity2 = imageWarped.at<uchar>(y1,x1);
+
 
             intensities1.push_back(intensity1);                
             intensities2.push_back(intensity2);
 
-            Jl.at<float>(0,0) = gradientX2.at<int>(y1,x1);
-            Jl.at<float>(0,1) = gradientY2.at<int>(y1,x1);
-
+            Jl.at<int>(0,0) = gradientX2.at<int>(y1,x1);
+            Jl.at<int>(0,1) = gradientY2.at<int>(y1,x1);
+        
             Jacobian[i] = Mat(1,6, CV_32FC1);
             Jacobian[i] = Jl * Jws[i];
         }
 
-        DebugShowJacobians(Jacobian, imageWarped);
+        //DebugShowJacobians(Jacobian, imageWarped);
 
         // Computation of Residuals
         // Workaround to work with float numbers (intensities are in CV_8UC1)  
@@ -252,8 +254,13 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         Mat errorMat =  inv_num_residuals * Residuals.t() * ResidualsW;
         error = errorMat.at<float>(0,0);
 
+        cout << "Error: " << error << endl;
+        DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
+
         // Break if error increases
         if (error > last_error) {
+            cout << " Finished Error: " << error << endl;
+            
             deltaMat = Mat::zeros(6,1,CV_32FC1);
             deltaVector(0) = 0;
             deltaVector(1) = 0;
@@ -265,12 +272,10 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             // Show results of optimization at lvl 0
             if (lvl == 0){
                 // DebugShowResidual(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
-                DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
             }
             break;
         }
 
-        cout << "Error: " << error << endl;
         last_error = error;
 
         // Update new pose with delta
@@ -281,20 +286,19 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         // Computation of new delta
         LS ls;
         ls.initialize(Residuals.rows);
-        // for (int i=0; i<Residuals.rows; i++) {
-        //     Mat61f jacobian;
-        //     cv2eigen(Jacobian.row(i), jacobian);
-        //     ls.update(jacobian, Residuals.at<float>(i,0), W.at<float>(i,0));
-        // }
+        for (int i=0; i<Residuals.rows; i++) {
+            Mat61f jacobian;
+            cv2eigen(Jacobian[i], jacobian);
+            ls.update(jacobian, Residuals.at<float>(i,0), W.at<float>(i,0));
+        }
         ls.finish();
         // Solve LS system
         float LM_lambda = 0.2;
         Mat61f b = -ls.b;
         Mat66f A = ls.A;
-        cout << A << endl;
-        cout << b << endl;
+
         deltaVector = A.ldlt().solve(b);
-        cout << deltaVector << endl;
+      
         // deltaMat = -1 * ((Jacobian.t() * JacobianW).inv() * Jacobian.t() * ResidualsW);
 
         // Apply update
@@ -305,6 +309,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         // deltaVector(4) = deltaMat.at<float>(4,0);
         // deltaVector(5) = deltaMat.at<float>(5,0);
     }
+    cout << " Finished Error: " << error << endl;
     
 
     // Mat candidatePoints      = _previous_frame->candidatePoints_[0].clone();
@@ -562,8 +567,8 @@ void Tracker::ObtainGradientXY(Mat _inputImage, Mat& _gradientX, Mat& _gradientY
     // frameYGPU.download(_gradientY);
 
     // Non CUDA Implementation
-    Scharr(_inputImage, _gradientX, CV_32FC1, 1, 0, 1, 0, BORDER_REFLECT);
-    Scharr(_inputImage, _gradientY, CV_32FC1, 0, 1, 1, 0, BORDER_REFLECT);
+    Scharr(_inputImage, _gradientX, CV_32F, 1, 0, 1, 0, BORDER_DEFAULT);
+    Scharr(_inputImage, _gradientY, CV_32F, 0, 1, 1, 0, BORDER_DEFAULT);
 
 }
 
