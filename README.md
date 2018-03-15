@@ -51,7 +51,10 @@ Run UW-SLAM on a dataset of images with known calibration parameters and dimenti
 Modify the `calibration.xml` file in the `/sample` folder to specify the instrinsic parameters of the camera of the dataset to use.
 Modify the `uw_slam.launch` file in the `/launch` folder to specify the directory of files. 
 
-
+Run UW-SLAM for general datasets:
+```bash
+    roslaunch uw_slam uw_slam.launch
+```
 ### Usage with EUROC and TUM datasets
 
 Currently, UW-SLAM supports ground-truth visualization along with UW-SLAM results for [TUM](https://vision.in.tum.de/data/datasets/mono-dataset?redirect=1) and [EUROC MAV](https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets) datasets for testing. For these datasets, a corresponding `calbration.xml` file is already created in the `/sample` folder.
@@ -63,6 +66,10 @@ For EUROC datasets, modify the args of the `uw_slamEUROC.launch` file in `/launc
     -s <number of starting frame>                   (Default: 0)
     --EUROC <directory of ground-truth poses file>  (for EUROC, directory of data.csv)
 ```
+Run UW-SLAM for EUROC datasets:
+```bash
+    roslaunch uw_slam uw_slamEUROC.launch
+```
 
 For TUM datasets, modify the args of the `uw_slamTUM.launch` file in `/launch` folder to specify the directory of the files.
 ```bash
@@ -71,7 +78,10 @@ For TUM datasets, modify the args of the `uw_slamTUM.launch` file in `/launch` f
     -s <number of starting frame>                 (Default: 0)
     --TUM <directory of ground-truth poses file>  (for TUM, directory of groundtruth.txt)
 ```
-
+Run UW-SLAM for TUM datasets:
+```bash
+    roslaunch uw_slam uw_slamTUM.launch
+```
 ## Software Details
 
 - Implementation done in C++ (CUDA optimization in progress).
