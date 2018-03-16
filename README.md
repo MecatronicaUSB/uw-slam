@@ -2,7 +2,7 @@
 
 Implementation of Monocular Simultaneous Localization and Mapping (SLAM) for underwater vehicles. Using OpenCV 3.2, CUDA 8.0 and ROS Kinect.
 
-UW-SLAM is a free and open hardware licensed under the [GPL-3.0 License](https://en.wikipedia.org/wiki/GNU_General_Public_License).
+UW-SLAM is a free and open source licensed under the [GPL-3.0 License](https://en.wikipedia.org/wiki/GNU_General_Public_License).
 
 ## Table of Contents
 - [Requirements](#requirements)
@@ -55,9 +55,10 @@ catkin_make
 
 ### General datasets
 
-Run UW-SLAM on a dataset of images with known calibration parameters and dimentions of images. 
+Run UW-SLAM on a dataset of images with known camera calibration parameters and image dimensions.
 
 Modify the `calibration.xml` file in `/calibration` folder to specify the instrinsic parameters of the camera of the dataset to use. 
+
 ```bash
     -d <directory of images files>                  
     -c <directory of calibration.xml file>          (<uw-slam directory>/calibration/calibration.xml)
@@ -66,6 +67,7 @@ Modify the `calibration.xml` file in `/calibration` folder to specify the instri
 
 Modify the `uw_slam.launch` file in `/launch` folder to specify the directory of files  
 (Refer to `/calibration/calibrationTUM.xml` for proper configuration of the .xml file).
+
 ```bash
     <!-- Images dimensions (Input) -->
     <in_width  type_id="integer"> W </in_width>       (Input dimentions of images)
@@ -98,11 +100,11 @@ roslaunch uw_slam uw_slam.launch
 ```
 ### EUROC and TUM datasets
 
-Currently, UW-SLAM supports ground-truth visualization along with UW-SLAM results for [TUM](https://vision.in.tum.de/data/datasets/mono-dataset?redirect=1) and [EUROC MAV](https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets) datasets for testing. For these datasets, corresponding `calbration.xml` files are in the `/calibration` folder.
+Currently, UW-SLAM supports ground-truth visualization along with UW-SLAM results for [TUM](https://vision.in.tum.de/data/datasets/mono-dataset?redirect=1) and [EUROC MAV](https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets) datasets for testing. For these datasets, corresponding `calbration.xml` files are located in the `/calibration` folder.
 
 #### EUROC
 
-For EUROC datasets, modify the args of the `uw_slamEUROC.launch` file in `/launch` folder to add the directory of the files.
+For [EUROC MAV](https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets) datasets, modify the arguments of the `uw_slamEUROC.launch` file in `/launch` folder to add the directory of the files.
 ```bash
     -d <directory of images files>                  (<EUROC directory>/mav0/cam0/data/)
     -c <directory of calibrationEUROC.xml file>     (<uw-slam directory>/calibration/calibrationEUROC.xml)
@@ -115,7 +117,7 @@ roslaunch uw_slam uw_slamEUROC.launch
 ```
 #### TUM
 
-For TUM datasets, modify the args of the `uw_slamTUM.launch` file in `/launch` folder to add the directory of the files.
+For [TUM](https://vision.in.tum.de/data/datasets/mono-dataset?redirect=1) datasets, modify the arguments of the `uw_slamTUM.launch` file in `/launch` folder to add the directory of the files.
 ```bash
     -d <directory of images files>                (<TUM directory>/rgb/)
     -c <directory of calibrationEUROC.xml file>   (<uw-slam directory>/calibration/calibrationTUM.xml)
@@ -144,7 +146,7 @@ Argument parser library `args.hxx` ([Taywee/args](https://github.com/Taywee/args
 
 #### /launch
 
-Launch files of UW-SLAM for easy ROS Kinetic execution.
+UW-SLAM launch files for easy ROS Kinetic execution.
 
 #### /thirdparty
 
@@ -152,7 +154,7 @@ Launch files of UW-SLAM for easy ROS Kinetic execution.
 
 #### /calibration
 
-Calibration files. Included calibration for EUROC and TUM datasets.
+Calibration files. Includes calibration for EUROC and TUM datasets.
 
 ## License
 
