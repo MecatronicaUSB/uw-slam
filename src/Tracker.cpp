@@ -580,8 +580,8 @@ void Tracker::DebugShowJacobians(Mat Jacobians, Mat points, int width, int heigh
 
     for (int index=0; index<Jacobians.rows; index++) {
         for (int i=0; i<6; i++) {
-            float x = points.row(index).at<float>(0,0);
-            float y = points.row(index).at<float>(0,1);
+            float x = round(points.row(index).at<float>(0,0));
+            float y = round(points.row(index).at<float>(0,1));
             if (Jacobians.row(index).at<float>(0,i) < -10){
                 image_jacobians[i].at<uchar>(y,x) = 90;
             }
