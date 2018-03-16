@@ -166,14 +166,14 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         ObtainGradientXY(image2, gradientX2, gradientY2);
 
         // Computation of Jacobian and Residuals
-        vector<Mat> Jacobian = vector<Mat>(candidatePoints1.rows);
+        Mat Jacobians;
         vector<Mat> Jws;           
 
         Mat Residuals = Mat(candidatePoints1.rows,1,CV_32FC1);        
 
         int num_valid = 0;
         for (int i=0; i<candidatePoints1.rows; i++) {
-
+            Mat Jacobian_row = Mat::zeros(1,6,CV_32FC1);
             Mat Jw = Mat::zeros(2,6,CV_32FC1);
             Mat Jl = Mat::zeros(1,2,CV_32FC1);
             
@@ -214,16 +214,16 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             
             Jl.at<float>(0,0) = gradientX2.at<float>(y1,x1);
             Jl.at<float>(0,1) = gradientY2.at<float>(y1,x1);
-
-            Jacobian[i] = Mat::zeros(1,6, CV_32FC1);
-            Jacobian[i] = Jl * Jw;        
+            Jacobian_row = Jl * Jw;  
+            Jacobians.push_back(Jacobian_row);
         }
 
-        //DebugShowJacobians(Jacobian, imageWarped);
+        DebugShowJacobians(Jacobians, warpedPoints, w_[lvl], h_[lvl]);
 
         // Computation of scale (Median Absolute Deviation)
-        float sigma = MedianAbsoluteDeviation(Residuals);
-        
+        float sigma_inv = 1 / MedianAbsoluteDeviation(Residuals);       
+        Residuals = Residuals.mul(sigma_inv);
+
         // Computation of Weights (Identity or Tukey function)
         Mat W = IdentityWeights(Residuals.rows);
         //Mat W = TukeyFunctionWeights(Residuals);
@@ -232,6 +232,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         float inv_num_residuals = 1.0 / Residuals.rows;
         Mat ResidualsW = Residuals.mul(W);
         Mat errorMat =  inv_num_residuals * Residuals.t() * ResidualsW;
+        cout << errorMat << endl;
         error = errorMat.at<float>(0,0);
 
         cout << "Error: " << error << endl;
@@ -257,24 +258,26 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
         last_error = error;
 
-        //DebugShowWarpedPerspective(gradient1, gradient2, candidatePoints, warpedPoints, lvl);   
-
-        // Computation of new delta
-        LS ls;
-        ls.initialize(Residuals.rows);
-        for (int i=0; i<Residuals.rows; i++) {
-            Mat61f jacobian;
-            cv2eigen(Jacobian[i], jacobian);
+        // Computation of new delta (DSO-way)
+        // LS ls;
+        // ls.initialize(Residuals.rows);
+        // for (int i=0; i<Residuals.rows; i++) {
+        //     Mat61f jacobian;
+        //     cv2eigen(Jacobian[i], jacobian);
             
-            ls.update(jacobian, Residuals.at<float>(i,0), W.at<float>(i,0));
-        }
-        ls.finish();
-        // Solve LS system
-        float LM_lambda = 0.2;
-        Mat61f b = -ls.b;
-        Mat66f A = ls.A;
+        //     ls.update(jacobian, Residuals.at<float>(i,0), W.at<float>(i,0));
+        // }
+        // ls.finish();
+        // // Solve LS system
+        // float LM_lambda = 0.2;
+        // Mat61f b = -ls.b;
+        // Mat66f A = ls.A;
+        //deltaVector = A.ldlt().solve(b);
 
-        deltaVector = A.ldlt().solve(b);
+        // Computation of new delta (normal way)
+        for (int i=0; i<Residuals.rows; i++) {
+
+        }
 
         // Update new pose with delta
         current_pose = SE3::exp(deltaVector) * current_pose;
@@ -570,28 +573,26 @@ void Tracker::ObtainGradientXY(Mat _inputImage, Mat& _gradientX, Mat& _gradientY
 
 }
 
-void Tracker::DebugShowJacobians(vector<Mat> Jacobians, Mat original) {
+void Tracker::DebugShowJacobians(Mat Jacobians, Mat points, int width, int height) {
     vector<Mat> image_jacobians = vector<Mat>(6);
     for (int i=0; i<6; i++) 
-        image_jacobians[i] = Mat::zeros(original.size(), CV_8UC1);
+        image_jacobians[i] = Mat::zeros(height, width, CV_8UC1);
 
-    int index = 0;
-    for (int x=0; x<original.cols; x++) {
-        for (int y=0; y<original.rows; y++) {
-            for (int i=0; i<6; i++){
-                if (Jacobians[index].at<float>(0,i) < -10){
-                    image_jacobians[i].at<uchar>(y,x) = 90;
-                }
-                if (Jacobians[index].at<float>(0,i) > 10) {             
-                    image_jacobians[i].at<uchar>(y,x) = 255;
-                }
+    for (int index=0; index<Jacobians.rows; index++) {
+        for (int i=0; i<6; i++) {
+            float x = points.row(index).at<float>(0,0);
+            float y = points.row(index).at<float>(0,1);
+            if (Jacobians.row(index).at<float>(0,i) < -10){
+                image_jacobians[i].at<uchar>(y,x) = 90;
             }
-            index++;
+            if (Jacobians.row(index).at<float>(0,i) > 10) {             
+                image_jacobians[i].at<uchar>(y,x) = 254;
+            }
         }
     }
 
     cout << Jacobians.size() << endl;
-    cout << index << endl;
+
     imshow("Jacobian for v1", image_jacobians[0]);
     imshow("Jacobian for v2", image_jacobians[1]);
     imshow("Jacobian for v3", image_jacobians[2]);

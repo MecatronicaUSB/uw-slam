@@ -144,7 +144,7 @@ public:
     
     void DebugShowResidual(Mat _image1, Mat _image2, Mat _candidatePoints, Mat _warped, int _lvl);
 
-    void DebugShowJacobians(vector<Mat> Jacobians, Mat original);
+    void DebugShowJacobians(Mat Jacobians, Mat points, int width, int height);
 
     float MedianMat(Mat _input);
 
