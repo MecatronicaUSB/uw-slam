@@ -148,7 +148,7 @@ public:
 
     float MedianMat(Mat _input);
 
-    float MedianAbsoluteDeviation(float _c, Mat _input);
+    float MedianAbsoluteDeviation(Mat _input);
 
     /**
      * @brief Returns a _num_residuals x 1 Mat of ones.
@@ -158,7 +158,7 @@ public:
      */
     Mat IdentityWeights(int _num_residuals);
 
-    Mat TukeyFunctionWeights(Mat _residuals);
+    Mat TukeyFunctionWeights(Mat _residuals, float MAD);
 
     /**
      * @brief Shows points in an image. Used only for debbugin.
