@@ -168,7 +168,7 @@ public:
      */
     void DebugShowCandidatePoints(Mat _image, Mat _candidatePoints);
 
-    void DebugShowWarpedPerspective(Mat _image1, Mat _image2, Mat _candidatePoints, Mat _warped, int _lvl);
+    void DebugShowWarpedPerspective(Mat _image1, Mat _image2, Mat _imageWarped, int _lvl);
     
     bool PixelIsBackground(Mat _intputImage, int y, int x);
 
