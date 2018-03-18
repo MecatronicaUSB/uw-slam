@@ -96,8 +96,13 @@ void System::InitializeSystem(string _images_path, string _ground_truth_dataset,
         depth_available_ = true;
 
     // Add list of the dataset images names
-    AddLists(_images_path, _depth_path);
-
+    AddLists(_images_path, _depth_path);\
+    
+    if (start_index_>images_list_.size()) {
+        cout << "The image " << start_index_ << " doesn't exist." << endl;
+        cout << "Exiting..." << endl;
+        exit(0);
+    }
     // Obtain parameters of camera_model
     K_ = camera_model_->GetK();
     w_input_ = camera_model_->GetInputHeight();
