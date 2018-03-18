@@ -55,6 +55,7 @@ Frame::Frame(void) {
 
     obtained_gradients_ = false;
     obtained_candidatePoints_ = false;
+    depth_available_ = false;
     
     isKeyFrame_ = false;
 }
@@ -95,8 +96,13 @@ void System::InitializeSystem(string _images_path, string _ground_truth_dataset,
         depth_available_ = true;
 
     // Add list of the dataset images names
-    AddLists(_images_path, _depth_path);
-
+    AddLists(_images_path, _depth_path);\
+    
+    if (start_index_>images_list_.size()) {
+        cout << "The image " << start_index_ << " doesn't exist." << endl;
+        cout << "Exiting..." << endl;
+        exit(0);
+    }
     // Obtain parameters of camera_model
     K_ = camera_model_->GetK();
     w_input_ = camera_model_->GetInputHeight();
@@ -114,7 +120,7 @@ void System::InitializeSystem(string _images_path, string _ground_truth_dataset,
         CalculateROI();
 
     // Initialize tracker system
-    tracker_ = new Tracker();
+    tracker_ = new Tracker(depth_available_);
     tracker_->InitializePyramid(w_, h_, K_);
 
     // Initialize output visualizer
@@ -122,8 +128,8 @@ void System::InitializeSystem(string _images_path, string _ground_truth_dataset,
     ground_truth_dataset_ = _ground_truth_dataset;
     visualizer_ = new Visualizer(start_index_, images_list_.size(), _ground_truth_dataset, _ground_truth_path);
 
-    cout << "Initializing system ... done" << endl;
     initialized_ = true;
+    cout << "Initializing system ... done" << endl << endl;
 }
 
 void System::CalculateROI() {
@@ -190,8 +196,6 @@ void System::AddFrame(int _id) {
     newFrame->idFrame_ = _id;
     newFrame->images_[0] = imread(images_list_[_id], CV_LOAD_IMAGE_GRAYSCALE);
 
-    // imshow("Distorted", newFrame->images_[0]);
-    // waitKey(0);
     if (distortion_valid_) {
         Mat distortion;
         remap(newFrame->images_[0], distortion, map1_, map2_, INTER_LINEAR);
@@ -201,8 +205,10 @@ void System::AddFrame(int _id) {
         // waitKey(0);
     }
 
-    if (depth_available_)
+    if (depth_available_) {
+        newFrame->depth_available_ = true;
         newFrame->depths_[0] = imread(depth_list_[_id], CV_LOAD_IMAGE_GRAYSCALE);
+    }
 
     for (int i=1; i<PYRAMID_LEVELS; i++) {
         resize(newFrame->images_[i-1], newFrame->images_[i], Size(), 0.5, 0.5);
@@ -252,7 +258,7 @@ void System::AddLists(string _path, string _depth_path) {
     vector<string> file_names;  
     DIR *dir;
     struct dirent *ent;
-
+    
     cout << "Searching images files in directory ... ";
     if ((dir = opendir(_path.c_str())) != NULL) {
         while ((ent = readdir (dir)) != NULL) {

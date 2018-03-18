@@ -90,7 +90,8 @@ public:
     SE3 rigid_transformation_;
 
     bool obtained_gradients_;
-    bool obtained_candidatePoints_;    
+    bool obtained_candidatePoints_; 
+    bool depth_available_;           
     bool isKeyFrame_;
 };
 
