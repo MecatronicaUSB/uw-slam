@@ -105,7 +105,7 @@ void Tracker::InitializePyramid(int _width, int _height, Mat _K) {
 // Gauss-Newton using Foward Compositional Algorithm
 void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     // Gauss-Newton Options
-    int max_iterations = 500;
+    int max_iterations = 10;
     float error_threshold = 0.005;
 
     // Variables initialization
@@ -124,190 +124,194 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     SE3 current_pose = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
 
     // Sparse to Fine iteration
-    // Create for()
-    int lvl = 2;
-    // Initialize error   
-    error = 0.0;
-    last_error = 50000.0;
-    
-    // Obtain points and depth of initial frame 
-    Mat candidatePoints1      = _previous_frame->candidatePoints_[lvl].clone();
-    Mat candidatePoints2      = _current_frame->candidatePoints_[lvl].clone();    
-    Mat candidatePointsDepth = _previous_frame->candidatePointsDepth_[lvl].clone();
-
-    // Obtain gradients
-    Mat image1 = _previous_frame->images_[lvl].clone();
-    Mat image2 = _current_frame->images_[lvl].clone();    
-    Mat gradient1 = _previous_frame->gradient_[lvl].clone();
-    Mat gradient2 = _current_frame->gradient_[lvl].clone();    
-    Mat gradientX1 = _previous_frame->gradientX_[lvl].clone();
-    Mat gradientY1 = _previous_frame->gradientY_[lvl].clone();
-
-    // Obtain intrinsic parameters 
-    Mat K = K_[lvl];
-
-    // Optimization iteration
-    for (int k=0; k<max_iterations; k++) {
+    // Create for() WORKED WITH LVL 2
+    for (int lvl=PYRAMID_LEVELS-1; lvl>=0; lvl--) {
+        // int lvl = 2;
+        // Initialize error   
+        error = 0.0;
+        last_error = 50000.0;
         
-        // Warp points with current pose and delta pose (from previous iteration)
-        SE3 deltaSE3;
-        Mat warpedPoints = Mat(candidatePoints1.size(), CV_32FC1);
-     
-        warpedPoints = WarpFunction(candidatePoints1, current_pose, lvl);
+        // Obtain points and depth of initial frame 
+        Mat candidatePoints1      = _previous_frame->candidatePoints_[lvl].clone();
+        Mat candidatePoints2      = _current_frame->candidatePoints_[lvl].clone();    
+        Mat candidatePointsDepth = _previous_frame->candidatePointsDepth_[lvl].clone();
 
-        Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
-        ObtainImageTransformed(image1, candidatePoints1, warpedPoints, imageWarped);
+        // Obtain gradients
+        Mat image1 = _previous_frame->images_[lvl].clone();
+        Mat image2 = _current_frame->images_[lvl].clone();    
+        Mat gradient1 = _previous_frame->gradient_[lvl].clone();
+        Mat gradient2 = _current_frame->gradient_[lvl].clone();
+        // Mat gradientX1 = _previous_frame->gradientX_[lvl].clone();
+        // Mat gradientY1 = _previous_frame->gradientY_[lvl].clone();
+        Mat gradientX1, gradientY1;
+        ObtainGradientXY(image1, gradientX1, gradientY1);
 
-        if (k==0 || k==max_iterations-1)
-            DebugShowWarpedPerspective(image1, image2, imageWarped, lvl);
+        // Obtain intrinsic parameters 
+        Mat K = K_[lvl];
 
-        Mat gradientX2 = Mat(imageWarped.size(), CV_32FC1);
-        Mat gradientY2 = Mat(imageWarped.size(), CV_32FC1);
-        //ObtainGradientXY(imageWarped, gradientX2, gradientY2);
-
-        // Computation of Jacobian and Residuals
-        Mat Jacobians;
-        Mat Residuals;
-        vector<Mat> Jws;           
-
-        int num_valid = 0;
-        for (int i=0; i<candidatePoints1.rows; i++) {
-            Mat Residual = Mat(1,1,CV_32FC1);        
-            Mat Jacobian_row = Mat::zeros(1,6,CV_32FC1);
-            Mat Jw = Mat::zeros(2,6,CV_32FC1);
-            Mat Jl = Mat::zeros(1,2,CV_32FC1);
+        // Optimization iteration
+        for (int k=0; k<max_iterations; k++) {
             
-            // Point in frame 1            
-            float x1 = candidatePoints1.at<float>(i,0);
-            float y1 = candidatePoints1.at<float>(i,1);
-            float z1 = candidatePoints1.at<float>(i,2);
-            // Points of warped frame
-            float x2 = warpedPoints.at<float>(i,0);
-            float y2 = warpedPoints.at<float>(i,1);
-            float z2 = warpedPoints.at<float>(i,2);
+            // Warp points with current pose and delta pose (from previous iteration)
+            SE3 deltaSE3;
+            Mat warpedPoints = Mat(candidatePoints1.size(), CV_32FC1);
+        
+            warpedPoints = WarpFunction(candidatePoints1, current_pose, lvl);
 
-            float inv_z2 = 1 / z2;
+            Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
+            ObtainImageTransformed(image1, candidatePoints1, warpedPoints, imageWarped);
 
-            if (y2>0 && y2<image2.rows && x2>0 && x2<image2.cols) {
-                if (z2!=0) {
-                    if (inv_z2<0) inv_z2 = 0;
-                    num_valid++;
-                    Jw.at<float>(0,0) = fx_[lvl] * inv_z2;
-                    Jw.at<float>(0,1) = 0.0;
-                    Jw.at<float>(0,2) = -(fx_[lvl] * x2 * inv_z2 * inv_z2);
-                    Jw.at<float>(0,3) = -(fx_[lvl] * x2 * y2 * inv_z2 * inv_z2);
-                    Jw.at<float>(0,4) = (fx_[lvl] * (1 + x2 * x2 * inv_z2 * inv_z2));   
-                    Jw.at<float>(0,5) = - fx_[lvl] * y2 * inv_z2;
+            if (k==0 || k==max_iterations-1)
+                DebugShowWarpedPerspective(image1, image2, imageWarped, lvl);
 
-                    Jw.at<float>(1,0) = 0.0;
-                    Jw.at<float>(1,1) = fy_[lvl] * inv_z2;
-                    Jw.at<float>(1,2) = -(fy_[lvl] * y2 * inv_z2 * inv_z2);
-                    Jw.at<float>(1,3) = -(fy_[lvl] * (1 + y2 * y2 * inv_z2 * inv_z2));
-                    Jw.at<float>(1,4) = fy_[lvl] * x2 * y2 * inv_z2 * inv_z2;
-                    Jw.at<float>(1,5) = fy_[lvl] * x2 * inv_z2;
+            Mat gradientX2 = Mat(imageWarped.size(), CV_32FC1);
+            Mat gradientY2 = Mat(imageWarped.size(), CV_32FC1);
+            //ObtainGradientXY(imageWarped, gradientX2, gradientY2);
 
+            // Computation of Jacobian and Residuals
+            Mat Jacobians;
+            Mat Residuals;
+            vector<Mat> Jws;           
+
+            int num_valid = 0;
+            for (int i=0; i<candidatePoints1.rows; i++) {
+                Mat Residual = Mat(1,1,CV_32FC1);        
+                Mat Jacobian_row = Mat::zeros(1,6,CV_32FC1);
+                Mat Jw = Mat::zeros(2,6,CV_32FC1);
+                Mat Jl = Mat::zeros(1,2,CV_32FC1);
+                
+                // Point in frame 1            
+                float x1 = candidatePoints1.at<float>(i,0);
+                float y1 = candidatePoints1.at<float>(i,1);
+                float z1 = candidatePoints1.at<float>(i,2);
+                // Points of warped frame
+                float x2 = warpedPoints.at<float>(i,0);
+                float y2 = warpedPoints.at<float>(i,1);
+                float z2 = warpedPoints.at<float>(i,2);
+
+                float inv_z2 = 1 / z2;
+
+                if (y2>0 && y2<image2.rows && x2>0 && x2<image2.cols) {
+                    if (z2!=0) {
+                        if (inv_z2<0) inv_z2 = 0;
+                        num_valid++;
+                        Jw.at<float>(0,0) = fx_[lvl] * inv_z2;
+                        Jw.at<float>(0,1) = 0.0;
+                        Jw.at<float>(0,2) = -(fx_[lvl] * x2 * inv_z2 * inv_z2);
+                        Jw.at<float>(0,3) = -(fx_[lvl] * x2 * y2 * inv_z2 * inv_z2);
+                        Jw.at<float>(0,4) = (fx_[lvl] * (1 + x2 * x2 * inv_z2 * inv_z2));   
+                        Jw.at<float>(0,5) = - fx_[lvl] * y2 * inv_z2;
+
+                        Jw.at<float>(1,0) = 0.0;
+                        Jw.at<float>(1,1) = fy_[lvl] * inv_z2;
+                        Jw.at<float>(1,2) = -(fy_[lvl] * y2 * inv_z2 * inv_z2);
+                        Jw.at<float>(1,3) = -(fy_[lvl] * (1 + y2 * y2 * inv_z2 * inv_z2));
+                        Jw.at<float>(1,4) = fy_[lvl] * x2 * y2 * inv_z2 * inv_z2;
+                        Jw.at<float>(1,5) = fy_[lvl] * x2 * inv_z2;
+
+                    }
+                    // Intensities
+                    int intensity1 = image1.at<uchar>(y1,x1);
+                    int intensity2 = image2.at<uchar>(y2,x2);
+
+                    Residual.at<float>(0,0) = intensity2 - intensity1;
+                    
+                    Jl.at<float>(0,0) = gradientX1.at<float>(y1,x1);
+                    Jl.at<float>(0,1) = gradientY1.at<float>(y1,x1);
+
+                    Jacobian_row = Jl * Jw;
+                    // cout << "Residual: " << Residual.at<float>(0,0) << endl;
+                    // cout << "Jl: " << Jl << endl;                
+                    // cout << "Jw: " << Jw << endl;                                
+                    // cout << "Jacobian: " << Jacobian_row << endl;
+                    // cout << endl;
+                    
+                    Jacobians.push_back(Jacobian_row);
+                    Residuals.push_back(Residual);
                 }
-                // Intensities
-                int intensity1 = image1.at<uchar>(y1,x1);
-                int intensity2 = image2.at<uchar>(y2,x2);
-
-                Residual.at<float>(0,0) = intensity2 - intensity1;
-                
-                Jl.at<float>(0,0) = gradientX1.at<uchar>(y1,x1);
-                Jl.at<float>(0,1) = gradientY1.at<uchar>(y1,x1);
-
-                Jacobian_row = Jl * Jw;
-                // cout << "Residual: " << Residuals.at<float>(i,0) << endl;
-                // cout << "Jl: " << Jl << endl;                
-                // cout << "Jw: " << Jw << endl;                                
-                // cout << "Jacobian: " << Jacobian_row << endl;
-                // cout << endl;
-                
-                Jacobians.push_back(Jacobian_row);
-                Residuals.push_back(Residual);
             }
+            cout << "Valid points found: " << num_valid << endl;
+            //DebugShowJacobians(Jacobians, warpedPoints, w_[lvl], h_[lvl]);
+
+            // Computation of scale (Median Absolute Deviation)
+            float sigma_inv = 1 / MedianAbsoluteDeviation(Residuals);       
+            Residuals = Residuals.mul(50);
+
+            // Computation of Weights (Identity or Tukey function)
+            Mat W = IdentityWeights(Residuals.rows);
+            //Mat W = TukeyFunctionWeights(Residuals);
+
+            // Computation of error
+            float inv_num_residuals = 1.0 / Residuals.rows;
+            Mat ResidualsW = Residuals.mul(W);
+            Mat errorMat =  inv_num_residuals * Residuals.t() * ResidualsW;
+
+            error = errorMat.at<float>(0,0);
+
+            cout << "Error: " << error << endl;
+
+            // Break if error increases
+            // if (error > last_error) {
+            //     cout << " Finished Error: " << error << endl;
+                
+            //     deltaMat = Mat::zeros(6,1,CV_32FC1);
+            //     deltaVector(0) = 0;
+            //     deltaVector(1) = 0;
+            //     deltaVector(2) = 0;
+            //     deltaVector(3) = 0;
+            //     deltaVector(4) = 0;
+            //     deltaVector(5) = 0;
+
+            //     // Show results of optimization at lvl 0
+            //     if (lvl == 0){
+            //         // DebugShowResidual(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
+            //     }
+            //     break;
+            // }
+
+            last_error = error;
+
+            // Checking dimentions of matrices
+            cout << "Jacobians dimentions: " << Jacobians.size() << endl;
+            cout << "Weights dimentions: " << W.size() << endl;
+            cout << "Residuals dimentions: " << Residuals.size() << endl;
+            
+            // Computation of new delta (DSO-way)
+            // LS ls;
+            // ls.initialize(Residuals.rows);
+            // for (int i=0; i<Residuals.rows; i++) {
+            //     Mat61f jacobian;
+            //     cv2eigen(Jacobians.row(i), jacobian);
+                
+            //     ls.update(jacobian, Residuals.at<float>(i,0), W.at<float>(i,0));
+            // }
+            // ls.finish();
+            // // Solve LS system
+            // float LM_lambda = 0.2;
+            // Mat61f b = -ls.b;
+            // Mat66f A = ls.A;
+            // deltaVector = A.ldlt().solve(b);
+
+            // Computation of new delta (normal way)
+            Mat b = -Jacobians.t() * Residuals.mul(W);
+            Mat A = Jacobians.t() * Jacobians;
+            Mat delta = A.inv() * b;
+            // Apply update
+            deltaVector(0) = delta.at<float>(0,0);
+            deltaVector(1) = delta.at<float>(1,0);
+            deltaVector(2) = delta.at<float>(2,0);
+            deltaVector(3) = delta.at<float>(3,0);
+            deltaVector(4) = delta.at<float>(4,0);
+            deltaVector(5) = delta.at<float>(5,0);
+
+            // Update new pose with delta
+            cout << deltaVector << endl << endl;
+            current_pose = SE3::exp(deltaVector) * current_pose;
+            //cout << deltaVector << endl;        
+            // deltaMat = -1 * ((Jacobian.t() * JacobianW).inv() * Jacobian.t() * ResidualsW);
+
+
         }
-        cout << "Valid points found: " << num_valid << endl;
-        //DebugShowJacobians(Jacobians, warpedPoints, w_[lvl], h_[lvl]);
-
-        // Computation of scale (Median Absolute Deviation)
-        float sigma_inv = 1 / MedianAbsoluteDeviation(Residuals);       
-        Residuals = Residuals.mul(1);
-
-        // Computation of Weights (Identity or Tukey function)
-        Mat W = IdentityWeights(Residuals.rows);
-        //Mat W = TukeyFunctionWeights(Residuals);
-
-        // Computation of error
-        float inv_num_residuals = 1.0 / Residuals.rows;
-        Mat ResidualsW = Residuals.mul(W);
-        Mat errorMat =  inv_num_residuals * Residuals.t() * ResidualsW;
-
-        error = errorMat.at<float>(0,0);
-
-        cout << "Error: " << error << endl;
-
-        // Break if error increases
-        // if (error > last_error) {
-        //     cout << " Finished Error: " << error << endl;
-            
-        //     deltaMat = Mat::zeros(6,1,CV_32FC1);
-        //     deltaVector(0) = 0;
-        //     deltaVector(1) = 0;
-        //     deltaVector(2) = 0;
-        //     deltaVector(3) = 0;
-        //     deltaVector(4) = 0;
-        //     deltaVector(5) = 0;
-
-        //     // Show results of optimization at lvl 0
-        //     if (lvl == 0){
-        //         // DebugShowResidual(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
-        //     }
-        //     break;
-        // }
-
-        last_error = error;
-
-        // Checking dimentions of matrices
-        cout << "Jacobians dimentions: " << Jacobians.size() << endl;
-        cout << "Weights dimentions: " << W.size() << endl;
-        cout << "Residuals dimentions: " << Residuals.size() << endl;
-        
-        // Computation of new delta (DSO-way)
-        // LS ls;
-        // ls.initialize(Residuals.rows);
-        // for (int i=0; i<Residuals.rows; i++) {
-        //     Mat61f jacobian;
-        //     cv2eigen(Jacobians.row(i), jacobian);
-            
-        //     ls.update(jacobian, Residuals.at<float>(i,0), W.at<float>(i,0));
-        // }
-        // ls.finish();
-        // // Solve LS system
-        // float LM_lambda = 0.2;
-        // Mat61f b = -ls.b;
-        // Mat66f A = ls.A;
-        // deltaVector = A.ldlt().solve(b);
-
-        // Computation of new delta (normal way)
-        Mat b = -Jacobians.t() * Residuals.mul(W);
-        Mat A = Jacobians.t() * Jacobians;
-        Mat delta = A.inv() * b;
-        // Apply update
-        deltaVector(0) = delta.at<float>(0,0);
-        deltaVector(1) = delta.at<float>(1,0);
-        deltaVector(2) = delta.at<float>(2,0);
-        deltaVector(3) = delta.at<float>(3,0);
-        deltaVector(4) = delta.at<float>(4,0);
-        deltaVector(5) = delta.at<float>(5,0);
-
-        // Update new pose with delta
-        cout << deltaVector << endl << endl;
-        current_pose = SE3::exp(deltaVector) * current_pose;
-        //cout << deltaVector << endl;        
-        // deltaMat = -1 * ((Jacobian.t() * JacobianW).inv() * Jacobian.t() * ResidualsW);
-
-
     }
     cout << " Finished Error: " << error << endl;
 
