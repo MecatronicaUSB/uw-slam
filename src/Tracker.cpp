@@ -105,22 +105,20 @@ void Tracker::InitializePyramid(int _width, int _height, Mat _K) {
 // Gauss-Newton using Foward Compositional Algorithm
 void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     // Gauss-Newton Options
-    int max_iterations = 10;
+    int max_iterations = 20;
     float error_threshold = 0.005;
 
     // Variables initialization
-    float error = 0.0;
-    float last_error = 0.0;
+    float error         = 0.0;
+    float initial_error = 0.0;    
+    float last_error    = 0.0;
 
     // Initial pose and deltapose (assumes little movement between frames)
     Mat deltaMat = Mat::zeros(6,1,CV_32FC1);
     Sophus::Vector<float, SE3::DoF> deltaVector;
-    deltaVector(0) = 0;
-    deltaVector(1) = 0;
-    deltaVector(2) = 0;
-    deltaVector(3) = 0;
-    deltaVector(4) = 0;
-    deltaVector(5) = 0;
+    for (int i=0; i<6; i++)
+        deltaVector(i) = 0;
+
     SE3 current_pose = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
 
     // Sparse to Fine iteration
@@ -134,15 +132,12 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         // Obtain points and depth of initial frame 
         Mat candidatePoints1      = _previous_frame->candidatePoints_[lvl].clone();
         Mat candidatePoints2      = _current_frame->candidatePoints_[lvl].clone();    
-        Mat candidatePointsDepth = _previous_frame->candidatePointsDepth_[lvl].clone();
+        Mat candidatePointsDepth  = _previous_frame->candidatePointsDepth_[lvl].clone();
 
         // Obtain gradients
         Mat image1 = _previous_frame->images_[lvl].clone();
         Mat image2 = _current_frame->images_[lvl].clone();    
-        Mat gradient1 = _previous_frame->gradient_[lvl].clone();
-        Mat gradient2 = _current_frame->gradient_[lvl].clone();
-        // Mat gradientX1 = _previous_frame->gradientX_[lvl].clone();
-        // Mat gradientY1 = _previous_frame->gradientY_[lvl].clone();
+
         Mat gradientX1, gradientY1;
         ObtainGradientXY(image1, gradientX1, gradientY1);
 
@@ -158,20 +153,9 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         
             warpedPoints = WarpFunction(candidatePoints1, current_pose, lvl);
 
-            Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
-            ObtainImageTransformed(image1, candidatePoints1, warpedPoints, imageWarped);
-
-            if (k==0 || k==max_iterations-1)
-                DebugShowWarpedPerspective(image1, image2, imageWarped, lvl);
-
-            Mat gradientX2 = Mat(imageWarped.size(), CV_32FC1);
-            Mat gradientY2 = Mat(imageWarped.size(), CV_32FC1);
-            //ObtainGradientXY(imageWarped, gradientX2, gradientY2);
-
             // Computation of Jacobian and Residuals
             Mat Jacobians;
-            Mat Residuals;
-            vector<Mat> Jws;           
+            Mat Residuals;      
 
             int num_valid = 0;
             for (int i=0; i<candidatePoints1.rows; i++) {
@@ -191,6 +175,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
                 float inv_z2 = 1 / z2;
 
+                // Check if warpedPoints are out of boundaries
                 if (y2>0 && y2<image2.rows && x2>0 && x2<image2.cols) {
                     if (z2!=0) {
                         if (inv_z2<0) inv_z2 = 0;
@@ -230,51 +215,52 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                     Residuals.push_back(Residual);
                 }
             }
-            cout << "Valid points found: " << num_valid << endl;
-            //DebugShowJacobians(Jacobians, warpedPoints, w_[lvl], h_[lvl]);
+            // cout << "Valid points found: " << num_valid << endl;
+            // DebugShowJacobians(Jacobians, warpedPoints, w_[lvl], h_[lvl]);
 
             // Computation of scale (Median Absolute Deviation)
-            float sigma_inv = 1 / MedianAbsoluteDeviation(Residuals);       
-            Residuals = Residuals.mul(50);
+            float MAD = MedianAbsoluteDeviation(Residuals);       
 
             // Computation of Weights (Identity or Tukey function)
-            Mat W = IdentityWeights(Residuals.rows);
-            //Mat W = TukeyFunctionWeights(Residuals);
+            //Mat W = IdentityWeights(Residuals.rows);
+            Mat W = TukeyFunctionWeights(Residuals, MAD);
 
             // Computation of error
             float inv_num_residuals = 1.0 / Residuals.rows;
             Mat ResidualsW = Residuals.mul(W);
             Mat errorMat =  inv_num_residuals * Residuals.t() * ResidualsW;
-
+            Residuals = Residuals.mul(50);  // Workaround to make delta updates larger
             error = errorMat.at<float>(0,0);
 
-            cout << "Error: " << error << endl;
+            if (k==0)
+                initial_error = error;
 
             // Break if error increases
-            // if (error > last_error) {
-            //     cout << " Finished Error: " << error << endl;
-                
-            //     deltaMat = Mat::zeros(6,1,CV_32FC1);
-            //     deltaVector(0) = 0;
-            //     deltaVector(1) = 0;
-            //     deltaVector(2) = 0;
-            //     deltaVector(3) = 0;
-            //     deltaVector(4) = 0;
-            //     deltaVector(5) = 0;
+            if (error > last_error) {
+                cout << "Pyramid level: " << lvl << endl;
+                cout << "Number of iterations: " << k << endl;
+                cout << "Initial-Final Error: " << initial_error << " - " << last_error << endl << endl;
 
-            //     // Show results of optimization at lvl 0
-            //     if (lvl == 0){
-            //         // DebugShowResidual(gradient1, gradient2, candidatePoints, warpedPoints, lvl);
-            //     }
-            //     break;
-            // }
+                if (lvl == 0) {
+                    Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
+                    ObtainImageTransformed(image1, candidatePoints1, warpedPoints, imageWarped);             
+                    DebugShowWarpedPerspective(image1, image2, imageWarped, lvl);
+                }
+
+                // Reset delta
+                deltaMat = Mat::zeros(6,1,CV_32FC1);
+                for (int i=0; i<6; i++)
+                    deltaVector(i) = 0;
+
+                break;
+            }
 
             last_error = error;
 
             // Checking dimentions of matrices
-            cout << "Jacobians dimentions: " << Jacobians.size() << endl;
-            cout << "Weights dimentions: " << W.size() << endl;
-            cout << "Residuals dimentions: " << Residuals.size() << endl;
+            // cout << "Jacobians dimentions: " << Jacobians.size() << endl;
+            // cout << "Weights dimentions: " << W.size() << endl;
+            // cout << "Residuals dimentions: " << Residuals.size() << endl;
             
             // Computation of new delta (DSO-way)
             // LS ls;
@@ -292,35 +278,25 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             // Mat66f A = ls.A;
             // deltaVector = A.ldlt().solve(b);
 
-            // Computation of new delta (normal way)
+            // Computation of new delta (Kerl-way)            
+            // Multiplication of W to Jacobian
+            for (int i=0; i<Jacobians.rows; i++) {
+                float wi = W.at<float>(i,0);
+                Jacobians.row(i) = wi * Jacobians.row(i);
+            }
             Mat b = -Jacobians.t() * Residuals.mul(W);
             Mat A = Jacobians.t() * Jacobians;
             Mat delta = A.inv() * b;
-            // Apply update
-            deltaVector(0) = delta.at<float>(0,0);
-            deltaVector(1) = delta.at<float>(1,0);
-            deltaVector(2) = delta.at<float>(2,0);
-            deltaVector(3) = delta.at<float>(3,0);
-            deltaVector(4) = delta.at<float>(4,0);
-            deltaVector(5) = delta.at<float>(5,0);
 
-            // Update new pose with delta
-            cout << deltaVector << endl << endl;
+            // Convert info from eigen to cv
+            for (int i=0; i<6; i++)
+                deltaVector(i) = delta.at<float>(i,0);
+            
+            // Update new pose with computed delta
             current_pose = SE3::exp(deltaVector) * current_pose;
-            //cout << deltaVector << endl;        
-            // deltaMat = -1 * ((Jacobian.t() * JacobianW).inv() * Jacobian.t() * ResidualsW);
-
-
         }
     }
-    cout << " Finished Error: " << error << endl;
 
-
-    // Mat candidatePoints      = _previous_frame->candidatePoints_[0].clone();
-    // Mat candidatePointsDepth = _previous_frame->candidatePointsDepth_[0].clone();
-    // Mat warpedPoints = Mat(candidatePoints.size(), CV_32FC1);
-    // warpedPoints = WarpFunction(candidatePoints, candidatePointsDepth, current_pose, 0);
-    // DebugShowWarpedPoints(_previous_frame->gradient_[0], _current_frame->gradient_[0], candidatePoints, warpedPoints);
     _previous_frame->rigid_transformation_ = current_pose;
 
 }

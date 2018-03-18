@@ -128,8 +128,8 @@ void System::InitializeSystem(string _images_path, string _ground_truth_dataset,
     ground_truth_dataset_ = _ground_truth_dataset;
     visualizer_ = new Visualizer(start_index_, images_list_.size(), _ground_truth_dataset, _ground_truth_path);
 
-    cout << "Initializing system ... done" << endl;
     initialized_ = true;
+    cout << "Initializing system ... done" << endl << endl;
 }
 
 void System::CalculateROI() {

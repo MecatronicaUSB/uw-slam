@@ -66,8 +66,9 @@ class Tracker
 {
 public:
     /**
-     * @brief Tracker consturctor.
+     * @brief Construct a new Tracker object.
      * 
+     * @param _depth_available 
      */
     Tracker(bool _depth_available);
 
@@ -119,12 +120,12 @@ public:
     void ObtainAllPoints(Frame* _frame);
 
     /**
-     * @brief Computes warp projected points from one frame to another, given a rigid transformation matrix 
-     *        and the depth estimation of those points. Returns matrix of warped points.
+     * @brief Computes warp projected points from one frame to another, given a rigid transformation matrix,
+     *        the depth estimation of those points and the pyramidal level. Returns matrix of warped points.
      * 
      * @param _points2warp 
-     * @param _depth 
      * @param _rigid_transformation 
+     * @param _lvl 
      * @return Mat 
      */
     Mat WarpFunction(Mat _points2warp, SE3 _rigid_transformation, int _lvl);
@@ -137,27 +138,61 @@ public:
      */
     SE3 Mat2SE3(Mat _input);
 
-
+    /**
+     * @brief Computes the result image given a _warpedPoints. Saves the result in _outputImage.
+     * 
+     * @param _originalImage 
+     * @param _candidatePoints 
+     * @param _warpedPoints 
+     * @param _outputImage 
+     */
     void ObtainImageTransformed(Mat _originalImage, Mat _candidatePoints, Mat _warpedPoints, Mat _outputImage);
     
+    /**
+     * @brief Computes gradient X and the gradient Y of _inputImage (it uses CV_32FC, and without abs())
+     * 
+     * @param _inputImage 
+     * @param _gradientX 
+     * @param _gradientY 
+     */
     void ObtainGradientXY(Mat _inputImage, Mat& _gradientX, Mat& _gradientY);
     
-    void DebugShowResidual(Mat _image1, Mat _image2, Mat _candidatePoints, Mat _warped, int _lvl);
-
-    void DebugShowJacobians(Mat Jacobians, Mat points, int width, int height);
-
+    
+    /**
+     * @brief Computes the median value of a set of values (x). 
+     * 
+     * @param _input 
+     * @return float 
+     */
     float MedianMat(Mat _input);
 
-    float MedianAbsoluteDeviation(Mat _input);
+    /**
+     * @brief Computes the Median Absolute Deviation of a set of values (x), using the following formula:
+     *          
+     *        MAD = 1.4826 * median(|x - median(x)|)
+     * 
+     * @param _input 
+     * @return float 
+     */
+    float MedianAbsoluteDeviation(Mat x);
 
     /**
-     * @brief Returns a _num_residuals x 1 Mat of ones.
+     * @brief Returns a (_num_residuals x 1) Mat of ones.
      * 
      * @param _input 
      * @return Mat 
      */
     Mat IdentityWeights(int _num_residuals);
 
+    /**
+     * @brief Computes the weights using Tukey formula:
+     *          
+     *          TukeyWeight(x) -> (1 - x^2 / b^2)^2     if (abs(x) <= 4.6851)
+     *                         -> 0                     else
+     * @param _residuals 
+     * @param MAD 
+     * @return Mat 
+     */
     Mat TukeyFunctionWeights(Mat _residuals, float MAD);
 
     /**
@@ -168,8 +203,53 @@ public:
      */
     void DebugShowCandidatePoints(Mat _image, Mat _candidatePoints);
 
+    /**
+     * @brief Shows four images in a single window that represents the result of the Gauss-Newton optimization.
+     *          Left  up image:  Previous image, _image1.
+     *          Right up image:  Current image, _image2.
+     *          Left  down image:  Sum of _image1 and _imageWarped image.
+     *          Right down image:  Sum of _image1 and _image2 image.
+     *
+     * @param _image1 
+     * @param _image2 
+     * @param _imageWarped 
+     * @param _lvl 
+     */
     void DebugShowWarpedPerspective(Mat _image1, Mat _image2, Mat _imageWarped, int _lvl);
-    
+
+        /**
+     * @brief Shows the difference between the original image and the warpedImage.
+     * 
+     * @param _image1 
+     * @param _image2 
+     * @param _candidatePoints 
+     * @param _warped 
+     * @param _lvl 
+     */
+    void DebugShowResidual(Mat _image1, Mat _image2, Mat _candidatePoints, Mat _warped, int _lvl);
+
+    /**
+     * @brief Shows six images that represents the Jacobians of the current iteration.
+     *          Positive values are brighter pixels.
+     *          Negative values are darker pixels.
+     *          Invalid values are black pixels.
+     * 
+     * @param Jacobians 
+     * @param points 
+     * @param width 
+     * @param height 
+     */
+    void DebugShowJacobians(Mat Jacobians, Mat points, int width, int height);
+
+    /**
+     * @brief
+     * 
+     * @param _intputImage 
+     * @param y 
+     * @param x 
+     * @return true 
+     * @return false 
+     */
     bool PixelIsBackground(Mat _intputImage, int y, int x);
 
     // TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com)
