@@ -52,6 +52,41 @@ Visualizer::Visualizer(int start_index, int num_images, string _ground_truth_dat
     camera_pose.color.b = 1.0f;
     camera_pose.color.a = 1.0;
     
+    // Publishers of Ground Truth Trajectory markers (dots or continuous line)
+    ros::NodeHandle n_camera_dots;
+    ros::NodeHandle n_camera_lines;    
+    ros::Publisher publisher_camera_trajectory_dots = n_camera_dots.advertise<visualization_msgs::Marker>("camera_trajectory_dots", 50);
+    ros::Publisher publisher_camera_trajectory_lines = n_camera_lines.advertise<visualization_msgs::Marker>("camera_trajectory_lines", 50);
+
+    // Initializing Ground Truth trajectory markers
+    visualization_msgs::Marker camera_trajectory_dots, camera_trajectory_lines;
+    camera_trajectory_dots.header.frame_id = camera_trajectory_lines.header.frame_id  = "/world";
+    camera_trajectory_dots.header.stamp = camera_trajectory_lines.header.stamp = ros::Time::now();
+    camera_trajectory_dots.ns = camera_trajectory_lines.ns = "points_and_lines";
+    camera_trajectory_dots.action = camera_trajectory_lines.action = visualization_msgs::Marker::ADD;
+    camera_trajectory_dots.pose.orientation.w = camera_trajectory_lines.pose.orientation.w = 1.0;
+
+    camera_trajectory_dots.id = 2;
+    camera_trajectory_lines.id = 3;
+
+    camera_trajectory_dots.type = visualization_msgs::Marker::SPHERE_LIST;
+    camera_trajectory_lines.type = visualization_msgs::Marker::LINE_STRIP;
+
+    camera_trajectory_dots.scale.x = 0.01;
+    camera_trajectory_dots.scale.y = 0.01;
+
+    camera_trajectory_lines.scale.x = 0.01;
+
+    // Dots and lines are green
+    camera_trajectory_dots.color.r = 0.40f;    
+    camera_trajectory_dots.color.g = 0.08f;
+    camera_trajectory_dots.color.b = 0.9f;    
+    camera_trajectory_dots.color.a = 1.0;
+    camera_trajectory_lines.color.r = 0.40f;    
+    camera_trajectory_lines.color.g = 0.08f;
+    camera_trajectory_lines.color.b = 0.9f;    
+    camera_trajectory_lines.color.a = 1.0;
+
     // If ground truth is used
     if (not (ground_truth_path == "")) {
         use_ground_truth_ = true;
@@ -90,8 +125,8 @@ Visualizer::Visualizer(int start_index, int num_images, string _ground_truth_dat
         gt_trajectory_dots.action = gt_trajectory_lines.action = visualization_msgs::Marker::ADD;
         gt_trajectory_dots.pose.orientation.w = gt_trajectory_lines.pose.orientation.w = 1.0;
 
-        gt_trajectory_dots.id = 2;
-        gt_trajectory_lines.id = 3;
+        gt_trajectory_dots.id = 4;
+        gt_trajectory_lines.id = 5;
 
         gt_trajectory_dots.type = visualization_msgs::Marker::SPHERE_LIST;
         gt_trajectory_lines.type = visualization_msgs::Marker::LINE_STRIP;
@@ -199,6 +234,12 @@ Visualizer::Visualizer(int start_index, int num_images, string _ground_truth_dat
     publisher_camera_pose_ = publisher_camera_pose;
     camera_pose_ = camera_pose;
 
+    publisher_camera_trajectory_dots_ = publisher_camera_trajectory_dots;
+    publisher_camera_trajectory_lines_ = publisher_camera_trajectory_lines;
+
+    camera_trajectory_dots_  = camera_trajectory_dots;
+    camera_trajectory_lines_ = camera_trajectory_lines;
+
 };
 
 Visualizer::~Visualizer() {};
@@ -210,10 +251,11 @@ void Visualizer::UpdateMessages(Frame* frame){
     // Update image message
     sensor_msgs::ImagePtr current_frame = cv_bridge::CvImage(std_msgs::Header(), "mono8", frame->images_[0]).toImageMsg();
 
-    SE3 pose = frame->rigid_transformation_;
-    Mat31f t = pose.translation();
-    Quaternion2 quaternion = pose.unit_quaternion();
-
+    SE3 previous_pose;
+    SE3 current_pose = frame->rigid_transformation_;
+    Mat31f t = 100* current_pose.translation();
+    Quaternion2 quaternion = current_pose.unit_quaternion();
+    cout << t << endl << endl;
     camera_pose_.pose.position.x += t(0);  
     camera_pose_.pose.position.y += t(1);
     camera_pose_.pose.position.z += t(2);
@@ -222,9 +264,16 @@ void Visualizer::UpdateMessages(Frame* frame){
     camera_pose_.pose.orientation.z += 0; 
     camera_pose_.pose.orientation.w += 0;
 
+    geometry_msgs::Point p;
+    p.x = camera_pose_.pose.position.x;
+    p.y = camera_pose_.pose.position.y;
+    p.z = camera_pose_.pose.position.z;
+    camera_trajectory_dots_.points.push_back(p);        
+    camera_trajectory_lines_.points.push_back(p);
+
     // Update ground truth marker position
     if (use_ground_truth_) {
-        // EUROC Convention: x, y, z, qw, qx, qy, qz
+        // EUROC Conventiobn: x, y, z, qw, qx, qy, qz
         if (ground_truth_dataset_ == "EUROC") {
             gt_pose_.pose.position.x = ground_truth_poses_[ground_truth_index_][0];
             gt_pose_.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
@@ -245,12 +294,12 @@ void Visualizer::UpdateMessages(Frame* frame){
             gt_pose_.pose.orientation.w = ground_truth_poses_[ground_truth_index_][6];
         }
         
-        geometry_msgs::Point p;
-        p.x = gt_pose_.pose.position.x;
-        p.y = gt_pose_.pose.position.y;
-        p.z = gt_pose_.pose.position.z;
-        gt_trajectory_dots_.points.push_back(p);        
-        gt_trajectory_lines_.points.push_back(p);
+        geometry_msgs::Point gt_p;
+        gt_p.x = gt_pose_.pose.position.x;
+        gt_p.y = gt_pose_.pose.position.y;
+        gt_p.z = gt_pose_.pose.position.z;
+        gt_trajectory_dots_.points.push_back(gt_p);        
+        gt_trajectory_lines_.points.push_back(gt_p);
         ground_truth_index_ += ground_truth_step_;
     }
 
@@ -268,6 +317,9 @@ void Visualizer::UpdateMessages(Frame* frame){
     // Send messages
     publisher_current_frame_.publish(current_frame);
     publisher_camera_pose_.publish(camera_pose_);
+    publisher_camera_trajectory_dots_.publish(camera_trajectory_dots_);
+    publisher_camera_trajectory_lines_.publish(camera_trajectory_lines_);
+
     if (use_ground_truth_) {
         publisher_gt_pose_.publish(gt_pose_);
         publisher_gt_trajectory_dots_.publish(gt_trajectory_dots_);

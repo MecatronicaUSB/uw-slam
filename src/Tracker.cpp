@@ -104,10 +104,12 @@ void Tracker::InitializePyramid(int _width, int _height, Mat _K) {
 
 // Gauss-Newton using Foward Compositional Algorithm
 void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
-    // Gauss-Newton Options
+    // Gauss-Newton Optimization Options
     int max_iterations = 20;
     float error_threshold = 0.005;
-
+    int first_pyramid_lvl = PYRAMID_LEVELS-1;
+    int last_pyramid_lvl = 2;
+    
     // Variables initialization
     float error         = 0.0;
     float initial_error = 0.0;    
@@ -123,7 +125,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
     // Sparse to Fine iteration
     // Create for() WORKED WITH LVL 2
-    for (int lvl=PYRAMID_LEVELS-1; lvl>=0; lvl--) {
+    for (int lvl = first_pyramid_lvl; lvl>=last_pyramid_lvl; lvl--) {
         // int lvl = 2;
         // Initialize error   
         error = 0.0;
@@ -221,6 +223,13 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             // Computation of scale (Median Absolute Deviation)
             float MAD = MedianAbsoluteDeviation(Residuals);       
 
+            if (MAD == 0) {
+                // Reset delta
+                deltaMat = Mat::zeros(6,1,CV_32FC1);
+                for (int i=0; i<6; i++)
+                    deltaVector(i) = 0;
+                break;
+            }
             // Computation of Weights (Identity or Tukey function)
             //Mat W = IdentityWeights(Residuals.rows);
             Mat W = TukeyFunctionWeights(Residuals, MAD);
@@ -237,11 +246,11 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
             // Break if error increases
             if (error > last_error) {
-                cout << "Pyramid level: " << lvl << endl;
-                cout << "Number of iterations: " << k << endl;
-                cout << "Initial-Final Error: " << initial_error << " - " << last_error << endl << endl;
+                // cout << "Pyramid level: " << lvl << endl;
+                // cout << "Number of iterations: " << k << endl;
+                // cout << "Initial-Final Error: " << initial_error << " - " << last_error << endl << endl;
 
-                if (lvl == 0) {
+                if (lvl == 2) {
                     Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
                     ObtainImageTransformed(image1, candidatePoints1, warpedPoints, imageWarped);             
                     DebugShowWarpedPerspective(image1, image2, imageWarped, lvl);
@@ -644,12 +653,6 @@ float Tracker::MedianAbsoluteDeviation(Mat _input) {
 
     // Median of deviation
     float MAD = MedianMat(deviation);
-
-    if (MAD == 0) {
-        cout << "Median Absolute Deviation (MAD) is 0" << endl;
-        cout << "Exiting ..." << endl;
-        exit(0);
-    }
 
     return c * MAD;
 }

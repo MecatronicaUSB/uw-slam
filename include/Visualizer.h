@@ -99,9 +99,12 @@ public:
     visualization_msgs::Marker gt_trajectory_dots_;
     visualization_msgs::Marker gt_trajectory_lines_;
     
-    ros::Publisher publisher_camera_pose_;     
+    ros::Publisher publisher_camera_pose_;
+    ros::Publisher publisher_camera_trajectory_dots_;    
+    ros::Publisher publisher_camera_trajectory_lines_;
     visualization_msgs::Marker camera_pose_;
-
+    visualization_msgs::Marker camera_trajectory_dots_;
+    visualization_msgs::Marker camera_trajectory_lines_;
     
 
     image_transport::Publisher publisher_current_frame_;
