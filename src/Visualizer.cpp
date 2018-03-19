@@ -139,9 +139,13 @@ Visualizer::Visualizer(int start_index, int num_images, string _ground_truth_dat
 
         if (ground_truth_dataset_ == "TUM") {
             ReadGroundTruthTUM(start_index, ground_truth_path);
-            
+            // Camera model changed for TUM dataset
+            camera_pose.type = visualization_msgs::Marker::CUBE;  
+            camera_pose.scale.x = 0.35;                              
+            camera_pose.scale.y = 0.2;
+            camera_pose.scale.z = 0.025;
+            // Dimentions of ground truth marker               
             gt_pose.type = visualization_msgs::Marker::CUBE;                         
-            // Dimentions of ground truth marker   
             gt_pose.scale.x = 0.35;                             
             gt_pose.scale.y = 0.2;
             gt_pose.scale.z = 0.025;
