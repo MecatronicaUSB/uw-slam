@@ -191,6 +191,7 @@ public:
     Visualizer* visualizer_;
 
     int start_index_;
+    int num_valid_images_;
     int num_frames_;
     int num_keyframes_;
     int w_, h_, w_input_, h_input_;

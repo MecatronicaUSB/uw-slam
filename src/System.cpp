@@ -34,6 +34,7 @@ System::System(int argc, char *argv[], int _start_index) {
     depth_available_ = false;
     num_frames_     = 0;
     num_keyframes_  = 0;
+    num_valid_images_ = 0;
 }
 
 System::~System() {
@@ -127,6 +128,16 @@ void System::InitializeSystem(string _images_path, string _ground_truth_dataset,
     ground_truth_path_    = _ground_truth_path;
     ground_truth_dataset_ = _ground_truth_dataset;
     visualizer_ = new Visualizer(start_index_, images_list_.size(), _ground_truth_dataset, _ground_truth_path);
+
+    // Cheking if the number of depth images are greater or lower than the actual images
+    if (depth_available_) {
+        if (images_list_.size() > depth_list_.size())
+            num_valid_images_ = depth_list_.size();
+        if (images_list_.size() <= depth_list_.size())
+            num_valid_images_ = images_list_.size();
+    } else {
+        num_valid_images_ = images_list_.size();
+    }
 
     initialized_ = true;
     cout << "Initializing system ... done" << endl << endl;
