@@ -146,7 +146,7 @@ int main (int argc, char *argv[]) {
             uwSystem->FreeFrames();
         }
     }
-
+    cout << "Dataset ended..." << endl;
     // Delete system
     uwSystem->~System();
     delete uwSystem;
