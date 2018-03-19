@@ -57,44 +57,75 @@ Visualizer::Visualizer(int start_index, int num_images, string _ground_truth_dat
     if (not (ground_truth_path == "")) {
         use_ground_truth_ = true;
         ground_truth_dataset_ = _ground_truth_dataset;
+
         // Ground truth marker initialization
-        ros::NodeHandle nodehandle_ground_truth_pose;
-        ros::Publisher publisher_ground_truth_pose = nodehandle_ground_truth_pose.advertise<visualization_msgs::Marker>("ground_truth", 50);
-        visualization_msgs::Marker ground_truth_pose;
+        ros::NodeHandle nodehandle_gt_pose;
+        ros::Publisher publisher_gt_pose = nodehandle_gt_pose.advertise<visualization_msgs::Marker>("gt_pose", 50);
+        visualization_msgs::Marker gt_pose;
         
         // Ground truth marker options
-        ground_truth_pose.id = 0;
-        ground_truth_pose.header.frame_id = "/world";            
-        ground_truth_pose.header.stamp = ros::Time::now();
-        ground_truth_pose.ns = "uw_slam";                                                   
-        ground_truth_pose.action = visualization_msgs::Marker::ADD;
-        ground_truth_pose.lifetime = ros::Duration();    
+        gt_pose.id = 0;
+        gt_pose.header.frame_id = "/world";            
+        gt_pose.header.stamp = ros::Time::now();
+        gt_pose.ns = "uw_slam";                                                   
+        gt_pose.action = visualization_msgs::Marker::ADD;
+        gt_pose.lifetime = ros::Duration();    
 
         // Color of ground truth marker
-        ground_truth_pose.color.r = 0.12f;                             
-        ground_truth_pose.color.g = 0.56f;
-        ground_truth_pose.color.b = 1.0f;
-        ground_truth_pose.color.a = 1.0;
+        gt_pose.color.r = 0.12f;                             
+        gt_pose.color.g = 0.56f;
+        gt_pose.color.b = 1.0f;
+        gt_pose.color.a = 1.0;
             
+        // Publishers of Ground Truth Trajectory markers (dots or continuous line)
+        ros::NodeHandle n_dots;
+        ros::NodeHandle n_lines;    
+        ros::Publisher publisher_gt_trajectory_dots = n_dots.advertise<visualization_msgs::Marker>("gt_trajectory_dots", 50);
+        ros::Publisher publisher_gt_trajectory_lines = n_lines.advertise<visualization_msgs::Marker>("gt_trajectory_lines", 50);
+
+        // Initializing Ground Truth trajectory markers
+        visualization_msgs::Marker gt_trajectory_dots, gt_trajectory_lines;
+        gt_trajectory_dots.header.frame_id = gt_trajectory_lines.header.frame_id  = "/world";
+        gt_trajectory_dots.header.stamp = gt_trajectory_lines.header.stamp = ros::Time::now();
+        gt_trajectory_dots.ns = gt_trajectory_lines.ns = "points_and_lines";
+        gt_trajectory_dots.action = gt_trajectory_lines.action = visualization_msgs::Marker::ADD;
+        gt_trajectory_dots.pose.orientation.w = gt_trajectory_lines.pose.orientation.w = 1.0;
+
+        gt_trajectory_dots.id = 2;
+        gt_trajectory_lines.id = 3;
+
+        gt_trajectory_dots.type = visualization_msgs::Marker::SPHERE_LIST;
+        gt_trajectory_lines.type = visualization_msgs::Marker::LINE_STRIP;
+
+        gt_trajectory_dots.scale.x = 0.01;
+        gt_trajectory_dots.scale.y = 0.01;
+
+        gt_trajectory_lines.scale.x = 0.01;
+
+        // Dots and lines are green
+        gt_trajectory_dots.color.g = 1.0f;
+        gt_trajectory_dots.color.a = 1.0;
+        gt_trajectory_lines.color.g = 1.0f;
+        gt_trajectory_lines.color.a = 1.0;
 
         if (ground_truth_dataset_ == "EUROC") {
             ReadGroundTruthEUROC(start_index, ground_truth_path);
 
-            ground_truth_pose.type = visualization_msgs::Marker::ARROW;                         
+            gt_pose.type = visualization_msgs::Marker::ARROW;                         
 
             // Dimentions of ground truth marker   
-            ground_truth_pose.scale.x = 0.1;                             
-            ground_truth_pose.scale.y = 0.15;
-            ground_truth_pose.scale.z = 0.15;
+            gt_pose.scale.x = 0.1;                             
+            gt_pose.scale.y = 0.15;
+            gt_pose.scale.z = 0.15;
             // EUROC Convention of quaternion: qw, qx, qy, qz
             // Initial position and orientation of ground truth marker   
-            ground_truth_pose.pose.position.x = ground_truth_poses_[ground_truth_index_][0];    
-            ground_truth_pose.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
-            ground_truth_pose.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
-            ground_truth_pose.pose.orientation.x = ground_truth_poses_[ground_truth_index_][4]; 
-            ground_truth_pose.pose.orientation.y = ground_truth_poses_[ground_truth_index_][5];    
-            ground_truth_pose.pose.orientation.z = ground_truth_poses_[ground_truth_index_][6]; 
-            ground_truth_pose.pose.orientation.w = ground_truth_poses_[ground_truth_index_][3]; 
+            gt_pose.pose.position.x = ground_truth_poses_[ground_truth_index_][0];    
+            gt_pose.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
+            gt_pose.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
+            gt_pose.pose.orientation.x = ground_truth_poses_[ground_truth_index_][4]; 
+            gt_pose.pose.orientation.y = ground_truth_poses_[ground_truth_index_][5];    
+            gt_pose.pose.orientation.z = ground_truth_poses_[ground_truth_index_][6]; 
+            gt_pose.pose.orientation.w = ground_truth_poses_[ground_truth_index_][3]; 
 
             // Initialize the camera pose marker in the same place and orientation as the ground truth marker
             // This initialization point depends of the start_index argument in SLAM process  
@@ -110,19 +141,19 @@ Visualizer::Visualizer(int start_index, int num_images, string _ground_truth_dat
         if (ground_truth_dataset_ == "TUM") {
             ReadGroundTruthTUM(start_index, ground_truth_path);
             
-            ground_truth_pose.type = visualization_msgs::Marker::CUBE;                         
+            gt_pose.type = visualization_msgs::Marker::CUBE;                         
             // Dimentions of ground truth marker   
-            ground_truth_pose.scale.x = 0.35;                             
-            ground_truth_pose.scale.y = 0.2;
-            ground_truth_pose.scale.z = 0.025;
+            gt_pose.scale.x = 0.35;                             
+            gt_pose.scale.y = 0.2;
+            gt_pose.scale.z = 0.025;
             // TUM Convention of quaternion: qx, qy, qz, qw
-            ground_truth_pose.pose.position.x = ground_truth_poses_[ground_truth_index_][0];    
-            ground_truth_pose.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
-            ground_truth_pose.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
-            ground_truth_pose.pose.orientation.x = ground_truth_poses_[ground_truth_index_][3]; 
-            ground_truth_pose.pose.orientation.y = ground_truth_poses_[ground_truth_index_][4];    
-            ground_truth_pose.pose.orientation.z = ground_truth_poses_[ground_truth_index_][5]; 
-            ground_truth_pose.pose.orientation.w = ground_truth_poses_[ground_truth_index_][6]; 
+            gt_pose.pose.position.x = ground_truth_poses_[ground_truth_index_][0];    
+            gt_pose.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
+            gt_pose.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
+            gt_pose.pose.orientation.x = ground_truth_poses_[ground_truth_index_][3]; 
+            gt_pose.pose.orientation.y = ground_truth_poses_[ground_truth_index_][4];    
+            gt_pose.pose.orientation.z = ground_truth_poses_[ground_truth_index_][5]; 
+            gt_pose.pose.orientation.w = ground_truth_poses_[ground_truth_index_][6]; 
 
             // Initialize the camera pose marker in the same place and orientation as the ground truth marker
             // This initialization point depends of the start_index argument in SLAM process  
@@ -135,9 +166,15 @@ Visualizer::Visualizer(int start_index, int num_images, string _ground_truth_dat
             camera_pose.pose.orientation.w = ground_truth_poses_[ground_truth_index_][6]; 
         }
 
-        // Saving ground truth marker configuration
-        publisher_ground_truth_pose_ = publisher_ground_truth_pose;
-        ground_truth_pose_ = ground_truth_pose;
+        // Saving ground truth markers configuration
+        publisher_gt_pose_ = publisher_gt_pose;
+        gt_pose_ = gt_pose;
+
+        publisher_gt_trajectory_dots_ = publisher_gt_trajectory_dots;
+        publisher_gt_trajectory_lines_ = publisher_gt_trajectory_lines;
+
+        gt_trajectory_dots_  = gt_trajectory_dots;
+        gt_trajectory_lines_ = gt_trajectory_lines;
 
     } else {
         // Initialize the camera pose marker in the same place and orientation as the ground truth marker
@@ -154,10 +191,11 @@ Visualizer::Visualizer(int start_index, int num_images, string _ground_truth_dat
     ros::NodeHandle nh_current_frame;
     image_transport::ImageTransport node_current_frame(nh_current_frame);
     publisher_current_frame_ = node_current_frame.advertise("current_frame",50);
-    
+
     // Saving camera pose marker configuration
     publisher_camera_pose_ = publisher_camera_pose;
     camera_pose_ = camera_pose;
+
 };
 
 Visualizer::~Visualizer() {};
@@ -185,25 +223,31 @@ void Visualizer::UpdateMessages(Frame* frame){
     if (use_ground_truth_) {
         // EUROC Convention: x, y, z, qw, qx, qy, qz
         if (ground_truth_dataset_ == "EUROC") {
-            ground_truth_pose_.pose.position.x = ground_truth_poses_[ground_truth_index_][0];
-            ground_truth_pose_.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
-            ground_truth_pose_.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
-            ground_truth_pose_.pose.orientation.x = ground_truth_poses_[ground_truth_index_][4];           
-            ground_truth_pose_.pose.orientation.y = ground_truth_poses_[ground_truth_index_][5];        
-            ground_truth_pose_.pose.orientation.z = ground_truth_poses_[ground_truth_index_][6];      
-            ground_truth_pose_.pose.orientation.w = ground_truth_poses_[ground_truth_index_][3];
+            gt_pose_.pose.position.x = ground_truth_poses_[ground_truth_index_][0];
+            gt_pose_.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
+            gt_pose_.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
+            gt_pose_.pose.orientation.x = ground_truth_poses_[ground_truth_index_][4];           
+            gt_pose_.pose.orientation.y = ground_truth_poses_[ground_truth_index_][5];        
+            gt_pose_.pose.orientation.z = ground_truth_poses_[ground_truth_index_][6];      
+            gt_pose_.pose.orientation.w = ground_truth_poses_[ground_truth_index_][3];
         }
         // TUM Convention: x, y, z, qx, qy, qz, qw (changed translation)
         if (ground_truth_dataset_ == "TUM") {
-            ground_truth_pose_.pose.position.x = ground_truth_poses_[ground_truth_index_][0];
-            ground_truth_pose_.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
-            ground_truth_pose_.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
-            ground_truth_pose_.pose.orientation.x = ground_truth_poses_[ground_truth_index_][3];           
-            ground_truth_pose_.pose.orientation.y = ground_truth_poses_[ground_truth_index_][4];        
-            ground_truth_pose_.pose.orientation.z = ground_truth_poses_[ground_truth_index_][5];      
-            ground_truth_pose_.pose.orientation.w = ground_truth_poses_[ground_truth_index_][6];
+            gt_pose_.pose.position.x = ground_truth_poses_[ground_truth_index_][0];
+            gt_pose_.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
+            gt_pose_.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
+            gt_pose_.pose.orientation.x = ground_truth_poses_[ground_truth_index_][3];           
+            gt_pose_.pose.orientation.y = ground_truth_poses_[ground_truth_index_][4];        
+            gt_pose_.pose.orientation.z = ground_truth_poses_[ground_truth_index_][5];      
+            gt_pose_.pose.orientation.w = ground_truth_poses_[ground_truth_index_][6];
         }
         
+        geometry_msgs::Point p;
+        p.x = gt_pose_.pose.position.x;
+        p.y = gt_pose_.pose.position.y;
+        p.z = gt_pose_.pose.position.z;
+        gt_trajectory_dots_.points.push_back(p);        
+        gt_trajectory_lines_.points.push_back(p);
         ground_truth_index_ += ground_truth_step_;
     }
 
@@ -217,13 +261,16 @@ void Visualizer::UpdateMessages(Frame* frame){
         ROS_WARN_ONCE("Please open RVIZ to continue...");
         sleep(1);
     }
-    r.sleep();
 
     // Send messages
     publisher_current_frame_.publish(current_frame);
     publisher_camera_pose_.publish(camera_pose_);
-    if (use_ground_truth_)
-        publisher_ground_truth_pose_.publish(ground_truth_pose_);
+    if (use_ground_truth_) {
+        publisher_gt_pose_.publish(gt_pose_);
+        publisher_gt_trajectory_dots_.publish(gt_trajectory_dots_);
+        publisher_gt_trajectory_lines_.publish(gt_trajectory_lines_);
+    }
+    r.sleep();
 
     ros::spinOnce();
 
