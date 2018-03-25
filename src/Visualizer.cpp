@@ -42,23 +42,21 @@ Visualizer::Visualizer(int start_index, int num_images, string _ground_truth_dat
     camera_pose.type = visualization_msgs::Marker::ARROW;   
     camera_pose.action = visualization_msgs::Marker::ADD;
     camera_pose.lifetime = ros::Duration();
-    // Dimentions of ground truth marker   
+    // Dimentions of camera pose marker   
     camera_pose.scale.x = 0.1;                              
     camera_pose.scale.y = 0.15;
     camera_pose.scale.z = 0.15;
-    // Color of ground truth marker
-    camera_pose.color.r = 0.56f;                             
-    camera_pose.color.g = 0.12f;
+    // Color of camera pose marker
     camera_pose.color.b = 1.0f;
     camera_pose.color.a = 1.0;
     
-    // Publishers of Ground Truth Trajectory markers (dots or continuous line)
+    // Publishers of Camera Pose Trajectory markers (dots or continuous line)
     ros::NodeHandle n_camera_dots;
     ros::NodeHandle n_camera_lines;    
     ros::Publisher publisher_camera_trajectory_dots = n_camera_dots.advertise<visualization_msgs::Marker>("camera_trajectory_dots", 50);
     ros::Publisher publisher_camera_trajectory_lines = n_camera_lines.advertise<visualization_msgs::Marker>("camera_trajectory_lines", 50);
 
-    // Initializing Ground Truth trajectory markers
+    // Initializing Camera Pose trajectory markers
     visualization_msgs::Marker camera_trajectory_dots, camera_trajectory_lines;
     camera_trajectory_dots.header.frame_id = camera_trajectory_lines.header.frame_id  = "/world";
     camera_trajectory_dots.header.stamp = camera_trajectory_lines.header.stamp = ros::Time::now();
@@ -78,13 +76,9 @@ Visualizer::Visualizer(int start_index, int num_images, string _ground_truth_dat
     camera_trajectory_lines.scale.x = 0.01;
 
     // Dots and lines are green
-    camera_trajectory_dots.color.r = 0.40f;    
-    camera_trajectory_dots.color.g = 0.08f;
-    camera_trajectory_dots.color.b = 0.9f;    
+    camera_trajectory_dots.color.b = 1.0f;    
     camera_trajectory_dots.color.a = 1.0;
-    camera_trajectory_lines.color.r = 0.40f;    
-    camera_trajectory_lines.color.g = 0.08f;
-    camera_trajectory_lines.color.b = 0.9f;    
+    camera_trajectory_lines.color.b = 1.0f;    
     camera_trajectory_lines.color.a = 1.0;
 
     // If ground truth is used
@@ -105,10 +99,8 @@ Visualizer::Visualizer(int start_index, int num_images, string _ground_truth_dat
         gt_pose.action = visualization_msgs::Marker::ADD;
         gt_pose.lifetime = ros::Duration();    
 
-        // Color of ground truth marker
-        gt_pose.color.r = 0.12f;                             
-        gt_pose.color.g = 0.56f;
-        gt_pose.color.b = 1.0f;
+        // Color of ground truth marker                 
+        gt_pose.color.g = 1.0f;
         gt_pose.color.a = 1.0;
             
         // Publishers of Ground Truth Trajectory markers (dots or continuous line)
@@ -253,12 +245,12 @@ void Visualizer::UpdateMessages(Frame* frame){
 
     SE3 previous_pose;
     SE3 current_pose = frame->rigid_transformation_;
-    Mat31f t = 100* current_pose.translation();
+    Mat31f t = 700 * current_pose.translation();
     Quaternion2 quaternion = current_pose.unit_quaternion();
-    cout << t << endl << endl;
-    camera_pose_.pose.position.x += t(0);  
-    camera_pose_.pose.position.y += t(1);
-    camera_pose_.pose.position.z += t(2);
+
+    camera_pose_.pose.position.x += -t(2);  
+    camera_pose_.pose.position.y += t(0);
+    camera_pose_.pose.position.z += t(1);
     camera_pose_.pose.orientation.x += 0;
     camera_pose_.pose.orientation.y += 0;    
     camera_pose_.pose.orientation.z += 0; 

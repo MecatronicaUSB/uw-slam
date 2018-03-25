@@ -193,7 +193,7 @@ public:
      * @param MAD 
      * @return Mat 
      */
-    Mat TukeyFunctionWeights(Mat _residuals, float MAD);
+    Mat TukeyFunctionWeights(Mat _residuals);
 
     /**
      * @brief Shows points in an image. Used only for debbugin.

@@ -30,7 +30,8 @@ namespace uw
 {
 
 class LS;
-class ResidualIntensity;
+class ResidualIntensity;    // if (not previous_frame_->obtained_gradients_)
+    //     tracker_->ApplyGradient(previous_frame_);
 class LocalParameterizationSE3;
 
 Tracker::Tracker(bool _depth_available) {
@@ -105,10 +106,11 @@ void Tracker::InitializePyramid(int _width, int _height, Mat _K) {
 // Gauss-Newton using Foward Compositional Algorithm
 void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     // Gauss-Newton Optimization Options
+    float intial_factor = 10;
     int max_iterations = 20;
     float error_threshold = 0.005;
     int first_pyramid_lvl = PYRAMID_LEVELS-1;
-    int last_pyramid_lvl = 2;
+    int last_pyramid_lvl = 1;
     
     // Variables initialization
     float error         = 0.0;
@@ -126,22 +128,26 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     // Sparse to Fine iteration
     // Create for() WORKED WITH LVL 2
     for (int lvl = first_pyramid_lvl; lvl>=last_pyramid_lvl; lvl--) {
-        // int lvl = 2;
+        // lvl = 0;
         // Initialize error   
         error = 0.0;
         last_error = 50000.0;
-        
+        float factor = intial_factor * (lvl + 1);
+
+        // Obtain image 1 and 2
+        Mat image1 = _previous_frame->images_[lvl].clone();
+        Mat image2 = _current_frame->images_[lvl].clone();
+
         // Obtain points and depth of initial frame 
         Mat candidatePoints1      = _previous_frame->candidatePoints_[lvl].clone();
         Mat candidatePoints2      = _current_frame->candidatePoints_[lvl].clone();    
         Mat candidatePointsDepth  = _previous_frame->candidatePointsDepth_[lvl].clone();
 
-        // Obtain gradients
-        Mat image1 = _previous_frame->images_[lvl].clone();
-        Mat image2 = _current_frame->images_[lvl].clone();    
-
-        Mat gradientX1, gradientY1;
-        ObtainGradientXY(image1, gradientX1, gradientY1);
+        // Obtain gradients           
+        Mat gradientX1 = Mat::zeros(image1.size(), CV_16SC1);
+        Mat gradientY1 = Mat::zeros(image1.size(), CV_16SC1);
+        gradientX1 = _previous_frame->gradientX_[lvl].clone();
+        gradientY1 = _previous_frame->gradientY_[lvl].clone();
 
         // Obtain intrinsic parameters 
         Mat K = K_[lvl];
@@ -199,12 +205,12 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                     }
                     // Intensities
                     int intensity1 = image1.at<uchar>(y1,x1);
-                    int intensity2 = image2.at<uchar>(y2,x2);
+                    int intensity2 = image2.at<uchar>(round(y2),round(x2));
 
                     Residual.at<float>(0,0) = intensity2 - intensity1;
                     
-                    Jl.at<float>(0,0) = gradientX1.at<float>(y1,x1);
-                    Jl.at<float>(0,1) = gradientY1.at<float>(y1,x1);
+                    Jl.at<float>(0,0) = gradientX1.at<short>(y1,x1);
+                    Jl.at<float>(0,1) = gradientY1.at<short>(y1,x1);
 
                     Jacobian_row = Jl * Jw;
                     // cout << "Residual: " << Residual.at<float>(0,0) << endl;
@@ -220,37 +226,27 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             // cout << "Valid points found: " << num_valid << endl;
             // DebugShowJacobians(Jacobians, warpedPoints, w_[lvl], h_[lvl]);
 
-            // Computation of scale (Median Absolute Deviation)
-            float MAD = MedianAbsoluteDeviation(Residuals);       
-
-            if (MAD == 0) {
-                // Reset delta
-                deltaMat = Mat::zeros(6,1,CV_32FC1);
-                for (int i=0; i<6; i++)
-                    deltaVector(i) = 0;
-                break;
-            }
             // Computation of Weights (Identity or Tukey function)
-            //Mat W = IdentityWeights(Residuals.rows);
-            Mat W = TukeyFunctionWeights(Residuals, MAD);
+            Mat W = IdentityWeights(Residuals.rows);
+            //Mat W = TukeyFunctionWeights(Residuals);
 
             // Computation of error
             float inv_num_residuals = 1.0 / Residuals.rows;
             Mat ResidualsW = Residuals.mul(W);
             Mat errorMat =  inv_num_residuals * Residuals.t() * ResidualsW;
-            Residuals = Residuals.mul(50);  // Workaround to make delta updates larger
             error = errorMat.at<float>(0,0);
-
+   
             if (k==0)
                 initial_error = error;
 
             // Break if error increases
-            if (error > last_error) {
-                // cout << "Pyramid level: " << lvl << endl;
-                // cout << "Number of iterations: " << k << endl;
-                // cout << "Initial-Final Error: " << initial_error << " - " << last_error << endl << endl;
+            if (error > last_error || k == max_iterations-1) {
+                cout << "Pyramid level: " << lvl << endl;
+                cout << "Number of iterations: " << k << endl;
+                cout << "Initial-Final Error: " << initial_error << " - " << last_error << endl << endl;
 
-                if (lvl == 2) {
+                if (lvl == last_pyramid_lvl) {
+                    DebugShowJacobians(Jacobians, warpedPoints, w_[lvl], h_[lvl]);
                     Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
                     ObtainImageTransformed(image1, candidatePoints1, warpedPoints, imageWarped);             
                     DebugShowWarpedPerspective(image1, image2, imageWarped, lvl);
@@ -258,6 +254,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
                 // Reset delta
                 deltaMat = Mat::zeros(6,1,CV_32FC1);
+           
                 for (int i=0; i<6; i++)
                     deltaVector(i) = 0;
 
@@ -293,13 +290,19 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                 float wi = W.at<float>(i,0);
                 Jacobians.row(i) = wi * Jacobians.row(i);
             }
+
+            Residuals = Residuals.mul(50);  // Workaround to make delta updates larger
+            Mat A = Jacobians.t() * Jacobians;                    
             Mat b = -Jacobians.t() * Residuals.mul(W);
-            Mat A = Jacobians.t() * Jacobians;
-            Mat delta = A.inv() * b;
+            //cout << b << endl;
+            deltaMat = A.inv() * b;
+            //cout << A.inv() << endl;
+            //cout << A << endl;
+            
 
             // Convert info from eigen to cv
             for (int i=0; i<6; i++)
-                deltaVector(i) = delta.at<float>(i,0);
+                deltaVector(i) = deltaMat.at<float>(i,0);
             
             // Update new pose with computed delta
             current_pose = SE3::exp(deltaVector) * current_pose;
@@ -309,45 +312,59 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     _previous_frame->rigid_transformation_ = current_pose;
 
 }
-
 // TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com)
 // 02-20-2018 - Consider other methods to obtain gradient from an image (Sober, Laplacian, ...) 
 //            - Calculate gradient for each pyramid image or scale the finest?
 void Tracker::ApplyGradient(Frame* _frame) {
-    Mat gradient;
-    Mat gradientX; 
-    Mat gradientY;
+
+    for (int lvl = 0; lvl<PYRAMID_LEVELS; lvl++) {
+        Mat gradientX = Mat(_frame->images_[lvl].size(), CV_16SC1); 
+        Mat gradientY = Mat(_frame->images_[lvl].size(), CV_16SC1);
+        Mat auxX;
+        Mat auxY;
+
+        Scharr(_frame->images_[lvl], _frame->gradientX_[lvl], CV_16S, 1, 0, 3, 0, BORDER_DEFAULT);
+        Scharr(_frame->images_[lvl], _frame->gradientY_[lvl], CV_16S, 0, 1, 3, 0, BORDER_DEFAULT);
+        
+        Scharr(_frame->images_[lvl], gradientX, CV_16S, 1, 0, 3, 0, BORDER_DEFAULT);
+        Scharr(_frame->images_[lvl], gradientY, CV_16S, 0, 1, 3, 0, BORDER_DEFAULT);
+
+        convertScaleAbs(gradientX, gradientX, 1.0, 0.0);
+        convertScaleAbs(gradientY, gradientY, 1.0, 0.0);
+        
+        addWeighted(gradientX, 0.5, gradientY, 0.5, 0, _frame->gradient_[lvl]);
+    }
 
     // Ptr<cuda::Filter> soberX_ = cuda::createDerivFilter(0, CV_16S, 1, 0, 3, 0,BORDER_DEFAULT,BORDER_DEFAULT);
     // Ptr<cuda::Filter> soberY_ = cuda::createDerivFilter(0, CV_16S, 0, 1, 3, 0,BORDER_DEFAULT,BORDER_DEFAULT);    
-    Ptr<cuda::Filter> soberX_ = cuda::createSobelFilter(0, CV_16S, 1, 0, 3, 1, BORDER_DEFAULT, BORDER_DEFAULT);
-    Ptr<cuda::Filter> soberY_ = cuda::createSobelFilter(0, CV_16S, 0, 1, 3, 1, BORDER_DEFAULT, BORDER_DEFAULT);
+    // Ptr<cuda::Filter> soberX_ = cuda::createSobelFilter(0, CV_16S, 1, 0, 3, 1, BORDER_DEFAULT, BORDER_DEFAULT);
+    // Ptr<cuda::Filter> soberY_ = cuda::createSobelFilter(0, CV_16S, 0, 1, 3, 1, BORDER_DEFAULT, BORDER_DEFAULT);
 
-    for (int lvl=PYRAMID_LEVELS-1; lvl>=0; lvl--) {
-        // Filters for calculating gradient in images
-        cuda::GpuMat frameGPU = cuda::GpuMat(_frame->images_[lvl]);
-        // Apply gradient in x and y
-        cuda::GpuMat frameXGPU, frameYGPU;
+    // for (int lvl=PYRAMID_LEVELS-1; lvl>=0; lvl--) {
+    //     // Filters for calculating gradient in images
+    //     cuda::GpuMat frameGPU = cuda::GpuMat(_frame->images_[lvl]);
+    //     // Apply gradient in x and y
+    //     cuda::GpuMat frameXGPU, frameYGPU;
 
-        cuda::GpuMat absX, absY, out;
-        soberX_->apply(frameGPU, frameXGPU);
-        soberY_->apply(frameGPU, frameYGPU);
-        cuda::abs(frameXGPU, frameXGPU);
-        cuda::abs(frameYGPU, frameYGPU);
-        frameXGPU.convertTo(absX, CV_8UC1);
-        frameYGPU.convertTo(absY, CV_8UC1);
+    //     cuda::GpuMat absX, absY, out;
+    //     soberX_->apply(frameGPU, frameXGPU);
+    //     soberY_->apply(frameGPU, frameYGPU);
+    //     cuda::abs(frameXGPU, frameXGPU);
+    //     cuda::abs(frameYGPU, frameYGPU);
+    //     frameXGPU.convertTo(absX, CV_8UC1);
+    //     frameYGPU.convertTo(absY, CV_8UC1);
         
-        cuda::addWeighted(absX, 0.5, absY, 0.5, 0, out);
+    //     cuda::addWeighted(absX, 0.5, absY, 0.5, 0, out);
 
-        absX.download(gradientX);
-        absY.download(gradientY);
-        out.download(gradient);
+    //     absX.download(gradientX);
+    //     absY.download(gradientY);
+    //     out.download(gradient);
 
-        _frame->gradient_[lvl] = gradient.clone();
-        _frame->gradientX_[lvl] = gradientX.clone();
-        _frame->gradientY_[lvl] = gradientY.clone();
+    //     _frame->gradient_[lvl] = gradient.clone();
+    //     _frame->gradientX_[lvl] = gradientX.clone();
+    //     _frame->gradientY_[lvl] = gradientY.clone();
 
-    }
+    // }
 
     _frame->obtained_gradients_ = true;
     
@@ -384,9 +401,9 @@ void Tracker::ObtainAllPoints(Frame* _frame) {
                     _frame->framePoints_[lvl].push_back(point);
 
                     Mat pointMat = Mat::ones(1, 4, CV_32FC1);                
-                    pointMat.at<float>(y+h_[lvl]*x,0) = x;
-                    pointMat.at<float>(y+h_[lvl]*x,1) = y;
-                    pointMat.at<float>(y+h_[lvl]*x,2) = depth_initialization;
+                    pointMat.at<float>(0,0) = x;
+                    pointMat.at<float>(0,1) = y;
+                    pointMat.at<float>(0,2) = depth_initialization;
                     _frame->candidatePoints_[lvl].push_back(pointMat);
                 }
 
@@ -399,42 +416,104 @@ void Tracker::ObtainAllPoints(Frame* _frame) {
 // TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com)
 // 02-13-2018 - Implement a faster way to obtain candidate points with high gradient value in patches (above of a certain threshold)
 void Tracker::ObtainCandidatePoints(Frame* _frame) {
-    // Block size search for high gradient points in image 
-    for (int i = 0; i < PYRAMID_LEVELS - 1; i++){
-        int block_size = BLOCK_SIZE - i * 5;
-        cuda::GpuMat frameGPU(_frame->gradient_[i]);
-        for (int x=0; x<w_[i]-block_size; x+=block_size) {
-            for (int y =0; y<h_[i]-block_size; y+=block_size) {
+    // Factor of TUM depth images
+    float factor = 0.0002;
+    float depth_initialization = 1;
+
+    for (int lvl = 0; lvl < PYRAMID_LEVELS; lvl++){
+        Scalar mean, stdev;
+        float thres = 0.0;
+        cuda::GpuMat filteredGPU;
+
+        cuda::GpuMat frameGPU(_frame->gradient_[lvl]);
+        cuda::meanStdDev(frameGPU, mean, stdev);
+        
+        thres = mean[0] + GRADIENT_THRESHOLD;
+
+        cuda::threshold(frameGPU, filteredGPU, thres, 255, THRESH_BINARY);
+
+        Mat filtered = Mat(_frame->gradient_[lvl].size(), CV_8UC1);
+        filteredGPU.download(filtered);
+
+        for (int x=0; x<w_[lvl]; x++) {
+            for (int y =0; y<h_[lvl]; y++) {
                 Mat point = Mat::ones(1,4,CV_32FC1);
                 Mat depth = Mat::ones(1,1,CV_32FC1);                
-                Scalar mean, stdev;
-                Point min_loc, max_loc;
-                double min, max;
-                cuda::GpuMat block(frameGPU, Rect(x,y,block_size,block_size));
-                block.convertTo(block, CV_8UC1);
-                cuda::meanStdDev(block, mean, stdev);
-                //cuda::minMaxLoc(block, &min, &max, &min_loc, &max_loc);
-                
-                if (max > mean[0] + GRADIENT_THRESHOLD) {
-                    point.at<float>(0,0) = (float) (x + max_loc.x);
-                    point.at<float>(0,1) = (float) (y + max_loc.y);
+                if (_frame->depth_available_) {
+                    if (_frame->depths_[lvl].at<uchar>(y,x) != 0 && filtered.at<uchar>(y,x) != 0) {
+                        Point3f point;
+                        point.x = x;
+                        point.y = y;
+                        point.z = _frame->depths_[lvl].at<uchar>(y,x) * factor;
+                        _frame->framePoints_[lvl].push_back(point);
 
-                    _frame->candidatePoints_[i].push_back(point);
-                    _frame->candidatePointsDepth_[i].push_back(depth);
+                        Mat pointMat = Mat::ones(1, 4, CV_32FC1);                
+                        pointMat.at<float>(0,0) = x;
+                        pointMat.at<float>(0,1) = y;
+                        pointMat.at<float>(0,2) = _frame->depths_[lvl].at<uchar>(y,x) * factor;
+                        _frame->candidatePoints_[lvl].push_back(pointMat);
+
+                    }
+                } else {
+                    if (filtered.at<uchar>(y,x) != 0) {
+                        Point3f point;  
+                        point.x = x;
+                        point.y = y;
+                        point.z = depth_initialization;
+                        _frame->framePoints_[lvl].push_back(point);
+
+                        Mat pointMat = Mat::ones(1, 4, CV_32FC1);                
+                        pointMat.at<float>(0,0) = x;
+                        pointMat.at<float>(0,1) = y;
+                        pointMat.at<float>(0,2) = depth_initialization;
+                        _frame->candidatePoints_[lvl].push_back(pointMat);
+                    }
                 }
             }
         }
+
+
     }
 
-    for (int lvl = 1; lvl < PYRAMID_LEVELS; lvl++) {
+    // Making block-size. Pretty slow 
+    // for (int lvl = 0; lvl < PYRAMID_LEVELS; lvl++){
+    //     int block_size = BLOCK_SIZE - lvl * 5;
+    //     cuda::GpuMat frameGPU(_frame->gradient_[lvl]);
+    //     for (int x=0; x<w_[lvl]-block_size; x+=block_size) {
+    //         for (int y =0; y<h_[lvl]-block_size; y+=block_size) {
+    //             Mat point = Mat::ones(1,4,CV_32FC1);
+    //             Mat depth = Mat::ones(1,1,CV_32FC1);                
+    //             Scalar mean, stdev;
+    //             Point min_loc, max_loc;
+    //             double min, max;
+    //             cuda::GpuMat block(frameGPU, Rect(x,y,block_size,block_size));
+    //             block.convertTo(block, CV_8UC1);
+    //             cuda::meanStdDev(block, mean, stdev);
+    //             cuda::minMaxLoc(block, &min, &max, &min_loc, &max_loc);
+                
+    //             if (max > mean[0] + GRADIENT_THRESHOLD) {
+                    
+    //                 point.at<float>(0,0) = (float) (x + max_loc.x);
+    //                 point.at<float>(0,1) = (float) (y + max_loc.y);
+
+    //                 _frame->candidatePoints_[lvl].push_back(point);
+    //                 _frame->candidatePointsDepth_[lvl].push_back(depth);
+    //             }
+    //         }
+    //     }
+    // }
+
+    
+    for (int lvl = 0; lvl < PYRAMID_LEVELS; lvl++) {
         // frame->candidatePoints_[lvl] = frame->candidatePoints_[lvl-1] * 0.5;
-        // DebugShowCandidatePoints(frame->gradient_[lvl-1], frame->candidatePoints_[lvl-1]);
+        // DebugShowCandidatePoints(_frame->gradient_[lvl], _frame->candidatePoints_[lvl]);
     }
     _frame->obtained_candidatePoints_ = true;
 }
 
 Mat Tracker::WarpFunction(Mat _points2warp, SE3 _rigid_transformation, int _lvl) {
     int lvl = _lvl;
+    float factor = 1 / pow(2, lvl);
     Mat33f R = _rigid_transformation.rotationMatrix();
     Mat31f t = _rigid_transformation.translation();
     Quaternion2 quaternion = _rigid_transformation.unit_quaternion();
@@ -459,6 +538,9 @@ Mat Tracker::WarpFunction(Mat _points2warp, SE3 _rigid_transformation, int _lvl)
     // cout << "cy: " << cy << endl;
     
     // 2D -> 3D
+    // factor = 1 / 2 ^ lvl
+    // Z = Z * factor
+    projected_points.col(2) = factor * projected_points.col(2);
     // X  = (x - cx) * Z / fx
     //cout << projected_points.row(0) << endl;    
     projected_points.col(0) = ((projected_points.col(0) - cx) * invfx);
@@ -468,7 +550,6 @@ Mat Tracker::WarpFunction(Mat _points2warp, SE3 _rigid_transformation, int _lvl)
     projected_points.col(1) = ((projected_points.col(1) - cy) * invfy);
     projected_points.col(1) = projected_points.col(1).mul(projected_points.col(2));
 
-    // Z = Z (depth)
 
     // Transformation of a point rigid body motion
     projected_points = rigid * projected_points.t();
@@ -556,29 +637,6 @@ bool Tracker::PixelIsBackground(Mat _inputImage, int y, int x) {
     return false;    
 }
 
-void Tracker::ObtainGradientXY(Mat _inputImage, Mat& _gradientX, Mat& _gradientY) {
-    // // Filters for calculating gradient in images
-    // cuda::GpuMat frameGPU = cuda::GpuMat(_inputImage);
-    // Ptr<cv::cuda::Filter> filter = cv::cuda::createGaussianFilter(frameGPU.type(), frameGPU.type(), Size(3,3), 0);
-
-    // // Apply gradient in x and y
-    // cuda::GpuMat frameXGPU, frameYGPU;   
-    // Ptr<cuda::Filter> soberX_ = cuda::createSobelFilter(0, CV_16S, 1, 0, 3, 1, BORDER_DEFAULT, BORDER_DEFAULT);
-    // Ptr<cuda::Filter> soberY_ = cuda::createSobelFilter(0, CV_16S, 0, 1, 3, 1, BORDER_DEFAULT, BORDER_DEFAULT);
-
-    // cuda::GpuMat absX, absY, out;
-    // soberX_->apply(frameGPU, frameXGPU);
-    // soberY_->apply(frameGPU, frameYGPU);
-
-    // frameXGPU.download(_gradientX);
-    // frameYGPU.download(_gradientY);
-
-    // Non CUDA Implementation
-    Scharr(_inputImage, _gradientX, CV_32F, 1, 0, 1, 0, BORDER_DEFAULT);
-    Scharr(_inputImage, _gradientY, CV_32F, 0, 1, 1, 0, BORDER_DEFAULT);
-
-}
-
 void Tracker::DebugShowJacobians(Mat Jacobians, Mat points, int width, int height) {
     vector<Mat> image_jacobians = vector<Mat>(6);
     for (int i=0; i<6; i++) 
@@ -592,7 +650,7 @@ void Tracker::DebugShowJacobians(Mat Jacobians, Mat points, int width, int heigh
                 image_jacobians[i].at<uchar>(y,x) = 90;
             }
             if (Jacobians.row(index).at<float>(0,i) > 10) {             
-                image_jacobians[i].at<uchar>(y,x) = 254;
+                image_jacobians[i].at<uchar>(y,x) = 200;
             }
         }
     }
@@ -662,11 +720,18 @@ Mat Tracker::IdentityWeights(int _num_residuals) {
     return W;
 }
 
-Mat Tracker::TukeyFunctionWeights(Mat _input, float MAD) {
+Mat Tracker::TukeyFunctionWeights(Mat _input) {
     int num_residuals = _input.rows;
     float b = 4.6851; // Achieve 95% efficiency if assumed Gaussian distribution for outliers
     Mat W = Mat(num_residuals,1,CV_32FC1);    
 
+    // Computation of scale (Median Absolute Deviation)
+    float MAD = MedianAbsoluteDeviation(_input);       
+
+    if (MAD == 0) {
+        cout << "Warning: MAD = 0." << endl;
+        MAD = 1;
+    }
     float inv_MAD = 1.0 / MAD;
     float inv_b2 = 1.0 / (b * b);
 
