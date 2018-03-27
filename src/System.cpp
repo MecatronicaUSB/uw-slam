@@ -194,17 +194,17 @@ void System::Tracking() {
     
     if (not previous_frame_->obtained_candidatePoints_) {
         //tracker_->ObtainCandidatePoints(previous_frame_);
-        //tracker_->ObtainAllPoints(previous_frame_);
+        tracker_->ObtainAllPoints(previous_frame_);
     }
         
     tracker_->ApplyGradient(current_frame_);
   
-    tracker_->ObtainFeaturesPoints(previous_frame_, current_frame_);
-
-    //tracker_->ObtainAllPoints(current_frame_);
+    //tracker_->ObtainFeaturesPoints(previous_frame_, current_frame_);
+    tracker_->ObtainAllPoints(current_frame_);
     //tracker_->ObtainCandidatePoints(current_frame_);
     
     tracker_->EstimatePose(previous_frame_, current_frame_);
+    // tracker_->EstimatePoseFeatures(previous_frame_, current_frame_);
 
 }
 

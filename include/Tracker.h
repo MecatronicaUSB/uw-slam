@@ -94,6 +94,10 @@ public:
      * @param _current_frame 
      */
     void EstimatePose(Frame* _previous_frame, Frame* _current_frame);
+    
+    Mat AddPatchPointsFeatures(Mat candidatePoints, int lvl);
+
+    void EstimatePoseFeatures(Frame* _previous_frame, Frame* _current_frame);
 
     /**
      * @brief Computes gradient of a frame for each pyramid level available.
@@ -475,6 +479,7 @@ public:
     //     virtual int LocalSize() const { return SE3::DoF; }
     // };
 
+    int patch_size_;
     // Width and height of images for each pyramid level available
     vector<int> w_ = vector<int>(PYRAMID_LEVELS);
     vector<int> h_ = vector<int>(PYRAMID_LEVELS);
