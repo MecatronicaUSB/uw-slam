@@ -82,9 +82,9 @@ public:
     vector<Mat> gradientY_ = vector<Mat>(PYRAMID_LEVELS);
     vector<Mat> gradient_  = vector<Mat>(PYRAMID_LEVELS);
     
-    vector<Mat> candidatePoints_    = vector<Mat>(PYRAMID_LEVELS);
+    vector<Mat> candidatePoints_   = vector<Mat>(PYRAMID_LEVELS);
+    vector<Mat> informationPoints_ = vector<Mat>(PYRAMID_LEVELS);
 
-    
     int idFrame_;
     Frame* previous_frame_;
     Frame* next_frame_;    
@@ -199,7 +199,7 @@ public:
     int num_keyframes_;
     int w_, h_, w_input_, h_input_;
     float fx_, fy_, cx_, cy_;
-
+    
     Frame* current_frame_;
     Frame* previous_frame_;
     Frame* current_keyframe_;

@@ -103,6 +103,239 @@ void Tracker::InitializePyramid(int _width, int _height, Mat _K) {
     }
 }
 
+// Gauss-Newton using Foward Compositional Algorithm
+void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
+    // Gauss-Newton Optimization Options
+    float epsilon = 0.001;
+    float intial_factor = 10;
+    int max_iterations = 50;
+    float error_threshold = 0.005;
+    int first_pyramid_lvl = PYRAMID_LEVELS-1;
+    int last_pyramid_lvl = 0;
+    
+    float z_factor = 0.01;
+    float angle_factor = 1;
+    
+    // Variables initialization
+    float error         = 0.0;
+    float initial_error = 0.0;    
+    float last_error    = 0.0;
+
+    // Initial pose and deltapose (assumes little movement between frames)
+    Mat deltaMat = Mat::zeros(6,1,CV_32FC1);
+    Sophus::Vector<float, SE3::DoF> deltaVector;
+    for (int i=0; i<6; i++)
+        deltaVector(i) = 0;
+
+    SE3 current_pose = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
+
+    // Sparse to Fine iteration
+    // Create for() WORKED WITH LVL 2
+    for (int lvl = first_pyramid_lvl; lvl>=last_pyramid_lvl; lvl--) {
+        // lvl = 0;
+        // Initialize error   
+        error = 0.0;
+        last_error = 50000.0;
+        float factor = intial_factor * (lvl + 1);
+
+        // Obtain image 1 and 2
+        Mat image1 = _previous_frame->images_[lvl].clone();
+        Mat image2 = _current_frame->images_[lvl].clone();
+        
+        // Convert image2 in a N x 1 vector
+        vector<uchar> image2_aux;
+        image2_aux.assign((uchar*)image2.datastart, (uchar*)image2.dataend);
+        Mat image2_vector = Mat(image2_aux);
+
+        // Obtain points and depth of initial frame 
+        Mat candidatePoints1  = _previous_frame->candidatePoints_[lvl].clone();
+        Mat informationPoints1 = _previous_frame->informationPoints_[lvl].clone();
+
+        // Obtain intrinsic parameters 
+        Mat K = K_[lvl];
+
+        // Optimization iteration
+        for (int k=0; k<max_iterations; k++) {
+            
+            // Warp points with current pose and delta pose (from previous iteration)
+            SE3 deltaSE3;
+            Mat warpedPoints = Mat(candidatePoints1.size(), CV_32FC1);
+
+            warpedPoints = WarpFunction(candidatePoints1, current_pose, lvl);
+
+            // Computation of Jacobian and Residuals
+            Mat Jacobians;
+            Mat Jw1 = Mat::zeros(warpedPoints.rows, 6, CV_32FC1);
+            Mat Jw2 = Mat::zeros(warpedPoints.rows, 6, CV_32FC1);
+            Mat Residuals;      
+
+            Mat valid_values = Mat(warpedPoints.rows, 1, CV_32FC1);
+            Mat bellowZeroThreshold = Mat(warpedPoints.size(), CV_32FC1);
+            Mat aboveHeight = Mat(warpedPoints.rows, 1, CV_32FC1);
+            Mat aboveWeight = Mat(warpedPoints.rows, 1, CV_32FC1);
+            
+            // Putting to zero all negative values
+            threshold(warpedPoints, bellowZeroThreshold, 0, 1, THRESH_BINARY);
+            // Putting to zero all values above the weight and height of the image            
+            threshold(warpedPoints.col(0), aboveWeight, w_[lvl]-1, 1, THRESH_BINARY_INV);
+            threshold(warpedPoints.col(1), aboveHeight, h_[lvl]-1, 1, THRESH_BINARY_INV);
+            // Concatenatiing threshold results on valid_values
+            valid_values = bellowZeroThreshold.col(0).mul(bellowZeroThreshold.col(1).mul(bellowZeroThreshold.col(3)));
+            valid_values = valid_values.mul(aboveWeight.mul(aboveHeight));
+
+            Mat inv_z2 = 1 / warpedPoints.col(2);
+            Mat inv2_z2 = inv_z2.mul(inv_z2);
+
+            // Jw1
+            Jw1.col(0) = fx_[lvl] * inv_z2;
+            
+            Jw1.col(1) = 0.0;
+            
+            Jw1.col(2) = -fx_[lvl];
+            Jw1.col(2) = Jw1.col(2).mul(warpedPoints.col(0).mul(inv2_z2));
+
+            Jw1.col(3) = -fx_[lvl];
+            Jw1.col(3) = Jw1.col(3).mul(warpedPoints.col(0).mul(warpedPoints.col(1).mul(inv2_z2)));
+
+            Jw1.col(4) = 1 + warpedPoints.col(0).mul(warpedPoints.col(0).mul(inv2_z2));
+            Jw1.col(4) *= fx_[lvl];
+
+            Jw1.col(5) = -fx_[lvl];
+            Jw1.col(5) = Jw1.col(5).mul(warpedPoints.col(1).mul(inv_z2));
+
+            // Jw2
+            Jw1.col(0) = 0.0;
+            
+            Jw2.col(1) = fy_[lvl] * inv_z2;
+
+            Jw2.col(2) = -fy_[lvl];
+            Jw2.col(2) = Jw2.col(2).mul(warpedPoints.col(1).mul(inv2_z2));
+
+            Jw2.col(3) = 1 + warpedPoints.col(1).mul(warpedPoints.col(1).mul(inv2_z2));
+            Jw2.col(3) *= -fy_[lvl];
+
+            Jw2.col(4) = fy_[lvl];
+            Jw2.col(4) = Jw2.col(4).mul(warpedPoints.col(0).mul(warpedPoints.col(1).mul(inv2_z2)));
+
+            Jw2.col(5) = fy_[lvl];
+            Jw2.col(5) = Jw2.col(5).mul(warpedPoints.col(0).mul(inv_z2));
+
+            Mat gradientX_Nx6 = Mat(warpedPoints.rows, 6, CV_32FC1);
+            Mat gradientY_Nx6 = Mat(warpedPoints.rows, 6, CV_32FC1);
+
+            for (int i=0; i<6; i++) {
+                gradientX_Nx6.col(i) = informationPoints1.col(1).mul(1);
+                gradientY_Nx6.col(i) = informationPoints1.col(2).mul(1);
+            }
+
+            Jacobians = Jw1.mul(gradientX_Nx6) + Jw2.mul(gradientY_Nx6);
+
+            cout << Jacobians.size() << endl;
+            
+            // Computation of Weights (Identity or Tukey function)
+            Mat W = IdentityWeights(Residuals.rows);
+            //Mat W = TukeyFunctionWeights(Residuals);
+
+            // Computation of error
+            float inv_num_residuals = 1.0 / Residuals.rows;
+            Mat ResidualsW = Residuals.mul(W);
+            Mat errorMat =  inv_num_residuals * Residuals.t() * ResidualsW;
+            error = errorMat.at<float>(0,0);
+   
+            if (k==0)
+                initial_error = error;
+
+            // Break if error increases
+            if (error >= last_error || k == max_iterations-1 || abs(error - last_error) < epsilon) {
+                // cout << "Pyramid level: " << lvl << endl;
+                // cout << "Number of iterations: " << k << endl;
+                // cout << "Initial-Final Error: " << initial_error << " - " << last_error << endl << endl;
+
+                // if (lvl == last_pyramid_lvl) {
+                //     //DebugShowJacobians(Jacobians, warpedPoints, w_[lvl], h_[lvl]);
+                //     Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
+                //     ObtainImageTransformed(image1, candidatePoints1, warpedPoints, imageWarped);             
+                //     DebugShowWarpedPerspective(image1, image2, imageWarped, lvl);
+                // }
+
+                // Reset delta
+                deltaMat = Mat::zeros(6,1,CV_32FC1);
+           
+                for (int i=0; i<6; i++)
+                    deltaVector(i) = 0;
+
+                break;
+            }
+
+            last_error = error;
+
+            // Checking dimentions of matrices
+            // cout << "Jacobians dimentions: " << Jacobians.size() << endl;
+            // cout << "Weights dimentions: " << W.size() << endl;
+            // cout << "Residuals dimentions: " << Residuals.size() << endl;
+            
+            // Computation of new delta (DSO-way)
+            // LS ls;
+            // ls.initialize(Residuals.rows);
+            // for (int i=0; i<Residuals.rows; i++) {
+            //     Mat61f jacobian;
+            //     cv2eigen(Jacobians.row(i), jacobian);
+                
+            //     ls.update(jacobian, Residuals.at<float>(i,0), W.at<float>(i,0));
+            // }
+            // ls.finish();
+            // // Solve LS system
+            // float LM_lambda = 0.2;
+            // Mat61f b = -ls.b;
+            // Mat66f A = ls.A;
+            // deltaVector = A.ldlt().solve(b);
+
+            // Computation of new delta (Kerl-way)            
+            // Multiplication of W to Jacobian
+            for (int i=0; i<Jacobians.rows; i++) {
+                float wi = W.at<float>(i,0);
+                Jacobians.row(i) = wi * Jacobians.row(i);
+            }
+
+            Residuals = Residuals.mul(50);  // Workaround to make delta updates larger
+            Mat A = Jacobians.t() * Jacobians;                    
+            Mat b = -Jacobians.t() * Residuals.mul(W);
+
+            //cout << b << endl;
+            deltaMat = A.inv() * b;
+            //cout << A.inv() << endl;
+            //cout << A << endl;
+            
+
+            // Convert info from eigen to cv
+            for (int i=0; i<6; i++)
+                deltaVector(i) = deltaMat.at<float>(i,0);
+
+            // Update new pose with computed delta
+            current_pose = current_pose * SE3::exp(deltaVector);
+            //cout << current_pose.matrix() << endl;
+            
+        }
+
+        // Scale current_pose estimation to next lvl
+        if (lvl !=0) {
+            Mat31f t = current_pose.translation();
+        
+            Quaternion quaternion = current_pose.unit_quaternion();
+
+            quaternion.x() = quaternion.x() * 2;
+            quaternion.y() = quaternion.y() * 2;
+            quaternion.z() = quaternion.z() * 2;
+            
+            current_pose = SE3(quaternion, t);
+        }
+        
+        //current_pose = SE3(current_pose.unit_quaternion() * 2, current_pose.translation() * 2);
+    }
+
+    _previous_frame->rigid_transformation_ = current_pose;
+    cout << current_pose.matrix() << endl;
+}
 
 // Gauss-Newton using Foward Compositional Algorithm
 void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
@@ -804,20 +1037,36 @@ void Tracker::ObtainAllPoints(Frame* _frame) {
 
         factor_lvl = factor / pow(2, lvl);
 
-        for (int x=0; x<w_[lvl]; x++) {
-            for (int y =0; y<h_[lvl]; y++) {
+        for (int y=0; y<h_[lvl]; y++) {
+            for (int x=0; x<w_[lvl]; x++) {
 
                 if (_frame->depth_available_) {
-                    if (_frame->depths_[lvl].at<short>(y,x) != 0) {
-                        Mat pointMat = Mat::ones(1, 4, CV_32FC1);                
+                    if (_frame->depths_[lvl].at<short>(y,x) > 0) {
+                        Mat pointMat = Mat::ones(1, 4, CV_32FC1);
+                        Mat informationPoint = Mat::ones(1, 4, CV_32FC1);                
+                                        
                         pointMat.at<float>(0,0) = x;
                         pointMat.at<float>(0,1) = y;
                         pointMat.at<float>(0,2) = _frame->depths_[lvl].at<short>(y,x) * factor_lvl;
 
-                        _frame->candidatePoints_[lvl].push_back(pointMat);
+                        informationPoint.at<float>(0,0) = _frame->images_[lvl].at<uchar>(y,x);
+                        informationPoint.at<float>(0,1) = _frame->gradientX_[lvl].at<short>(y,x);
+                        informationPoint.at<float>(0,2) = _frame->gradientY_[lvl].at<short>(y,x);
+                        informationPoint.at<float>(0,3) = 1; // Valid point
 
+                        _frame->candidatePoints_[lvl].push_back(pointMat);                       
+                        _frame->informationPoints_[lvl].push_back(informationPoint);
+
+                    } else {
+                        // Not valid point
+                        Mat pointMat = Mat::zeros(1, 4, CV_32FC1);
+                        pointMat.at<float>(0,2) = 1;                     
+                        Mat informationPoint = Mat::zeros(1, 4, CV_32FC1);
+
+                        _frame->candidatePoints_[lvl].push_back(pointMat);                       
+                        _frame->informationPoints_[lvl].push_back(informationPoint);  
                     }
-
+                // Needs review
                 } else {
                     Mat pointMat = Mat::ones(1, 4, CV_32FC1);                
                     pointMat.at<float>(0,0) = x;
@@ -989,6 +1238,10 @@ Mat Tracker::WarpFunction(Mat _points2warp, SE3 _rigid_transformation, int _lvl)
 
     //cout << projected_points.col(0) << endl;
     
+    // Cleaning invalid points
+    projected_points.row(0) = projected_points.row(0).mul(projected_points.row(3));
+    projected_points.row(1) = projected_points.row(1).mul(projected_points.row(3));
+
     // Transposing the points due transformation multiplication
     return projected_points.t();
 }

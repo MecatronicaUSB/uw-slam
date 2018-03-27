@@ -203,7 +203,7 @@ void System::Tracking() {
     tracker_->ObtainAllPoints(current_frame_);
     //tracker_->ObtainCandidatePoints(current_frame_);
     
-    tracker_->EstimatePose(previous_frame_, current_frame_);
+    tracker_->FastEstimatePose(previous_frame_, current_frame_);
     // tracker_->EstimatePoseFeatures(previous_frame_, current_frame_);
 
 }
@@ -256,7 +256,7 @@ void System::AddKeyFrame(int _id) {
     newKeyFrame = frames_[num_frames_ - 1];
     current_keyframe_ = newKeyFrame;
 
-    frames_[num_frames_ - 1]->isKeyFrame_ = true;
+    frames_[num_frames_-1]->isKeyFrame_ = true;
     num_keyframes_++;
     keyframes_.push_back(newKeyFrame);
 }
