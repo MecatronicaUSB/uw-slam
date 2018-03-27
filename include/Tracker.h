@@ -119,6 +119,17 @@ public:
      */
     void ObtainAllPoints(Frame* _frame);
 
+    vector<DMatch> getGoodMatches(vector< vector< DMatch> > matches, vector<KeyPoint> keypoints);
+
+    array<vector<KeyPoint>,2> getGoodKeypoints(vector<DMatch> goodMatches, array< vector< KeyPoint>, 2 > keypoints);
+    
+    
+    void ObtainFeaturesPoints(Frame* _previous_frame, Frame* _current_frame);
+
+    void Obtain3DPoints(Frame* frame);
+    
+    Mat WarpFunctionOpenCV(Mat _points2warp, SE3 _rigid_transformation, int _lvl);
+    
     /**
      * @brief Computes warp projected points from one frame to another, given a rigid transformation matrix,
      *        the depth estimation of those points and the pyramidal level. Returns matrix of warped points.

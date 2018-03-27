@@ -25,6 +25,7 @@
 #include "CameraModel.h"
 #include "Tracker.h"
 #include "Visualizer.h"
+#include "Map.h"
 
 ///Basic C and C++ libraries
 #include <stdlib.h>
@@ -81,14 +82,15 @@ public:
     vector<Mat> gradientY_ = vector<Mat>(PYRAMID_LEVELS);
     vector<Mat> gradient_  = vector<Mat>(PYRAMID_LEVELS);
     
-    vector<Mat> candidatePoints_      = vector<Mat>(PYRAMID_LEVELS);
-    vector<Mat> candidatePointsDepth_ = vector<Mat>(PYRAMID_LEVELS);
-    vector<vector<Point3f> > framePoints_ = vector<vector<Point3f> >(PYRAMID_LEVELS);
+    vector<Mat> candidatePoints_    = vector<Mat>(PYRAMID_LEVELS);
 
+    
     int idFrame_;
+    Frame* previous_frame_;
+    Frame* next_frame_;    
     vector<float> map_;
     SE3 rigid_transformation_;
-
+    
     bool obtained_gradients_;
     bool obtained_candidatePoints_; 
     bool depth_available_;           
@@ -188,6 +190,7 @@ public:
 
     CameraModel* camera_model_;
     Tracker* tracker_;
+    Map* map_;
     Visualizer* visualizer_;
 
     int start_index_;

@@ -63,15 +63,11 @@ Frame::Frame(void) {
 
 Frame::~Frame(void) {
 
-    for (vector<Point3f> point : framePoints_)
-        point.clear();
-
     images_.clear();
     gradientX_.clear();
     gradientY_.clear();
     gradient_.clear();
     candidatePoints_.clear();
-    candidatePointsDepth_.clear();
     map_.clear();
 
 }
@@ -124,12 +120,15 @@ void System::InitializeSystem(string _images_path, string _ground_truth_dataset,
     tracker_ = new Tracker(depth_available_);
     tracker_->InitializePyramid(w_, h_, K_);
 
+    // Initialize map
+    map_ = new Map();
+
     // Initialize output visualizer
     ground_truth_path_    = _ground_truth_path;
     ground_truth_dataset_ = _ground_truth_dataset;
-    visualizer_ = new Visualizer(start_index_, images_list_.size(), _ground_truth_dataset, _ground_truth_path);
+    visualizer_ = new Visualizer(start_index_, images_list_.size(), K_, _ground_truth_dataset, _ground_truth_path);
 
-    // Cheking if the number of depth images are greater or lower than the actual images
+    // Cheking if the number of depth images are greater or lower than the actual number of images
     if (depth_available_) {
         if (images_list_.size() > depth_list_.size())
             num_valid_images_ = depth_list_.size();
@@ -193,13 +192,17 @@ void System::Tracking() {
     if (not previous_frame_->obtained_gradients_)
         tracker_->ApplyGradient(previous_frame_);
     
-    if (not previous_frame_->obtained_candidatePoints_)
-        tracker_->ObtainCandidatePoints(previous_frame_);
-        // tracker_->ObtainAllPoints(previous_frame_);
+    if (not previous_frame_->obtained_candidatePoints_) {
+        //tracker_->ObtainCandidatePoints(previous_frame_);
+        //tracker_->ObtainAllPoints(previous_frame_);
+    }
         
     tracker_->ApplyGradient(current_frame_);
+  
+    tracker_->ObtainFeaturesPoints(previous_frame_, current_frame_);
+
     //tracker_->ObtainAllPoints(current_frame_);
-    tracker_->ObtainCandidatePoints(current_frame_);
+    //tracker_->ObtainCandidatePoints(current_frame_);
     
     tracker_->EstimatePose(previous_frame_, current_frame_);
 
@@ -221,7 +224,7 @@ void System::AddFrame(int _id) {
 
     if (depth_available_) {
         newFrame->depth_available_ = true;
-        newFrame->depths_[0] = imread(depth_list_[_id], CV_LOAD_IMAGE_GRAYSCALE);
+        newFrame->depths_[0] = imread(depth_list_[_id], -1);
     }
 
     for (int i=1; i<PYRAMID_LEVELS; i++) {
