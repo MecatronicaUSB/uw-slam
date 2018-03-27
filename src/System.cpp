@@ -189,6 +189,8 @@ void System::CalculateROI() {
 
 void System::Tracking() {
 
+
+
     if (not previous_frame_->obtained_gradients_)
         tracker_->ApplyGradient(previous_frame_);
     

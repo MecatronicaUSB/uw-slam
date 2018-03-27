@@ -132,7 +132,7 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     // Sparse to Fine iteration
     // Create for() WORKED WITH LVL 2
     for (int lvl = first_pyramid_lvl; lvl>=last_pyramid_lvl; lvl--) {
-        // lvl = 0;
+        //lvl = 0;
         // Initialize error   
         error = 0.0;
         last_error = 50000.0;
@@ -142,11 +142,6 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         Mat image1 = _previous_frame->images_[lvl].clone();
         Mat image2 = _current_frame->images_[lvl].clone();
         
-        // Convert image2 in a N x 1 vector
-        vector<uchar> image2_aux;
-        image2_aux.assign((uchar*)image2.datastart, (uchar*)image2.dataend);
-        Mat image2_vector = Mat(image2_aux);
-
         // Obtain points and depth of initial frame 
         Mat candidatePoints1  = _previous_frame->candidatePoints_[lvl].clone();
         Mat informationPoints1 = _previous_frame->informationPoints_[lvl].clone();
@@ -161,14 +156,31 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             SE3 deltaSE3;
             Mat warpedPoints = Mat(candidatePoints1.size(), CV_32FC1);
 
+            Mat Residuals = Mat(candidatePoints1.size(), CV_32FC1);
             warpedPoints = WarpFunction(candidatePoints1, current_pose, lvl);
+            Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
+            Mat validPixels = ObtainImageTransformed(image1, candidatePoints1, warpedPoints, imageWarped);
+            Mat image2_filtered = image2.mul(validPixels);
+
+            vector<uchar> image2_aux;
+            image2_aux.assign((uchar*)image2.datastart, (uchar*)image2.dataend);
+            Mat intensities2_uchar = Mat(image2.size(), CV_32FC1);
+            intensities2_uchar = Mat(image2_aux);
+            
+            Mat intensities2;
+            intensities2_uchar.convertTo(intensities2, CV_32FC1, 1, 0);
+
+            Mat intensities1 = Mat(image2.size(), CV_32FC1);
+            intensities1 = informationPoints1.col(0);
+
+            Residuals = intensities2 - intensities1;
+            cout << Residuals << endl;
 
             // Computation of Jacobian and Residuals
             Mat Jacobians;
             Mat Jw1 = Mat::zeros(warpedPoints.rows, 6, CV_32FC1);
             Mat Jw2 = Mat::zeros(warpedPoints.rows, 6, CV_32FC1);
-            Mat Residuals;      
-
+    
             Mat valid_values = Mat(warpedPoints.rows, 1, CV_32FC1);
             Mat bellowZeroThreshold = Mat(warpedPoints.size(), CV_32FC1);
             Mat aboveHeight = Mat(warpedPoints.rows, 1, CV_32FC1);
@@ -222,16 +234,19 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
             Mat gradientX_Nx6 = Mat(warpedPoints.rows, 6, CV_32FC1);
             Mat gradientY_Nx6 = Mat(warpedPoints.rows, 6, CV_32FC1);
-
+            Mat valid_Jacobians = Mat(warpedPoints.rows, 6, CV_32FC1);
             for (int i=0; i<6; i++) {
                 gradientX_Nx6.col(i) = informationPoints1.col(1).mul(1);
                 gradientY_Nx6.col(i) = informationPoints1.col(2).mul(1);
+                valid_Jacobians.col(i) = valid_values.mul(1);
             }
 
             Jacobians = Jw1.mul(gradientX_Nx6) + Jw2.mul(gradientY_Nx6);
+            Jacobians = Jacobians.mul(valid_Jacobians);
 
-            cout << Jacobians.size() << endl;
+  
             
+
             // Computation of Weights (Identity or Tukey function)
             Mat W = IdentityWeights(Residuals.rows);
             //Mat W = TukeyFunctionWeights(Residuals);
@@ -1246,7 +1261,7 @@ Mat Tracker::WarpFunction(Mat _points2warp, SE3 _rigid_transformation, int _lvl)
     return projected_points.t();
 }
 
-void Tracker::ObtainImageTransformed(Mat _originalImage, Mat _candidatePoints, Mat _warpedPoints, Mat _outputImage) {
+Mat Tracker::ObtainImageTransformed(Mat _originalImage, Mat _candidatePoints, Mat _warpedPoints, Mat _outputImage) {
 
     // Obtaining warped image from warpedpoints
     Mat validPixel = Mat::zeros(_outputImage.size(), CV_8UC1);
@@ -1259,43 +1274,47 @@ void Tracker::ObtainImageTransformed(Mat _originalImage, Mat _candidatePoints, M
         if (y2>0 && y2<_originalImage.rows && x2>0 && x2<_originalImage.cols){
             _outputImage.at<uchar>(y2,x2) = _originalImage.at<uchar>(y1,x1);
             validPixel.at<uchar>(y2,x2) = 1;
+        } else {
+            validPixel.at<uchar>(y2,x2) = 0;
         }
     } 
     // Applying bilinear interpolation of resulting waped image
-    for (int x=0; x<_outputImage.cols; x++) {
-        for (int y=0; y<_outputImage.rows; y++) {
+    // for (int x=0; x<_outputImage.cols; x++) {
+    //     for (int y=0; y<_outputImage.rows; y++) {
             
-            if (_outputImage.at<uchar>(y,x) == 0) {                
-                int x1 = x - 1;
-                int x2 = x + 1;
-                int y1 = y - 1;
-                int y2 = y + 1;
-                if (x1 < 0) x1 = 0;
-                if (y1 < 0) y1 = 0;
-                if (x2 == _outputImage.cols) x2 = x2-1;   
-                if (y2 == _outputImage.rows) y2 = y2-1;
-                if (validPixel.at<uchar>(y1,x1) == 1 || validPixel.at<uchar>(y1,x) == 1 || validPixel.at<uchar>(y1,x2) == 1 ||
-                    validPixel.at<uchar>(y,x1)  == 1 || validPixel.at<uchar>(y,x)  == 1 || validPixel.at<uchar>(y,x2)  == 1 ||
-                    validPixel.at<uchar>(y2,x1) == 1 || validPixel.at<uchar>(y2,x) == 1 || validPixel.at<uchar>(y2,x2) == 1    ) {
+    //         if (_outputImage.at<uchar>(y,x) == 0) {                
+    //             int x1 = x - 1;
+    //             int x2 = x + 1;
+    //             int y1 = y - 1;
+    //             int y2 = y + 1;
+    //             if (x1 < 0) x1 = 0;
+    //             if (y1 < 0) y1 = 0;
+    //             if (x2 == _outputImage.cols) x2 = x2-1;   
+    //             if (y2 == _outputImage.rows) y2 = y2-1;
+    //             if (validPixel.at<uchar>(y1,x1) == 1 || validPixel.at<uchar>(y1,x) == 1 || validPixel.at<uchar>(y1,x2) == 1 ||
+    //                 validPixel.at<uchar>(y,x1)  == 1 || validPixel.at<uchar>(y,x)  == 1 || validPixel.at<uchar>(y,x2)  == 1 ||
+    //                 validPixel.at<uchar>(y2,x1) == 1 || validPixel.at<uchar>(y2,x) == 1 || validPixel.at<uchar>(y2,x2) == 1    ) {
 
-                    int Q11 = _outputImage.at<uchar>(y2,x1);
-                    int Q21 = _outputImage.at<uchar>(y2,x2);
-                    int Q12 = _outputImage.at<uchar>(y1,x1);
-                    int Q22 = _outputImage.at<uchar>(y1,x2);
+    //                 int Q11 = _outputImage.at<uchar>(y2,x1);
+    //                 int Q21 = _outputImage.at<uchar>(y2,x2);
+    //                 int Q12 = _outputImage.at<uchar>(y1,x1);
+    //                 int Q22 = _outputImage.at<uchar>(y1,x2);
 
-                    if (Q12 == 0) Q12 = Q22;
-                    if (Q22 == 0) Q22 = Q12;
-                    if (Q11 == 0) Q11 = Q21;
-                    if (Q21 == 0) Q21 = Q11;
+    //                 if (Q12 == 0) Q12 = Q22;
+    //                 if (Q22 == 0) Q22 = Q12;
+    //                 if (Q11 == 0) Q11 = Q21;
+    //                 if (Q21 == 0) Q21 = Q11;
                     
-                    int f_y1 = (Q12 * 0.5) + (Q22 * 0.5);
-                    int f_y2 = (Q11 * 0.5) + (Q21 * 0.5);
+    //                 int f_y1 = (Q12 * 0.5) + (Q22 * 0.5);
+    //                 int f_y2 = (Q11 * 0.5) + (Q21 * 0.5);
                     
-                    _outputImage.at<uchar>(y,x) = (f_y1 * 0.5) + (f_y2 * 0.5);
-                }
-            }
-        }
-    }
+    //                 _outputImage.at<uchar>(y,x) = (f_y1 * 0.5) + (f_y2 * 0.5);
+    //             }
+    //         }
+    //     }
+    // }
+
+    return validPixel;
 }
 
 bool Tracker::PixelIsBackground(Mat _inputImage, int y, int x) {

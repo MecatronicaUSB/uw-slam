@@ -163,7 +163,7 @@ public:
      * @param _warpedPoints 
      * @param _outputImage 
      */
-    void ObtainImageTransformed(Mat _originalImage, Mat _candidatePoints, Mat _warpedPoints, Mat _outputImage);
+    Mat ObtainImageTransformed(Mat _originalImage, Mat _candidatePoints, Mat _warpedPoints, Mat _outputImage);
     
     /**
      * @brief Computes gradient X and the gradient Y of _inputImage (it uses CV_32FC, and without abs())
