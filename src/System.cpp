@@ -51,9 +51,10 @@ System::~System() {
 }
 
 Frame::Frame(void) {
+    
     rigid_transformation_ = SE3();
     idFrame_    = 0;
-
+    n_matches_  = 0;
     obtained_gradients_ = false;
     obtained_candidatePoints_ = false;
     depth_available_ = false;
@@ -189,24 +190,32 @@ void System::CalculateROI() {
 
 void System::Tracking() {
 
-
-
     if (not previous_frame_->obtained_gradients_)
         tracker_->ApplyGradient(previous_frame_);
-    
+     
     if (not previous_frame_->obtained_candidatePoints_) {
         //tracker_->ObtainCandidatePoints(previous_frame_);
-        tracker_->ObtainAllPoints(previous_frame_);
+        //tracker_->ObtainAllPoints(previous_frame_);
+        //tracker_->ObtainFeaturesPoints(previous_frame_, current_frame_);
     }
         
     tracker_->ApplyGradient(current_frame_);
-  
-    //tracker_->ObtainFeaturesPoints(previous_frame_, current_frame_);
-    tracker_->ObtainAllPoints(current_frame_);
+    
+    if (previous_frame_->n_matches_ > 250) {
+        tracker_->TrackFeatures(previous_frame_, current_frame_);
+    } else {
+        tracker_->DetectAndTrackFeatures(previous_frame_, current_frame_);
+    }
+
+    tracker_->ObtainPatchesPoints(previous_frame_);
+    
+    //tracker_->ObtainAllPoints(current_frame_);
     //tracker_->ObtainCandidatePoints(current_frame_);
     
-    tracker_->FastEstimatePose(previous_frame_, current_frame_);
-    // tracker_->EstimatePoseFeatures(previous_frame_, current_frame_);
+    //tracker_->FastEstimatePose(previous_frame_, current_frame_);
+    tracker_->EstimatePoseFeatures(previous_frame_, current_frame_);
+    //tracker_->EstimatePose(previous_frame_, current_frame_);
+    
 
 }
 
@@ -214,7 +223,9 @@ void System::AddFrame(int _id) {
     Frame* newFrame   = new Frame();
     newFrame->idFrame_ = _id;
     newFrame->images_[0] = imread(images_list_[_id], CV_LOAD_IMAGE_GRAYSCALE);
-
+    
+    cvtColor(newFrame->images_[0], newFrame->image_to_send, COLOR_GRAY2BGR);
+    
     if (distortion_valid_) {
         Mat distortion;
         remap(newFrame->images_[0], distortion, map1_, map2_, INTER_LINEAR);

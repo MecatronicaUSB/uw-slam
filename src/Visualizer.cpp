@@ -294,16 +294,16 @@ Visualizer::~Visualizer() {};
 
 void Visualizer::UpdateMessages(Frame* frame){
     // Rate (Hz) of publishing messages
-    ros::Rate r(200);
+    ros::Rate r(1000);
 
     // Update image message
-    sensor_msgs::ImagePtr current_frame = cv_bridge::CvImage(std_msgs::Header(), "mono8", frame->images_[0]).toImageMsg();
+    sensor_msgs::ImagePtr current_frame = cv_bridge::CvImage(std_msgs::Header(), "bgr8", frame->image_to_send).toImageMsg();
 
     // Corrected movement of camera
     Mat31f t_TUM;
-    t_TUM(0) = frame->rigid_transformation_.translation().x();
-    t_TUM(1) = frame->rigid_transformation_.translation().y();
-    t_TUM(2) = frame->rigid_transformation_.translation().z();
+    t_TUM(0) = 10 * frame->rigid_transformation_.translation().x();
+    t_TUM(1) = 10 * frame->rigid_transformation_.translation().y();
+    t_TUM(2) = 10 * frame->rigid_transformation_.translation().z();
     
     SE3 current_pose = SE3(frame->rigid_transformation_.unit_quaternion(), (t_TUM));
 
@@ -312,9 +312,9 @@ void Visualizer::UpdateMessages(Frame* frame){
     Mat31f t = final_pose.translation();
     Quaternion quaternion = final_pose.unit_quaternion();
 
-    camera_pose_.pose.position.x = -t(0);  
-    camera_pose_.pose.position.y = -t(2);
-    camera_pose_.pose.position.z = -t(1);
+    camera_pose_.pose.position.x = - t(0);  
+    camera_pose_.pose.position.y = - t(2);
+    camera_pose_.pose.position.z = - t(1);
     camera_pose_.pose.orientation.x = quaternion.x();
     camera_pose_.pose.orientation.y = quaternion.y();    
     camera_pose_.pose.orientation.z = quaternion.z(); 

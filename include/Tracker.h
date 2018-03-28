@@ -101,6 +101,7 @@ public:
 
     void EstimatePoseFeatures(Frame* _previous_frame, Frame* _current_frame);
 
+
     /**
      * @brief Computes gradient of a frame for each pyramid level available.
      *        Saves the result gradient images within the frame class.
@@ -129,9 +130,12 @@ public:
 
     array<vector<KeyPoint>,2> getGoodKeypoints(vector<DMatch> goodMatches, array< vector< KeyPoint>, 2 > keypoints);
     
+    void TrackFeatures(Frame* _previous_frame, Frame* _current_frame);
     
-    void ObtainFeaturesPoints(Frame* _previous_frame, Frame* _current_frame);
+    void DetectAndTrackFeatures(Frame* _previous_frame, Frame* _current_frame);
 
+    void ObtainPatchesPoints(Frame* _previous_frame);
+    
     void Obtain3DPoints(Frame* frame);
     
     Mat WarpFunctionOpenCV(Mat _points2warp, SE3 _rigid_transformation, int _lvl);

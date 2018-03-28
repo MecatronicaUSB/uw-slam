@@ -76,6 +76,7 @@ public:
 
 
     int id;
+    Mat image_to_send;
     vector<Mat> images_    = vector<Mat>(PYRAMID_LEVELS);
     vector<Mat> depths_    = vector<Mat>(PYRAMID_LEVELS);    
     vector<Mat> gradientX_ = vector<Mat>(PYRAMID_LEVELS);
@@ -85,7 +86,11 @@ public:
     vector<Mat> candidatePoints_   = vector<Mat>(PYRAMID_LEVELS);
     vector<Mat> informationPoints_ = vector<Mat>(PYRAMID_LEVELS);
 
+    vector<KeyPoint> keypoints_;
+    vector<float> descriptors_;
+    
     int idFrame_;
+    int n_matches_;
     Frame* previous_frame_;
     Frame* next_frame_;    
     vector<float> map_;
