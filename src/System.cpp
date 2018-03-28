@@ -201,10 +201,11 @@ void System::Tracking() {
         
     tracker_->ApplyGradient(current_frame_);
     
-    if (previous_frame_->n_matches_ > 250) {
-        tracker_->TrackFeatures(previous_frame_, current_frame_);
+    if (previous_frame_->n_matches_ < 200) {
+        tracker_->DetectAndTrackFeatures(previous_frame_, current_frame_);        
     } else {
-        tracker_->DetectAndTrackFeatures(previous_frame_, current_frame_);
+        tracker_->TrackFeatures(previous_frame_, current_frame_);
+        
     }
 
     tracker_->ObtainPatchesPoints(previous_frame_);

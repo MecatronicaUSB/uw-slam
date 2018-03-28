@@ -145,7 +145,6 @@ int main (int argc, char *argv[]) {
         if (uwSystem->num_frames_> 10) {
             uwSystem->FreeFrames();
         }
-        cout << "Frame: " << uwSystem->previous_frame_->idFrame_ << ". Num matches: " << uwSystem->previous_frame_->n_matches_ << "\r" << flush;
     }
     cout << "Dataset ended..." << endl;
     // Delete system

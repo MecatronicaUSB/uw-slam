@@ -955,34 +955,48 @@ void Tracker::TrackFeatures(Frame* _previous_frame, Frame* _current_frame) {
     array<vector<KeyPoint>,2> keypoints;
     array<vector<float>,2> descriptors;
 
-    // SURF as feature detector
-    Ptr<cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher();
-    cuda::SURF_CUDA surf;
-
-    // Load previous calculated keypoints and descriptors from _previous_frame
-    surf.uploadKeypoints(_previous_frame->keypoints_, keypointsGPU[0]);
-    //descriptors ?
-
     // Upload images to GPU
     previous_frameGPU.upload(_previous_frame->images_[0]);
     current_frameGPU.upload(_current_frame->images_[0]);
-    
-    // Detecting keypoints and computing descriptors
-    surf(previous_frameGPU, cuda::GpuMat(), keypointsGPU[0], descriptorsGPU[0], true);
-    surf(current_frameGPU, cuda::GpuMat(), keypointsGPU[1], descriptorsGPU[1]);
 
-    // Matching descriptors
+    // // SURF as feature detector
+    // Ptr<cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher();
+    // cuda::SURF_CUDA surf;
+
+    // // Load previous calculated keypoints and descriptors from _previous_frame
+    // surf.uploadKeypoints(_previous_frame->keypoints_, keypointsGPU[0]);
+
+    // // Detecting keypoints and computing descriptors
+    // surf(previous_frameGPU, cuda::GpuMat(), keypointsGPU[0], descriptorsGPU[0], true);
+    // surf(current_frameGPU, cuda::GpuMat(), keypointsGPU[1], descriptorsGPU[1]);
+
+    // // Matching descriptors
+    // matcher->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches, 2);
+
+    // // Downloading results
+    // surf.downloadKeypoints(keypointsGPU[0], keypoints[0]);
+    // surf.downloadKeypoints(keypointsGPU[1], keypoints[1]);
+    // surf.downloadDescriptors(descriptorsGPU[0], descriptors[0]);
+    // surf.downloadDescriptors(descriptorsGPU[1], descriptors[1]);
+
+
+    // ORB as feature detector
+    Ptr<cuda::ORB> orb = cv::cuda::ORB::create();
+    Ptr<cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher(cv::NORM_HAMMING);
+    // Load previous keypoint
+    keypoints[0] = _previous_frame->keypoints_;
+    orb->detectAndCompute(previous_frameGPU, noArray(), keypoints[0], descriptorsGPU[0], true);
+    orb->detectAndCompute(current_frameGPU, noArray(), keypoints[1], descriptorsGPU[1]), true;
     matcher->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches, 2);
-    // Downloading results
-    surf.downloadKeypoints(keypointsGPU[0], keypoints[0]);
-    surf.downloadKeypoints(keypointsGPU[1], keypoints[1]);
-    surf.downloadDescriptors(descriptorsGPU[0], descriptors[0]);
-    surf.downloadDescriptors(descriptorsGPU[1], descriptors[1]);
 
     // Obtain good matches
     vector<DMatch> goodMatches;
     goodMatches = getGoodMatches(matches,keypoints[0]);   
     _previous_frame->n_matches_ = goodMatches.size();
+    _current_frame->n_matches_ = goodMatches.size();
+
+    cout << "Frame: " << _previous_frame->idFrame_ << ". Num matches: " << _previous_frame->n_matches_ << "\r" << flush;
+    
 
     // Obtain good keypoints from goodMatches
     array<vector<KeyPoint>,2> goodKeypoints;
@@ -1009,30 +1023,37 @@ void Tracker::DetectAndTrackFeatures(Frame* _previous_frame, Frame* _current_fra
     vector< vector< DMatch> > matches;
     array<vector<KeyPoint>,2> keypoints;
     array<vector<float>,2> descriptors;
-
-    // SURF as feature detector
-    Ptr<cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher();
-    cuda::SURF_CUDA surf;
-
+    
     // Upload images to GPU
     previous_frameGPU.upload(_previous_frame->images_[0]);
     current_frameGPU.upload(_current_frame->images_[0]);
+
+    // // SURF as feature detector
+    // Ptr<cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher();
+    // cuda::SURF_CUDA surf;
+
+    // // If there are any previous keypoints detected, load them
+    // surf.uploadKeypoints(_previous_frame->keypoints_, keypointsGPU[0]);
+
+    // // Detecting keypoints and computing descriptors
+    // surf(previous_frameGPU, cuda::GpuMat(), keypointsGPU[0], descriptorsGPU[0]);
+    // surf(current_frameGPU, cuda::GpuMat(), keypointsGPU[1], descriptorsGPU[1]);
+
+    // // Matching descriptors
+    // matcher->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches, 2);
+    // // Downloading results
+    // surf.downloadKeypoints(keypointsGPU[0], keypoints[0]);
+    // surf.downloadKeypoints(keypointsGPU[1], keypoints[1]);
+    // surf.downloadDescriptors(descriptorsGPU[0], descriptors[0]);
+    // surf.downloadDescriptors(descriptorsGPU[1], descriptors[1]);
     
-    // If there are any previous keypoints detected, load them
-    surf.uploadKeypoints(_previous_frame->keypoints_, keypointsGPU[0]);
-
-    // Detecting keypoints and computing descriptors
-    surf(previous_frameGPU, cuda::GpuMat(), keypointsGPU[0], descriptorsGPU[0]);
-    surf(current_frameGPU, cuda::GpuMat(), keypointsGPU[1], descriptorsGPU[1]);
-
+    // ORB as feature detector
+    Ptr<cuda::ORB> orb = cv::cuda::ORB::create();
+    Ptr<cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher(cv::NORM_HAMMING);
+    orb->detectAndCompute(previous_frameGPU, noArray(), keypoints[0], descriptorsGPU[0]);
+    orb->detectAndCompute(current_frameGPU, noArray(), keypoints[1], descriptorsGPU[1]);
     // Matching descriptors
     matcher->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches, 2);
-    // Downloading results
-    surf.downloadKeypoints(keypointsGPU[0], keypoints[0]);
-    surf.downloadKeypoints(keypointsGPU[1], keypoints[1]);
-    surf.downloadDescriptors(descriptorsGPU[0], descriptors[0]);
-    surf.downloadDescriptors(descriptorsGPU[1], descriptors[1]);
-
     // Obtain good matches
     vector<DMatch> goodMatches;
     goodMatches = getGoodMatches(matches,keypoints[0]);   
