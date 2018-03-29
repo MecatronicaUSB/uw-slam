@@ -90,6 +90,8 @@ public:
 
     void ReadGroundTruthTUM(int start_index, string groundtruth_path);
 
+    void AddPointCloud(Frame* frame);
+    
     void AddPointCloudFromRGBD(Frame* frame);
 
     // Ground-Truth publishers and markers
@@ -114,7 +116,7 @@ public:
 
     image_transport::Publisher publisher_current_frame_;
 
-    SE3 previous_pose_;
+    SE3 previous_world_pose_;
 
     string ground_truth_path_;
     string ground_truth_dataset_;   

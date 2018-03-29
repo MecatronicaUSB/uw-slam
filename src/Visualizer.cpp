@@ -240,7 +240,7 @@ Visualizer::Visualizer(int start_index, int num_images, Mat K, string _ground_tr
             Quaternion quat_init(0,0,0,1);
             
             //previous_pose_ = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
-            previous_pose_ = SE3(quat_init, SE3::Point(0, -1, 0));
+            previous_world_pose_ = SE3(quat_init, SE3::Point(0, -1, 0));
         }
 
         // Saving ground truth markers configuration
@@ -255,7 +255,7 @@ Visualizer::Visualizer(int start_index, int num_images, Mat K, string _ground_tr
 
     } else {
         // Identity initialization
-        previous_pose_ = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
+        previous_world_pose_ = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
 
         // Initialize the camera pose marker in the same place and orientation as the ground truth marker
         camera_pose.pose.position.x = 0;  
@@ -292,22 +292,22 @@ Visualizer::Visualizer(int start_index, int num_images, Mat K, string _ground_tr
 
 Visualizer::~Visualizer() {};
 
-void Visualizer::UpdateMessages(Frame* frame){
+void Visualizer::UpdateMessages(Frame* _previous_frame){
     // Rate (Hz) of publishing messages
     ros::Rate r(1000);
 
     // Update image message
-    sensor_msgs::ImagePtr current_frame = cv_bridge::CvImage(std_msgs::Header(), "bgr8", frame->image_to_send).toImageMsg();
+    sensor_msgs::ImagePtr current_frame = cv_bridge::CvImage(std_msgs::Header(), "bgr8", _previous_frame->image_to_send).toImageMsg();
 
-    // Corrected movement of camera
+    // Scaled movement of camera
     Mat31f t_TUM;
-    t_TUM(0) = 40 * frame->rigid_transformation_.translation().x();
-    t_TUM(1) = 40 * frame->rigid_transformation_.translation().y();
-    t_TUM(2) = 40 * frame->rigid_transformation_.translation().z();
+    t_TUM(0) = 40 * _previous_frame->rigid_transformation_.translation().x();
+    t_TUM(1) = 40 * _previous_frame->rigid_transformation_.translation().y();
+    t_TUM(2) = 40 * _previous_frame->rigid_transformation_.translation().z();
     
-    SE3 current_pose = SE3(frame->rigid_transformation_.unit_quaternion(), (t_TUM));
+    SE3 current_pose = SE3(_previous_frame->rigid_transformation_.unit_quaternion(), (t_TUM));
 
-    SE3 final_pose = previous_pose_ * current_pose;
+    SE3 final_pose = previous_world_pose_ * current_pose;
     
     Mat31f t = final_pose.translation();
     Quaternion quaternion = final_pose.unit_quaternion();
@@ -319,7 +319,7 @@ void Visualizer::UpdateMessages(Frame* frame){
     camera_pose_.pose.orientation.y = quaternion.y();    
     camera_pose_.pose.orientation.z = quaternion.z(); 
     camera_pose_.pose.orientation.w = quaternion.w();
-    previous_pose_ = final_pose;
+    previous_world_pose_ = final_pose;
     
 
     geometry_msgs::Point p;
@@ -329,8 +329,8 @@ void Visualizer::UpdateMessages(Frame* frame){
     camera_trajectory_dots_.points.push_back(p);        
     camera_trajectory_lines_.points.push_back(p);
 
-    // Point-Cloud add
-    // AddPointCloudFromRGBD(frame);
+    // Add Point-Cloud
+    AddPointCloud(_previous_frame);
 
     // Update ground truth marker position
     if (use_ground_truth_) {
@@ -381,6 +381,7 @@ void Visualizer::UpdateMessages(Frame* frame){
     publisher_camera_trajectory_dots_.publish(camera_trajectory_dots_);
     publisher_camera_trajectory_lines_.publish(camera_trajectory_lines_);
     publisher_point_cloud_.publish(point_cloud_);
+    point_cloud_.points.clear();
 
     if (use_ground_truth_) {
         publisher_gt_pose_.publish(gt_pose_);
@@ -393,11 +394,26 @@ void Visualizer::UpdateMessages(Frame* frame){
 
 };
 
+void Visualizer::AddPointCloud(Frame* frame) {
+    int num_cloud_points = frame->map_.cols;
+    Mat points_3D = frame->map_.clone();
+
+    for (int i=0; i< points_3D.cols; i++) {
+        geometry_msgs::Point p3D;
+
+        p3D.x = points_3D.at<float>(0,i) / points_3D.at<float>(3,i);
+        p3D.y = points_3D.at<float>(1,i) / points_3D.at<float>(3,i);
+        p3D.z = points_3D.at<float>(2,i) / points_3D.at<float>(3,i);
+
+        point_cloud_.points.push_back(p3D);    
+    }
+};
+
 void Visualizer::AddPointCloudFromRGBD(Frame* frame) {
     int num_cloud_points = frame->candidatePoints_[0].rows;
     Mat points_3D = frame->candidatePoints_[0].clone();
 
-    Mat31f t = previous_pose_.translation();
+    Mat31f t = previous_world_pose_.translation();
 
     // 2D -> 3D
     // X  = (x - cx) * Z / fx 

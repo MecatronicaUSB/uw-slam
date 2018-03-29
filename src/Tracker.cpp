@@ -23,9 +23,6 @@
 #include "Tracker.h"
 #include "System.h"
 
-
-#include <opencv2/core/eigen.hpp>
-
 namespace uw
 {
 
@@ -270,7 +267,7 @@ array<vector<KeyPoint>,2> RobustMatcher::getGoodKeypoints(vector<DMatch> goodMat
 }
 
 Tracker::Tracker(bool _depth_available) {
-    robust_matcher_ = new RobustMatcher(0);
+    robust_matcher_ = new RobustMatcher(1);
     patch_size_ = 5;
     depth_available_ = _depth_available;
     for (Mat K: K_)
@@ -669,12 +666,6 @@ void Tracker::EstimatePoseFeatures(Frame* _previous_frame, Frame* _current_frame
         Mat candidatePoints1  = _previous_frame->candidatePoints_[lvl].clone();
         Mat candidatePoints2  = _current_frame->candidatePoints_[lvl].clone();    
         
-        //candidatePoints1 = AddPatchPointsFeatures(candidatePoints1, lvl);
-        // cout << candidatePoints1.rows << endl;
-        // Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
-        // ObtainImageTransformed(image1, candidatePoints1, candidatePoints1, imageWarped);             
-        // DebugShowWarpedPerspective(image1, image2, imageWarped, lvl);
-
         // Obtain gradients           
         Mat gradientX1 = Mat::zeros(image1.size(), CV_16SC1);
         Mat gradientY1 = Mat::zeros(image1.size(), CV_16SC1);
@@ -870,6 +861,7 @@ void Tracker::EstimatePoseFeatures(Frame* _previous_frame, Frame* _current_frame
 
 }
 
+// TODO - Works, but slow as EstimatePose()
 // Gauss-Newton using Foward Compositional Algorithm "Fast"
 void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     // Gauss-Newton Optimization Options

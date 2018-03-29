@@ -35,6 +35,9 @@ System::System(int argc, char *argv[], int _start_index) {
     num_frames_     = 0;
     num_keyframes_  = 0;
     num_valid_images_ = 0;
+
+    previous_world_pose_ = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
+    temp_previous_world_pose_ = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
 }
 
 System::~System() {
@@ -69,7 +72,6 @@ Frame::~Frame(void) {
     gradientY_.clear();
     gradient_.clear();
     candidatePoints_.clear();
-    map_.clear();
 
 }
 
@@ -123,7 +125,7 @@ void System::InitializeSystem(string _images_path, string _ground_truth_dataset,
     tracker_->InitializeMasks();
 
     // Initialize map
-    map_ = new Map();
+    mapper_ = new Mapper(w_, h_, K_);
 
     // Initialize output visualizer
     ground_truth_path_    = _ground_truth_path;
@@ -189,6 +191,16 @@ void System::CalculateROI() {
     h_ = p2.y - p1.y;
 }
 
+void System::UpdateWorldPose(SE3& _previous_world_pose, SE3 _current_pose) {
+    // Scaled movement of camera
+    Mat31f t_;
+    t_(0) = 1 * _current_pose.translation().x();
+    t_(1) = 1 * _current_pose.translation().y();
+    t_(2) = 1 * _current_pose.translation().z();
+    
+    _previous_world_pose = SE3(_previous_world_pose.unit_quaternion(), (t_)) * _current_pose;
+}
+
 void System::Tracking() {
 
     bool usekeypoints = true;
@@ -217,9 +229,24 @@ void System::Tracking() {
     //tracker_->FastEstimatePose(previous_frame_, current_frame_);
     tracker_->EstimatePoseFeatures(previous_frame_, current_frame_);
     //tracker_->EstimatePose(previous_frame_, current_frame_);
+
+    UpdateWorldPose(temp_previous_world_pose_, previous_frame_->rigid_transformation_);
     
+}
+
+void System::Mapping() {
+    // Update world pose with new one
+    mapper_->previous_world_pose_ = temp_previous_world_pose_;
+    
+    mapper_->TriangulateCloudPoints(previous_frame_, current_frame_);
 
 }
+
+void System::Visualize() {
+
+    visualizer_->UpdateMessages(previous_frame_);
+}
+
 
 void System::AddFrame(int _id) {
     Frame* newFrame   = new Frame();

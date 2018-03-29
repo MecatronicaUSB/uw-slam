@@ -25,7 +25,7 @@
 #include "CameraModel.h"
 #include "Tracker.h"
 #include "Visualizer.h"
-#include "Map.h"
+#include "Mapper.h"
 
 ///Basic C and C++ libraries
 #include <stdlib.h>
@@ -87,13 +87,13 @@ public:
     vector<Mat> informationPoints_ = vector<Mat>(PYRAMID_LEVELS);
 
     vector<KeyPoint> keypoints_;
-    vector<float> descriptors_;
+    vector<Point2f> points_;
     
     int idFrame_;
     int n_matches_;
     Frame* previous_frame_;
     Frame* next_frame_;    
-    vector<float> map_;
+    Mat map_;
     SE3 rigid_transformation_;
     
     bool obtained_gradients_;
@@ -141,6 +141,8 @@ public:
      */
     void InitializeSystem(string _images_path, string _ground_truth_dataset, string _ground_truth_path, string _depth_path);
 
+    void UpdateWorldPose(SE3& _previous_world_pose, SE3 _current_pose);
+
     /**
      * @brief Starts tracking thread of the next frame. 
      *        Computes image alingment and optimization of camera poses given two frames and
@@ -148,6 +150,14 @@ public:
      */
     void Tracking();
 
+    /**
+     * @brief Starts mapping thread of the next frame.
+     * 
+     */
+    void Mapping();
+
+    void Visualize();
+    
     /**
      * @brief Adds the frame corresponding on the id position from all the dataset.
      * 
@@ -195,7 +205,7 @@ public:
 
     CameraModel* camera_model_;
     Tracker* tracker_;
-    Map* map_;
+    Mapper* mapper_;
     Visualizer* visualizer_;
 
     int start_index_;
@@ -216,6 +226,9 @@ public:
     
     string ground_truth_dataset_;    
     string ground_truth_path_;
+
+    SE3 temp_previous_world_pose_;    
+    SE3 previous_world_pose_;
 
     Mat K_;
     Mat map1_, map2_;

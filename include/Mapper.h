@@ -41,6 +41,7 @@
 
 // Eigen library
 #include <eigen3/Eigen/Core>
+#include <opencv2/core/eigen.hpp>
 
 // Sophus
 #include "sophus/se3.hpp"
@@ -62,15 +63,33 @@ namespace uw
 
 class Frame;
 
-class Map {
+class Mapper {
 public:
 
-    Map();
-    ~Map();
+    Mapper(int _width, int _height, Mat _K);
+    ~Mapper();
 
+    void TriangulateCloudPoints(Frame* _previous_frame, Frame* _current_frame);
+    
     void AddPointCloudFromRGBD(Frame* frame);
 
-
+    SE3 previous_world_pose_;
+    
     Mat recent_cloud_points_;
+
+    // Width and height of images for each pyramid level available  
+    vector<int> w_ = vector<int>(PYRAMID_LEVELS);
+    vector<int> h_ = vector<int>(PYRAMID_LEVELS);
+
+    vector<float> fx_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> fy_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> cx_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> cy_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> invfx_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> invfy_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> invcx_ = vector<float>(PYRAMID_LEVELS);
+    vector<float> invcy_ = vector<float>(PYRAMID_LEVELS);
+
+    vector<Mat> K_ = vector<Mat>(PYRAMID_LEVELS);
 };
 }

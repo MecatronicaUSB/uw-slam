@@ -137,16 +137,22 @@ int main (int argc, char *argv[]) {
     // Read images one by one from directory provided
     uwSystem->AddFrame(start_index);
     for (int i=start_index+1; i<uwSystem->num_valid_images_; i++) {
+        // Add next frame
         uwSystem->AddFrame(i);
+
+        // Tracking thread
         uwSystem->Tracking();
-        uwSystem->visualizer_->UpdateMessages(uwSystem->previous_frame_);
+
+        // Mapping thread
+        uwSystem->Mapping();
+
+        // Visualizer thread
+        uwSystem->Visualize();
         
-        // Delete oldest frame (keeping 10 frames)
+        // Delete oldest frame (keeping last 10 frames)
         if (uwSystem->num_frames_> 10) {
             uwSystem->FreeFrames();
         }
-
-        cout << "Matches: " << uwSystem->previous_frame_->n_matches_ << endl;
     }
     cout << "Dataset ended..." << endl;
     // Delete system

@@ -41,6 +41,7 @@
 
 // Eigen library
 #include <eigen3/Eigen/Core>
+#include <opencv2/core/eigen.hpp>
 
 // Sophus
 #include "sophus/se3.hpp"
