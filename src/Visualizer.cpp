@@ -301,9 +301,9 @@ void Visualizer::UpdateMessages(Frame* frame){
 
     // Corrected movement of camera
     Mat31f t_TUM;
-    t_TUM(0) = 10 * frame->rigid_transformation_.translation().x();
-    t_TUM(1) = 10 * frame->rigid_transformation_.translation().y();
-    t_TUM(2) = 10 * frame->rigid_transformation_.translation().z();
+    t_TUM(0) = 40 * frame->rigid_transformation_.translation().x();
+    t_TUM(1) = 40 * frame->rigid_transformation_.translation().y();
+    t_TUM(2) = 40 * frame->rigid_transformation_.translation().z();
     
     SE3 current_pose = SE3(frame->rigid_transformation_.unit_quaternion(), (t_TUM));
 

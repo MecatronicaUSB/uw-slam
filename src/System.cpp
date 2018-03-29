@@ -120,6 +120,7 @@ void System::InitializeSystem(string _images_path, string _ground_truth_dataset,
     // Initialize tracker system
     tracker_ = new Tracker(depth_available_);
     tracker_->InitializePyramid(w_, h_, K_);
+    tracker_->InitializeMasks();
 
     // Initialize map
     map_ = new Map();
@@ -201,11 +202,10 @@ void System::Tracking() {
         
     tracker_->ApplyGradient(current_frame_);
     
-    if (previous_frame_->n_matches_ < 200) {
-        tracker_->DetectAndTrackFeatures(previous_frame_, current_frame_);        
+    if (previous_frame_->n_matches_ < 110) {
+        tracker_->robust_matcher_->DetectAndTrackFeatures(previous_frame_, current_frame_);        
     } else {
-        tracker_->TrackFeatures(previous_frame_, current_frame_);
-        
+        tracker_->robust_matcher_->TrackFeatures(previous_frame_, current_frame_);
     }
 
     tracker_->ObtainPatchesPoints(previous_frame_);
