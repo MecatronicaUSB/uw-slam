@@ -191,6 +191,8 @@ void System::CalculateROI() {
 
 void System::Tracking() {
 
+    bool usekeypoints = true;
+
     if (not previous_frame_->obtained_gradients_)
         tracker_->ApplyGradient(previous_frame_);
      
@@ -202,11 +204,10 @@ void System::Tracking() {
         
     tracker_->ApplyGradient(current_frame_);
     
-    if (previous_frame_->n_matches_ < 110) {
-        tracker_->robust_matcher_->DetectAndTrackFeatures(previous_frame_, current_frame_);        
-    } else {
-        tracker_->robust_matcher_->TrackFeatures(previous_frame_, current_frame_);
-    }
+    if (previous_frame_->n_matches_ < 110)
+        usekeypoints = false;
+
+    tracker_->robust_matcher_->DetectAndTrackFeatures(previous_frame_, current_frame_, usekeypoints);        
 
     tracker_->ObtainPatchesPoints(previous_frame_);
     

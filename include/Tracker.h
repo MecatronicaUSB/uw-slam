@@ -64,11 +64,9 @@ class Frame;
 
 class RobustMatcher {
 public:
-    RobustMatcher();
+    RobustMatcher(int detector);
     
-    void TrackFeatures(Frame* _previous_frame, Frame* _current_frame);  
-    
-    void DetectAndTrackFeatures(Frame* _previous_frame, Frame* _current_frame);
+    void DetectAndTrackFeatures(Frame* _previous_frame, Frame* _current_frame, bool usekeypoints);
 
     int ratioTest(vector<vector<DMatch> > &matches);
 

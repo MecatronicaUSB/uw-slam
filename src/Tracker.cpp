@@ -35,9 +35,14 @@ class LocalParameterizationSE3;
 
 class RobustMatcher;
 
-RobustMatcher::RobustMatcher() {
-    isSURF_ = true;
-    isORB_ = false;
+RobustMatcher::RobustMatcher(int detector) {
+    if (detector == 0){
+        isSURF_ = true;
+        isORB_ = false;
+    } else {
+        isSURF_ = false;
+        isORB_ = true;
+    }
 };
 
 // Clear matches for which NN ratio is > than threshold
@@ -163,7 +168,7 @@ Mat RobustMatcher::ransacTest(const vector<DMatch>& matches, const vector<KeyPoi
     return fundemental;
 }
 
-void RobustMatcher::TrackFeatures(Frame* _previous_frame, Frame* _current_frame) {
+void RobustMatcher::DetectAndTrackFeatures(Frame* _previous_frame, Frame* _current_frame, bool usekeypoints) {
     cuda::GpuMat previous_frameGPU, current_frameGPU;
     cuda::GpuMat keypointsGPU[2];
     cuda::GpuMat descriptorsGPU[2];
@@ -185,9 +190,9 @@ void RobustMatcher::TrackFeatures(Frame* _previous_frame, Frame* _current_frame)
 
         // Loading previous keypoints found
         surf.uploadKeypoints(_previous_frame->keypoints_, keypointsGPU[0]);
-        
+
         // Detecting keypoints and computing descriptors
-        surf(previous_frameGPU, cuda::GpuMat(), keypointsGPU[0], descriptorsGPU[0], true);
+        surf(previous_frameGPU, cuda::GpuMat(), keypointsGPU[0], descriptorsGPU[0], usekeypoints);
         surf(current_frameGPU, cuda::GpuMat(), keypointsGPU[1], descriptorsGPU[1]);
 
         // Matching descriptors
@@ -206,7 +211,11 @@ void RobustMatcher::TrackFeatures(Frame* _previous_frame, Frame* _current_frame)
     if(isORB_)  {
         Ptr<cuda::ORB> orb = cv::cuda::ORB::create();
         Ptr<cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher(NORM_HAMMING);
-        orb->detectAndCompute(previous_frameGPU, cuda::GpuMat(), keypoints[0], descriptorsGPU[0]);
+
+        // Loading previous keypoints found
+        keypoints[0] = _previous_frame->keypoints_;
+
+        orb->detectAndCompute(previous_frameGPU, cuda::GpuMat(), keypoints[0], descriptorsGPU[0], usekeypoints);
         orb->detectAndCompute(current_frameGPU, cuda::GpuMat(), keypoints[1], descriptorsGPU[1]);
  
         matcher->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches1, 2);
@@ -238,94 +247,13 @@ void RobustMatcher::TrackFeatures(Frame* _previous_frame, Frame* _current_frame)
     _current_frame->keypoints_  = goodKeypoints[1];
 
     // Show results
-    Mat img_matches;
-    drawMatches(Mat(previous_frameGPU), keypoints[0], Mat(current_frameGPU), keypoints[1], 
-                goodMatches, img_matches, Scalar::all(-1), Scalar::all(-1), 
-                vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-    imshow("ORB", img_matches);
+    // Mat img_matches;
+    // drawMatches(Mat(previous_frameGPU), keypoints[0], Mat(current_frameGPU), keypoints[1], 
+    //             goodMatches, img_matches, Scalar::all(-1), Scalar::all(-1), 
+    //             vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+    // imshow("ORB", img_matches);
     
-    waitKey(0);
-}
-
-void RobustMatcher::DetectAndTrackFeatures(Frame* _previous_frame, Frame* _current_frame) {
-    cuda::GpuMat previous_frameGPU, current_frameGPU;
-    cuda::GpuMat keypointsGPU[2];
-    cuda::GpuMat descriptorsGPU[2];
-    array<vector<KeyPoint>,2> keypoints;
-    array<vector<float>,2> descriptors;
-    
-    // Upload images to GPU
-    previous_frameGPU.upload(_previous_frame->images_[0]);
-    current_frameGPU.upload(_current_frame->images_[0]);
-
-    // Matching descriptors
-    vector< vector< DMatch> > matches1;
-    vector< vector< DMatch> > matches2;
-
-    // SURF as feature detector
-    if(isSURF_) {
-        cuda::SURF_CUDA surf;        
-        Ptr<cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher();
-
-        // Detecting keypoints and computing descriptors
-        surf(previous_frameGPU, cuda::GpuMat(), keypointsGPU[0], descriptorsGPU[0]);
-        surf(current_frameGPU, cuda::GpuMat(), keypointsGPU[1], descriptorsGPU[1]);
-
-        // Matching descriptors
-        matcher->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches1, 2);
-        matcher->knnMatch(descriptorsGPU[1], descriptorsGPU[0], matches2, 2);
-        
-        // Downloading results
-        surf.downloadKeypoints(keypointsGPU[0], keypoints[0]);
-        surf.downloadKeypoints(keypointsGPU[1], keypoints[1]);
-        surf.downloadDescriptors(descriptorsGPU[0], descriptors[0]);
-        surf.downloadDescriptors(descriptorsGPU[1], descriptors[1]);
-
-    }
-
-    // ORB as feature detector
-    if(isORB_)  {
-        Ptr<cuda::ORB> orb = cv::cuda::ORB::create();
-        Ptr<cuda::DescriptorMatcher> matcher = cv::cuda::DescriptorMatcher::createBFMatcher(NORM_HAMMING);
-        orb->detectAndCompute(previous_frameGPU, cuda::GpuMat(), keypoints[0], descriptorsGPU[0]);
-        orb->detectAndCompute(current_frameGPU, cuda::GpuMat(), keypoints[1], descriptorsGPU[1]);
- 
-        matcher->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches1, 2);
-        matcher->knnMatch(descriptorsGPU[1], descriptorsGPU[0], matches2, 2);
-    }
-
-    // Remove matches for which NN ratio is > than threshold
-    // clean image 1 -> image 2 matches
-    int removed = ratioTest(matches1);
-    // clean image 2 -> image 1 matches
-    removed = ratioTest(matches2);
-
-    // Remove non-symmetrical matches
-    vector<DMatch> symMatches;
-    symmetryTest(matches1, matches2, symMatches);
-
-    // Validate matches using RANSAC
-    vector< DMatch> goodMatches;    
-    Mat fundamental = ransacTest(symMatches, keypoints[0], keypoints[1], goodMatches);
-
-    // Obtain good keypoints from goodMatches
-    array<vector<KeyPoint>,2> goodKeypoints;
-    goodKeypoints = getGoodKeypoints(goodMatches, keypoints);
-
-    _previous_frame->n_matches_ = goodMatches.size();
-    _current_frame->n_matches_ = goodMatches.size();
-    
-    _previous_frame->keypoints_ = goodKeypoints[0];    
-    _current_frame->keypoints_  = goodKeypoints[1];
-
-    // Show results
-    Mat img_matches;
-    drawMatches(Mat(previous_frameGPU), keypoints[0], Mat(current_frameGPU), keypoints[1], 
-                goodMatches, img_matches, Scalar::all(-1), Scalar::all(-1), 
-                vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-    imshow("ORB", img_matches);
-    
-    waitKey(0);     
+    // waitKey(0);     
 
 }
 
@@ -342,7 +270,7 @@ array<vector<KeyPoint>,2> RobustMatcher::getGoodKeypoints(vector<DMatch> goodMat
 }
 
 Tracker::Tracker(bool _depth_available) {
-    robust_matcher_ = new RobustMatcher();
+    robust_matcher_ = new RobustMatcher(0);
     patch_size_ = 5;
     depth_available_ = _depth_available;
     for (Mat K: K_)
