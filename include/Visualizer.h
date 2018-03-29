@@ -63,7 +63,7 @@ public:
      * @param num_images 
      * @param ground_truth_path 
      */
-    Visualizer(int start_index_, int num_images, string _ground_truth_dataset, string ground_truth_path);
+    Visualizer(int start_index_, int num_images, Mat K, string _ground_truth_dataset, string ground_truth_path);
 
     /**
      * @brief Destructor of visualizer.
@@ -89,16 +89,32 @@ public:
     void ReadGroundTruthEUROC(int start_index, string groundtruth_path);
 
     void ReadGroundTruthTUM(int start_index, string groundtruth_path);
+
+    void AddPointCloudFromRGBD(Frame* frame);
+
+    // Ground-Truth publishers and markers
+    ros::Publisher publisher_gt_pose_;
+    ros::Publisher publisher_gt_trajectory_dots_;    
+    ros::Publisher publisher_gt_trajectory_lines_;   
+    visualization_msgs::Marker gt_pose_;
+    visualization_msgs::Marker gt_trajectory_dots_;
+    visualization_msgs::Marker gt_trajectory_lines_;
     
-
-
-    ros::Publisher publisher_ground_truth_pose_;
-    visualization_msgs::Marker ground_truth_pose_;
-
+    // Camera-pose publishers and markers    
     ros::Publisher publisher_camera_pose_;
+    ros::Publisher publisher_camera_trajectory_dots_;    
+    ros::Publisher publisher_camera_trajectory_lines_;
     visualization_msgs::Marker camera_pose_;
+    visualization_msgs::Marker camera_trajectory_dots_;
+    visualization_msgs::Marker camera_trajectory_lines_;
+    
+    // Point-Cloud publisher and marker   
+    ros::Publisher publisher_point_cloud_;
+    visualization_msgs::Marker point_cloud_;
 
     image_transport::Publisher publisher_current_frame_;
+
+    SE3 previous_pose_;
 
     string ground_truth_path_;
     string ground_truth_dataset_;   
@@ -106,6 +122,9 @@ public:
     int num_images_, num_ground_truth_poses_;
     int ground_truth_step_;
     int ground_truth_index_;
+
+    // Intrinsic parameters
+    float fx_, fy_, invfx_, invfy_, cx_, cy_;
 
     bool use_ground_truth_;
 };

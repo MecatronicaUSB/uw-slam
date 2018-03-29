@@ -34,6 +34,7 @@ System::System(int argc, char *argv[], int _start_index) {
     depth_available_ = false;
     num_frames_     = 0;
     num_keyframes_  = 0;
+    num_valid_images_ = 0;
 }
 
 System::~System() {
@@ -50,9 +51,10 @@ System::~System() {
 }
 
 Frame::Frame(void) {
+    
     rigid_transformation_ = SE3();
     idFrame_    = 0;
-
+    n_matches_  = 0;
     obtained_gradients_ = false;
     obtained_candidatePoints_ = false;
     depth_available_ = false;
@@ -62,15 +64,11 @@ Frame::Frame(void) {
 
 Frame::~Frame(void) {
 
-    for (vector<Point3f> point : framePoints_)
-        point.clear();
-
     images_.clear();
     gradientX_.clear();
     gradientY_.clear();
     gradient_.clear();
     candidatePoints_.clear();
-    candidatePointsDepth_.clear();
     map_.clear();
 
 }
@@ -122,11 +120,25 @@ void System::InitializeSystem(string _images_path, string _ground_truth_dataset,
     // Initialize tracker system
     tracker_ = new Tracker(depth_available_);
     tracker_->InitializePyramid(w_, h_, K_);
+    tracker_->InitializeMasks();
+
+    // Initialize map
+    map_ = new Map();
 
     // Initialize output visualizer
     ground_truth_path_    = _ground_truth_path;
     ground_truth_dataset_ = _ground_truth_dataset;
-    visualizer_ = new Visualizer(start_index_, images_list_.size(), _ground_truth_dataset, _ground_truth_path);
+    visualizer_ = new Visualizer(start_index_, images_list_.size(), K_, _ground_truth_dataset, _ground_truth_path);
+
+    // Cheking if the number of depth images are greater or lower than the actual number of images
+    if (depth_available_) {
+        if (images_list_.size() > depth_list_.size())
+            num_valid_images_ = depth_list_.size();
+        if (images_list_.size() <= depth_list_.size())
+            num_valid_images_ = images_list_.size();
+    } else {
+        num_valid_images_ = images_list_.size();
+    }
 
     initialized_ = true;
     cout << "Initializing system ... done" << endl << endl;
@@ -179,15 +191,33 @@ void System::CalculateROI() {
 
 void System::Tracking() {
 
+    bool usekeypoints = true;
+
     if (not previous_frame_->obtained_gradients_)
         tracker_->ApplyGradient(previous_frame_);
-    
-    if (not previous_frame_->obtained_candidatePoints_)
-        tracker_->ObtainAllPoints(previous_frame_);
+     
+    if (not previous_frame_->obtained_candidatePoints_) {
+        //tracker_->ObtainCandidatePoints(previous_frame_);
+        //tracker_->ObtainAllPoints(previous_frame_);
+        //tracker_->ObtainFeaturesPoints(previous_frame_, current_frame_);
+    }
         
     tracker_->ApplyGradient(current_frame_);
-    tracker_->ObtainAllPoints(current_frame_);
-    tracker_->EstimatePose(previous_frame_, current_frame_);
+    
+    if (previous_frame_->n_matches_ < 110)
+        usekeypoints = false;
+
+    tracker_->robust_matcher_->DetectAndTrackFeatures(previous_frame_, current_frame_, usekeypoints);        
+
+    tracker_->ObtainPatchesPoints(previous_frame_);
+    
+    //tracker_->ObtainAllPoints(current_frame_);
+    //tracker_->ObtainCandidatePoints(current_frame_);
+    
+    //tracker_->FastEstimatePose(previous_frame_, current_frame_);
+    tracker_->EstimatePoseFeatures(previous_frame_, current_frame_);
+    //tracker_->EstimatePose(previous_frame_, current_frame_);
+    
 
 }
 
@@ -195,7 +225,9 @@ void System::AddFrame(int _id) {
     Frame* newFrame   = new Frame();
     newFrame->idFrame_ = _id;
     newFrame->images_[0] = imread(images_list_[_id], CV_LOAD_IMAGE_GRAYSCALE);
-
+    
+    cvtColor(newFrame->images_[0], newFrame->image_to_send, COLOR_GRAY2BGR);
+    
     if (distortion_valid_) {
         Mat distortion;
         remap(newFrame->images_[0], distortion, map1_, map2_, INTER_LINEAR);
@@ -207,7 +239,7 @@ void System::AddFrame(int _id) {
 
     if (depth_available_) {
         newFrame->depth_available_ = true;
-        newFrame->depths_[0] = imread(depth_list_[_id], CV_LOAD_IMAGE_GRAYSCALE);
+        newFrame->depths_[0] = imread(depth_list_[_id], -1);
     }
 
     for (int i=1; i<PYRAMID_LEVELS; i++) {
@@ -239,7 +271,7 @@ void System::AddKeyFrame(int _id) {
     newKeyFrame = frames_[num_frames_ - 1];
     current_keyframe_ = newKeyFrame;
 
-    frames_[num_frames_ - 1]->isKeyFrame_ = true;
+    frames_[num_frames_-1]->isKeyFrame_ = true;
     num_keyframes_++;
     keyframes_.push_back(newKeyFrame);
 }

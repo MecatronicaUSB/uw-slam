@@ -136,7 +136,7 @@ int main (int argc, char *argv[]) {
     // Start SLAM process
     // Read images one by one from directory provided
     uwSystem->AddFrame(start_index);
-    for (int i=start_index+1; i<uwSystem->images_list_.size(); i++) {
+    for (int i=start_index+1; i<uwSystem->num_valid_images_; i++) {
         uwSystem->AddFrame(i);
         uwSystem->Tracking();
         uwSystem->visualizer_->UpdateMessages(uwSystem->previous_frame_);
@@ -145,8 +145,10 @@ int main (int argc, char *argv[]) {
         if (uwSystem->num_frames_> 10) {
             uwSystem->FreeFrames();
         }
-    }
 
+        cout << "Matches: " << uwSystem->previous_frame_->n_matches_ << endl;
+    }
+    cout << "Dataset ended..." << endl;
     // Delete system
     uwSystem->~System();
     delete uwSystem;

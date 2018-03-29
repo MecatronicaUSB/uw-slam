@@ -131,7 +131,7 @@ typedef Sophus::SO3f SO3;
 
 typedef Eigen::Vector4d QuaternionVector;
 typedef Eigen::Vector3d TranslationVector;
-typedef Eigen::Quaternion<SE3::Scalar> Quaternion2;
+typedef Eigen::Quaternion<SE3::Scalar> Quaternion;
 typedef Eigen::Matrix<double,3,1> Mat31d;
 typedef Eigen::Matrix<double,3,3> Mat33d;
 typedef Eigen::Matrix<double,4,1> Mat41d;
@@ -142,6 +142,7 @@ typedef Eigen::Matrix<double,6,7> Mat67d;
 
 typedef Eigen::Matrix<float,3,1> Mat31f;
 typedef Eigen::Matrix<float,3,3> Mat33f;
+typedef Eigen::Matrix<float,3,4> Mat34f;
 typedef Eigen::Matrix<float,4,1> Mat41f;
 typedef Eigen::Matrix<float,4,4> Mat44f;
 typedef Eigen::Matrix<float,6,1> Mat61f;

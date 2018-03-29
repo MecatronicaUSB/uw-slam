@@ -19,13 +19,30 @@
 * along with UW-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <Options.h>
+#include "Map.h"
+#include "System.h"
 
-namespace uw{
+namespace uw
+{
+class Frame;
 
-const int PYRAMID_LEVELS  =  5;
-double GRADIENT_THRESHOLD =  20;
-int BLOCK_SIZE            =  32;
+Map::Map() {
+ 
+};
+
+void Map::AddPointCloudFromRGBD(Frame* frame) {
+    int num_cloud_points = frame->candidatePoints_[0].rows;
+
+    recent_cloud_points_ = Mat(num_cloud_points, 3, CV_32FC1);
+
+    for (int i=0; i<frame->candidatePoints_[0].rows; i++) {
+
+        recent_cloud_points_.at<float>(i,0) = frame->candidatePoints_[0].at<float>(i,0);
+        recent_cloud_points_.at<float>(i,1) = frame->candidatePoints_[0].at<float>(i,1);
+        recent_cloud_points_.at<float>(i,2) = frame->candidatePoints_[0].at<float>(i,2);
+    
+    }
+};
 
 
 }

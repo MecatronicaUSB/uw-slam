@@ -62,8 +62,32 @@ namespace uw
 {
 class Frame;
 
-class Tracker
-{
+class RobustMatcher {
+public:
+    RobustMatcher(int detector);
+    
+    void DetectAndTrackFeatures(Frame* _previous_frame, Frame* _current_frame, bool usekeypoints);
+
+    int ratioTest(vector<vector<DMatch> > &matches);
+
+    void symmetryTest(const vector<vector<DMatch> >& matches1, const vector<vector<DMatch> >& matches2, vector<DMatch>& symMatches);
+
+    Mat ransacTest(const vector<DMatch>& matches, const vector<KeyPoint>& keypoints1, const vector<KeyPoint>& keypoints2, 
+                    vector<DMatch>& outMatches);
+    
+    array<vector<KeyPoint>,2> getGoodKeypoints(vector<DMatch> goodMatches, array< vector< KeyPoint>, 2 > keypoints);
+    
+    float ratio_ = 0.65f;
+    bool refineF_ = true;      // if true will refine the Fundamental matrix
+    double distance_ = 3.0;    // min distance to epipolar
+    double confidence_ = 0.99; // confidence level (probability)
+
+    bool isSURF_;
+    bool isORB_;
+    
+};
+
+class Tracker {
 public:
     /**
      * @brief Construct a new Tracker object.
@@ -87,6 +111,8 @@ public:
      */
     void InitializePyramid(int _width, int _height, Mat _K);
     
+    void InitializeMasks();
+
     /**
      * @brief Computes optimal transformation given two input frames.
      * 
@@ -94,6 +120,13 @@ public:
      * @param _current_frame 
      */
     void EstimatePose(Frame* _previous_frame, Frame* _current_frame);
+
+    void FastEstimatePose(Frame* _previous_frame, Frame* _current_frame);
+        
+    Mat AddPatchPointsFeatures(Mat candidatePoints, int lvl);
+
+    void EstimatePoseFeatures(Frame* _previous_frame, Frame* _current_frame);
+
 
     /**
      * @brief Computes gradient of a frame for each pyramid level available.
@@ -119,6 +152,12 @@ public:
      */
     void ObtainAllPoints(Frame* _frame);
 
+    void ObtainPatchesPoints(Frame* _previous_frame);
+    
+    void Obtain3DPoints(Frame* frame);
+    
+    Mat WarpFunctionOpenCV(Mat _points2warp, SE3 _rigid_transformation, int _lvl);
+    
     /**
      * @brief Computes warp projected points from one frame to another, given a rigid transformation matrix,
      *        the depth estimation of those points and the pyramidal level. Returns matrix of warped points.
@@ -146,7 +185,7 @@ public:
      * @param _warpedPoints 
      * @param _outputImage 
      */
-    void ObtainImageTransformed(Mat _originalImage, Mat _candidatePoints, Mat _warpedPoints, Mat _outputImage);
+    Mat ObtainImageTransformed(Mat _originalImage, Mat _candidatePoints, Mat _warpedPoints, Mat _outputImage);
     
     /**
      * @brief Computes gradient X and the gradient Y of _inputImage (it uses CV_32FC, and without abs())
@@ -193,7 +232,7 @@ public:
      * @param MAD 
      * @return Mat 
      */
-    Mat TukeyFunctionWeights(Mat _residuals, float MAD);
+    Mat TukeyFunctionWeights(Mat _residuals);
 
     /**
      * @brief Shows points in an image. Used only for debbugin.
@@ -251,6 +290,7 @@ public:
      * @return false 
      */
     bool PixelIsBackground(Mat _intputImage, int y, int x);
+
 
     // TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com)
     // 03-05-2018 - Review: Ceres usage in UW-SLAM ?
@@ -463,6 +503,14 @@ public:
 
     //     virtual int LocalSize() const { return SE3::DoF; }
     // };
+
+    RobustMatcher* robust_matcher_;
+
+    int patch_size_;
+    int grid_size_ = 32;
+    int num_grids_;
+
+    vector<Mat> masks_;
 
     // Width and height of images for each pyramid level available
     vector<int> w_ = vector<int>(PYRAMID_LEVELS);
