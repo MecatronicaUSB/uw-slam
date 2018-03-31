@@ -22,6 +22,7 @@
 #pragma once
 #include <Options.h>
 ///Basic C and C++ libraries
+#include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
 #include <iomanip>
@@ -54,6 +55,12 @@
 #include "opencv2/cudaimgproc.hpp"
 #include "opencv2/cudaarithm.hpp"
 
+// SSE libraries
+#include <wmmintrin.h>
+#include <smmintrin.h>
+#include <xmmintrin.h>
+#include <math.h>
+
 // Namespaces
 using namespace cv;
 using namespace std;
@@ -78,6 +85,11 @@ public:
     
     array<vector<KeyPoint>,2> getGoodKeypoints(vector<DMatch> goodMatches, array< vector< KeyPoint>, 2 > keypoints);
     
+    // Matchers available
+    cuda::SURF_CUDA surf_;       
+    Ptr<cuda::DescriptorMatcher> SURF_matcher_;
+    Ptr<cuda::DescriptorMatcher> ORB_matcher_;
+
     float ratio_ = 0.65f;
     bool refineF_ = true;      // if true will refine the Fundamental matrix
     double distance_ = 3.0;    // min distance to epipolar

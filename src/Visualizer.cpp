@@ -301,9 +301,9 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
 
     // Scaled movement of camera
     Mat31f t_TUM;
-    t_TUM(0) = 40 * _previous_frame->rigid_transformation_.translation().x();
-    t_TUM(1) = 40 * _previous_frame->rigid_transformation_.translation().y();
-    t_TUM(2) = 40 * _previous_frame->rigid_transformation_.translation().z();
+    t_TUM(0) =  _previous_frame->rigid_transformation_.translation().x();
+    t_TUM(1) =  _previous_frame->rigid_transformation_.translation().y();
+    t_TUM(2) =  _previous_frame->rigid_transformation_.translation().z();
     
     SE3 current_pose = SE3(_previous_frame->rigid_transformation_.unit_quaternion(), (t_TUM));
 
@@ -317,7 +317,7 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
     camera_pose_.pose.position.z = - t(1);
     camera_pose_.pose.orientation.x = quaternion.x();
     camera_pose_.pose.orientation.y = quaternion.y();    
-    camera_pose_.pose.orientation.z = quaternion.z(); 
+    camera_pose_.pose.orientation.z = -quaternion.z(); 
     camera_pose_.pose.orientation.w = quaternion.w();
     previous_world_pose_ = final_pose;
     
@@ -330,7 +330,8 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
     camera_trajectory_lines_.points.push_back(p);
 
     // Add Point-Cloud
-    AddPointCloud(_previous_frame);
+    // AddPointCloudFromRGBD(_previous_frame);
+    //AddPointCloud(_previous_frame);
 
     // Update ground truth marker position
     if (use_ground_truth_) {

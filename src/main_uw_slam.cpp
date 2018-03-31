@@ -144,7 +144,7 @@ int main (int argc, char *argv[]) {
         uwSystem->Tracking();
 
         // Mapping thread
-        uwSystem->Mapping();
+        // uwSystem->Mapping();
 
         // Visualizer thread
         uwSystem->Visualize();

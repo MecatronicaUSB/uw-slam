@@ -210,24 +210,24 @@ void System::Tracking() {
      
     if (not previous_frame_->obtained_candidatePoints_) {
         //tracker_->ObtainCandidatePoints(previous_frame_);
-        //tracker_->ObtainAllPoints(previous_frame_);
+        tracker_->ObtainAllPoints(previous_frame_);
         //tracker_->ObtainFeaturesPoints(previous_frame_, current_frame_);
     }
         
     tracker_->ApplyGradient(current_frame_);
     
-    if (previous_frame_->n_matches_ < 110)
+    if (previous_frame_->n_matches_ <= 150)
         usekeypoints = false;
 
-    tracker_->robust_matcher_->DetectAndTrackFeatures(previous_frame_, current_frame_, usekeypoints);        
+    //tracker_->robust_matcher_->DetectAndTrackFeatures(previous_frame_, current_frame_, usekeypoints);        
 
-    tracker_->ObtainPatchesPoints(previous_frame_);
+    //tracker_->ObtainPatchesPoints(previous_frame_);
     
-    //tracker_->ObtainAllPoints(current_frame_);
+    tracker_->ObtainAllPoints(current_frame_);
     //tracker_->ObtainCandidatePoints(current_frame_);
     
-    //tracker_->FastEstimatePose(previous_frame_, current_frame_);
-    tracker_->EstimatePoseFeatures(previous_frame_, current_frame_);
+    tracker_->FastEstimatePose(previous_frame_, current_frame_);
+
     //tracker_->EstimatePose(previous_frame_, current_frame_);
 
     UpdateWorldPose(temp_previous_world_pose_, previous_frame_->rigid_transformation_);
@@ -251,6 +251,7 @@ void System::Visualize() {
 void System::AddFrame(int _id) {
     Frame* newFrame   = new Frame();
     newFrame->idFrame_ = _id;
+
     newFrame->images_[0] = imread(images_list_[_id], CV_LOAD_IMAGE_GRAYSCALE);
     
     cvtColor(newFrame->images_[0], newFrame->image_to_send, COLOR_GRAY2BGR);
