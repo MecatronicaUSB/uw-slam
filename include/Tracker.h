@@ -135,8 +135,6 @@ public:
     void EstimatePose(Frame* _previous_frame, Frame* _current_frame);
 
     void FastEstimatePose(Frame* _previous_frame, Frame* _current_frame);
-        
-    Mat AddPatchPointsFeatures(Mat candidatePoints, int lvl);
 
     void EstimatePoseFeatures(Frame* _previous_frame, Frame* _current_frame);
 
@@ -519,7 +517,6 @@ public:
 
     RobustMatcher* robust_matcher_;
 
-    int patch_size_;
     int grid_size_ = 32;
     int num_grids_;
 

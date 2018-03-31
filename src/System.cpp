@@ -205,25 +205,26 @@ void System::Tracking() {
 
     bool usekeypoints = true;
 
-    if (not previous_frame_->obtained_gradients_)
-        tracker_->ApplyGradient(previous_frame_);
+    if (not previous_frame_->obtained_gradients_){
+        //tracker_->ApplyGradient(previous_frame_);
+    }
      
     if (not previous_frame_->obtained_candidatePoints_) {
         //tracker_->ObtainCandidatePoints(previous_frame_);
-        tracker_->ObtainAllPoints(previous_frame_);
+        //tracker_->ObtainAllPoints(previous_frame_);
         //tracker_->ObtainFeaturesPoints(previous_frame_, current_frame_);
     }
         
-    tracker_->ApplyGradient(current_frame_);
+    tracker_->ApplyGradient(previous_frame_);
     
     if (previous_frame_->n_matches_ <= 150)
         usekeypoints = false;
 
-    //tracker_->robust_matcher_->DetectAndTrackFeatures(previous_frame_, current_frame_, usekeypoints);        
+    tracker_->robust_matcher_->DetectAndTrackFeatures(previous_frame_, current_frame_, usekeypoints);        
 
-    //tracker_->ObtainPatchesPoints(previous_frame_);
+    tracker_->ObtainPatchesPoints(previous_frame_);
     
-    tracker_->ObtainAllPoints(current_frame_);
+    //tracker_->ObtainAllPoints(previous_frame_);
     //tracker_->ObtainCandidatePoints(current_frame_);
     
     tracker_->FastEstimatePose(previous_frame_, current_frame_);

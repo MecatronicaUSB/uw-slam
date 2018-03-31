@@ -270,7 +270,6 @@ array<vector<KeyPoint>,2> RobustMatcher::getGoodKeypoints(vector<DMatch> goodMat
 
 Tracker::Tracker(bool _depth_available) {
     robust_matcher_ = new RobustMatcher(0);
-    patch_size_ = 5;
     depth_available_ = _depth_available;
     for (Mat K: K_)
         K = Mat(3,3,CV_32FC1, Scalar(0.f));
@@ -596,38 +595,6 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
 }
 
-Mat Tracker::AddPatchPointsFeatures(Mat candidatePoints, int lvl) {
-
-    Mat newCandidatePoints = candidatePoints.clone();
-    int start_point = (patch_size_ - 1) / 2;
-    int n = 0;
-
-    for (int index=0; index<candidatePoints.rows; index++) {
-
-        float x = round(candidatePoints.at<float>(index,0));
-        float y = round(candidatePoints.at<float>(index,1));
-        float z = candidatePoints.at<float>(index,2);
-        
-        for (int i=x-start_point; i<=x+start_point; i++) {
-            for (int j=y-start_point; j<=y+start_point; j++) {
-                if (i>0 && i<w_[lvl] && j>0 && j<h_[lvl] && !(i==x && j==y)) {
-                    Mat pointMat = Mat::ones(1, 4, CV_32FC1);                
-                    pointMat.at<float>(0,0) = i;
-                    pointMat.at<float>(0,1) = j;
-                    pointMat.at<float>(0,2) = z;
-                    
-                    newCandidatePoints.push_back(pointMat);
-                } else {
-                    n++;
-                }
-            }
-        }
-
-    }
-
-    return newCandidatePoints; 
-}
-
 // TODO - Works, but slow as EstimatePose()
 // Gauss-Newton using Foward Compositional Algorithm "Fast"
 void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
@@ -636,11 +603,12 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     float intial_factor = 10;
     int max_iterations = 50;
     float error_threshold = 0.005;
-    int first_pyramid_lvl = PYRAMID_LEVELS-1;
+    int first_pyramid_lvl = 0;
     int last_pyramid_lvl = 0;
     
-    float z_factor = 0.01;
-    float angle_factor = 1;
+    float xy_factor = 1.0;
+    float z_factor = 1.0;
+    float angle_factor = 1.0;
     
     // Variables initialization
     float error         = 0.0;
@@ -672,6 +640,13 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         Mat candidatePoints1  = _previous_frame->candidatePoints_[lvl].clone();
         Mat informationPoints1 = _previous_frame->informationPoints_[lvl].clone();
 
+        cout << candidatePoints1 << endl;
+        // Obtain gradients           
+        Mat gradientX1 = Mat::zeros(image1.size(), CV_16SC1);
+        Mat gradientY1 = Mat::zeros(image1.size(), CV_16SC1);
+        gradientX1 = _previous_frame->gradientX_[lvl].clone();
+        gradientY1 = _previous_frame->gradientY_[lvl].clone();
+
         // Obtain intrinsic parameters 
         Mat K = K_[lvl];
 
@@ -690,6 +665,70 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             SE3 deltaSE3;
             Mat warpedPoints = Mat(candidatePoints1.size(), CV_32FC1);
             warpedPoints = WarpFunction(candidatePoints1, current_pose, lvl);
+        
+            Mat Jacobians;
+            Mat Residuals;
+            int num_valid = 0;
+            for (int i=0; i<candidatePoints1.rows; i++) {
+                Mat Residual = Mat(1,1,CV_32FC1);        
+                Mat Jacobian_row = Mat::zeros(1,6,CV_32FC1);
+                Mat Jw = Mat::zeros(2,6,CV_32FC1);
+                Mat Jl = Mat::zeros(1,2,CV_32FC1);
+                
+                // Point in frame 1            
+                float x1 = candidatePoints1.at<float>(i,0);
+                float y1 = candidatePoints1.at<float>(i,1);
+                float z1 = candidatePoints1.at<float>(i,2);
+                // Points of warped frame
+                float x2 = warpedPoints.at<float>(i,0);
+                float y2 = warpedPoints.at<float>(i,1);
+                float z2 = warpedPoints.at<float>(i,2);
+
+                float inv_z2 = 1 / z2;
+
+                // Check if warpedPoints are out of boundaries
+                if (y2>0 && y2<image2.rows && x2>0 && x2<image2.cols) {
+                    if (z2!=0) {
+                        if (inv_z2<0) 
+                            inv_z2 = 0;
+                        num_valid++;
+                        Jw.at<float>(0,0) = fx_[lvl] * inv_z2 * xy_factor;
+                        Jw.at<float>(0,1) = 0.0;
+                        Jw.at<float>(0,2) = -(fx_[lvl] * x2 * inv_z2 * inv_z2) * z_factor;
+                        Jw.at<float>(0,3) = -(fx_[lvl] * x2 * y2 * inv_z2 * inv_z2) * angle_factor;
+                        Jw.at<float>(0,4) = (fx_[lvl] * (1 + x2 * x2 * inv_z2 * inv_z2)) * angle_factor;   
+                        Jw.at<float>(0,5) = - fx_[lvl] * y2 * inv_z2 * angle_factor;
+
+                        Jw.at<float>(1,0) = 0.0;
+                        Jw.at<float>(1,1) = fy_[lvl] * inv_z2 * xy_factor;
+                        Jw.at<float>(1,2) = -(fy_[lvl] * y2 * inv_z2 * inv_z2) * z_factor;
+                        Jw.at<float>(1,3) = -(fy_[lvl] * (1 + y2 * y2 * inv_z2 * inv_z2)) * angle_factor;
+                        Jw.at<float>(1,4) = fy_[lvl] * x2 * y2 * inv_z2 * inv_z2 * angle_factor;
+                        Jw.at<float>(1,5) = fy_[lvl] * x2 * inv_z2 * angle_factor;
+
+                    
+                        // Intensities
+                        int intensity1 = image1.at<uchar>(y1,x1);
+                        int intensity2 = image2.at<uchar>(round(y2),round(x2));
+
+                        Residual.at<float>(0,0) = intensity2 - intensity1;
+                        
+                        Jl.at<float>(0,0) = gradientX1.at<short>(y1,x1);
+                        Jl.at<float>(0,1) = gradientY1.at<short>(y1,x1);
+
+                        Jacobian_row = Jl * Jw;
+                        // cout << "Normal results: " << endl;
+                        // cout << x1 << " " << y1 << " " << intensity1 << endl;
+                        // cout << "Jl: " << Jl << endl;                
+                        // cout << "Jw: " << Jw << endl;                                
+                        // cout << "Jacobian: " << Jacobian_row << endl;
+                        // cout << endl;
+                        
+                        Jacobians.push_back(Jacobian_row);
+                        Residuals.push_back(Residual);
+                    }
+                }
+            }
 
             // SSE Warp Function Optimization
             // Obtain values for current pose
@@ -709,10 +748,12 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             int i = 0;
             int is = 0;
             int num_points = candidatePoints1.rows;            
+            cout << num_points << endl;
 
             float* x_Result = (float*) _mm_malloc(num_points * sizeof(float), 16);
             float* y_Result = (float*) _mm_malloc(num_points * sizeof(float), 16);
             float* z_Result = (float*) _mm_malloc(num_points * sizeof(float), 16);
+            
             float* J1 = (float*) _mm_malloc(num_points * sizeof(float), 16);
             float* J2 = (float*) _mm_malloc(num_points * sizeof(float), 16);
             float* J3 = (float*) _mm_malloc(num_points * sizeof(float), 16);
@@ -723,6 +764,7 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             __m128* x_ResultSSE = (__m128*) x_Result;
             __m128* y_ResultSSE = (__m128*) y_Result;
             __m128* z_ResultSSE = (__m128*) z_Result;
+
             __m128* J1_SSE = (__m128*) J1;
             __m128* J2_SSE = (__m128*) J2;
             __m128* J3_SSE = (__m128*) J3;
@@ -745,7 +787,8 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             __m128 x_w, y_w, z_w;            
             __m128 j1, j2, j31, j32, j3, j41, j42, j4, j51, j52, j5, j61, j62, j6;
 
-
+            bool show = true;
+            int num_actual = 0;
             for ( auto it = candidatePoints1.begin<float>(), end_it = candidatePoints1.end<float>(), 
                     inf = informationPoints1.begin<float>(), end_inf = informationPoints1.end<float>(); it!= end_it, inf!=end_inf; 
                     it+=16, inf+=16) {
@@ -754,10 +797,10 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                 float x3 = *(it+8), y3 = *(it+9), z3 = *(it+10);             
                 float x4 = *(it+12), y4 = *(it+13), z4 = *(it+14);
 
-                float i1 = *inf, gX1 = *(inf+1), gY1 = *(inf+2);
-                float i2 = *(inf+4), gX2 = *(inf+5), gY2 = *(inf+6);             
-                float i3 = *(inf+8), gX3 = *(inf+9), gY3 = *(inf+10);             
-                float i4 = *(inf+12), gX4 = *(inf+13), gY4 = *(inf+14);      
+                float i1 = *(inf+12), gX1 = *(inf+13), gY1 = *(inf+14);
+                float i2 = *(inf+8), gX2 = *(inf+9), gY2 = *(inf+10);             
+                float i3 = *(inf+4), gX3 = *(inf+5), gY3 = *(inf+6);             
+                float i4 = *inf, gX4 = *(inf+1), gY4 = *(inf+2);      
 
                 x = _mm_set_ps(*(it+12), *(it+8), *(it+4), *it);
                 y = _mm_set_ps(*(it+13), *(it+9), *(it+5), *(it+1));
@@ -766,6 +809,10 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                 i_1 = _mm_set_ps(*(inf+12), *(inf+8), *(inf+4), *inf);
                 gX = _mm_set_ps(*(inf+13), *(inf+9), *(inf+5), *(inf+1));
                 gY = _mm_set_ps(*(inf+14), *(inf+10), *(inf+6), *(inf+2));
+
+                // i_1 = _mm_set_ps(*inf, *(inf+4), *(inf+8), *(inf+12));   
+                // gX = _mm_set_ps(*(inf+1), *(inf+5), *(inf+9), *(inf+13));
+                // gY = _mm_set_ps(*(inf+2), *(inf+6), *(inf+10), *(inf+14));
 
                 // X  = (x - cx) * Z / fx 
                 x_ = _mm_mul_ps(_mm_mul_ps(_mm_sub_ps(x, cx), z), invfx);
@@ -794,14 +841,14 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                 // Computing Jacobians
                 __m128 z_inv2 = _mm_mul_ps(z_inv, z_inv);
                 j1 = _mm_mul_ps(_mm_mul_ps(fx, z_inv), gX);
-                j2 = _mm_mul_ps(_mm_mul_ps(fy, z_inv2), gY);
+                j2 = _mm_mul_ps(_mm_mul_ps(fy, z_inv), gY);
                 j31 = _mm_xor_ps(_mm_mul_ps(_mm_mul_ps(_mm_mul_ps(fx, x_w), z_inv2), gX), _mm_set1_ps(-0.0)); // xor changes signed
                 j32 = _mm_xor_ps(_mm_mul_ps(_mm_mul_ps(_mm_mul_ps(fy, y_w), z_inv2), gY), _mm_set1_ps(-0.0)); // xor changes signed
                 j3 = _mm_add_ps(j31, j32);
                 j41 = _mm_xor_ps(_mm_mul_ps(_mm_mul_ps(_mm_mul_ps(_mm_mul_ps(fx, x_w), z_inv2), y_w), gX), _mm_set1_ps(-0.0)); // xor changes signed                
                 j42 = _mm_xor_ps(_mm_mul_ps(_mm_mul_ps(_mm_add_ps(_mm_mul_ps(_mm_mul_ps(y_w, y_w), z_inv2), _mm_set1_ps(1.0f)), fy), gY), _mm_set1_ps(-0.0));
                 j4 = _mm_add_ps(j41, j42);
-                j51 = _mm_xor_ps(_mm_mul_ps(_mm_mul_ps(_mm_add_ps(_mm_mul_ps(_mm_mul_ps(x_w, x_w), z_inv2), _mm_set1_ps(1.0f)), fx), gX), _mm_set1_ps(-0.0));
+                j51 = _mm_mul_ps(_mm_mul_ps(_mm_add_ps(_mm_mul_ps(_mm_mul_ps(x_w, x_w), z_inv2), _mm_set1_ps(1.0f)), fx), gX);
                 j52 = _mm_mul_ps(_mm_mul_ps(_mm_mul_ps(_mm_mul_ps(fy, x_w), z_inv2), y_w), gY); 
                 j5 = _mm_add_ps(j51, j52);
                 j61 = _mm_xor_ps(_mm_mul_ps(_mm_mul_ps(_mm_mul_ps(fx, z_inv), gX), y_w), _mm_set1_ps(-0.0));
@@ -812,22 +859,49 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                 x_ResultSSE[i] = x_w;
                 y_ResultSSE[i] = y_w;
                 z_ResultSSE[i] = z_w;
+                J1_SSE[i] = j1;
+                J2_SSE[i] = j2;
+                J3_SSE[i] = j3;
+                J4_SSE[i] = j4;
+                J5_SSE[i] = j5;
+                J6_SSE[i] = j6;
                 
-                cout << x1 << " " << y1 << " " << z1 << " | " << i1 << " " << gX1 << " " << gY1 << endl;
-                cout << x_Result[0+is] << " " << y_Result[0+is] << " " << z_Result[0+is] << endl;
+                //if(show) {
+            
+                    cout << x1 << " " << y1 << " " << z1 << " | " << i1 << " " << gX1 << " " << gY1 << endl;
+                    cout << x_Result[0+is] << " " << y_Result[0+is] << " " << z_Result[0+is] << endl;
+                    cout << J1[0+is] << " " << J2[0+is] << " " << J3[0+is] << " " << J4[0+is] << " " << J5[0+is] << " " << J6[0+is] << endl;
+                    cout << Jacobians.row(num_actual) << endl;
 
-                cout << x2 << " " << y2 << " " << z3 << " | " << i2 << " " << gX2 << " " << gY2 << endl;
-                cout << x_Result[1+is] << " " << y_Result[1+is] << " " << z_Result[1+is] << endl;  
+                    cout << x2 << " " << y2 << " " << z3 << " | " << i2 << " " << gX2 << " " << gY2 << endl;
+                    cout << x_Result[1+is] << " " << y_Result[1+is] << " " << z_Result[1+is] << endl;  
+                    cout << J1[1+is] << " " << J2[1+is] << " " << J3[1+is] << " " << J4[1+is] << " " << J5[1+is] << " " << J6[1+is] << endl;
+                    cout << Jacobians.row(num_actual+1) << endl;
 
-                cout << x3 << " " << y3 << " " << z3 << " | " << i3 << " " << gX3 << " " << gY3 << endl;
-                cout << x_Result[2+is] << " " << y_Result[2+is] << " " << z_Result[2+is] << endl;
+                    cout << x3 << " " << y3 << " " << z3 << " | " << i3 << " " << gX3 << " " << gY3 << endl;
+                    cout << x_Result[2+is] << " " << y_Result[2+is] << " " << z_Result[2+is] << endl;
+                    cout << J1[2+is] << " " << J2[2+is] << " " << J3[2+is] << " " << J4[2+is] << " " << J5[2+is] << " " << J6[2+is] << endl;
+                    cout << Jacobians.row(num_actual+2) << endl;
+                    
+                    cout << x4 << " " << y4 << " " << z4 << " | " << i4 << " " << gX4 << " " << gY4 << endl;;
+                    cout << x_Result[3+is] << " " << y_Result[3+is] << " " << z_Result[3+is] << endl;
+                    cout << J1[3+is] << " " << J2[3+is] << " " << J3[3+is] << " " << J4[3+is] << " " << J5[3+is] << " " << J6[3+is] << endl;
+                    cout << Jacobians.row(num_actual+3) << endl;
+                    
+                    show = false;
+                //}
 
-                cout << x4 << " " << y4 << " " << z4 << " | " << i4 << " " << gX4 << " " << gY4 << endl;;
-                cout << x_Result[3+is] << " " << y_Result[3+is] << " " << z_Result[3+is] << endl;
+                num_actual+=4;
                 is+=4;
                 i++;
             }
-                     
+            cout << num_points << " " << num_actual << endl;
+            vector<float> prueba_J1 {J1, J1+num_points};
+            Mat Jacobians2 = Mat::zeros(num_points, 1, CV_32FC1);
+            memcpy(Jacobians2.data, prueba_J1.data(), prueba_J1.size() *sizeof(float));
+
+            
+
             _mm_free(x_Result);
             _mm_free(y_Result);
             _mm_free(z_Result);
@@ -843,19 +917,13 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             Mat intensities2_uchar = Mat(image2.size(), CV_32FC1);
             intensities2_uchar = Mat(image2_aux);
             
-            Mat intensities2;
-            intensities2_uchar.convertTo(intensities2, CV_32FC1, 1, 0);
-
-            Mat intensities1 = Mat(image2.size(), CV_32FC1);
-            intensities1 = informationPoints1.col(0);
-
-            Mat Residuals = Mat(candidatePoints1.size(), CV_32FC1);
-            Residuals = intensities2 - intensities1;
 
             // Computation of Jacobian and Residuals
-            Mat Jacobians;
             Mat Jw1 = Mat::zeros(warpedPoints.rows, 6, CV_32FC1);
             Mat Jw2 = Mat::zeros(warpedPoints.rows, 6, CV_32FC1);
+
+           
+
 
             
             
@@ -1033,34 +1101,47 @@ void Tracker::ObtainPatchesPoints(Frame* _previous_frame) {
 
     int lvl = 0;
     factor_lvl = 1 / pow(2, lvl);
-    int start_point = patch_size_ - 1 / 2;
+    // Obtain gradients           
+    Mat gradientX1 = Mat::zeros(_previous_frame->images_[lvl].size(), CV_16SC1);
+    Mat gradientY1 = Mat::zeros(_previous_frame->images_[lvl].size(), CV_16SC1);
+    gradientX1 = _previous_frame->gradientX_[lvl].clone();
+    gradientY1 = _previous_frame->gradientY_[lvl].clone();
 
     for (int i=0; i< min(num_max_keypoints, 200); i++) {
-        if (_previous_frame->depth_available_) {
 
-            float x = goodKeypoints[i].pt.x;
-            float y = goodKeypoints[i].pt.y;
+        float x = goodKeypoints[i].pt.x;
+        float y = goodKeypoints[i].pt.y;
+        float z;
+        circle(_previous_frame->image_to_send, Point(x,y), 2, Scalar(0,255,0), -1, 6, 0);
+        
+        if (_previous_frame->depth_available_ && _previous_frame->depths_[0].at<short>(y,x) != 0) {
+            z = _previous_frame->depths_[0].at<short>(y,x) * factor_depth * factor_lvl;
+        } else {
+            z = 1;            
+        }
+        // Add 4x4 patch around feature
+        for (int i=x-2; i<=x+1; i++) {
+            for (int j=y-2; j<=y+1; j++) {
+                if (i>0 && i<w_[lvl] && j>0 && j<h_[lvl]) {
+                    Mat pointMat_patch = Mat::ones(1, 4, CV_32FC1);   
+                    Mat informationPoint = Mat::zeros(1, 4, CV_32FC1);                
+        
+                    pointMat_patch.at<float>(0,0) = i;
+                    pointMat_patch.at<float>(0,1) = j;
+                    pointMat_patch.at<float>(0,2) = z;
 
-            circle(_previous_frame->image_to_send, Point(x,y), 2, Scalar(0,255,0), -1, 6, 0);
+                    informationPoint.at<float>(0,0) = _previous_frame->images_[lvl].at<uchar>(j,i);
+                    informationPoint.at<float>(0,1) = gradientX1.at<short>(j,i);
+                    informationPoint.at<float>(0,2) = gradientY1.at<short>(j,i);
+                    informationPoint.at<float>(0,3) = 1; // Valid point
 
-            if (_previous_frame->depths_[0].at<short>(y,x) != 0) {
 
-                float z = _previous_frame->depths_[0].at<short>(y,x) * factor_depth * factor_lvl;
-
-                for (int i=x-start_point; i<=x+start_point; i++) {
-                    for (int j=y-start_point; j<=y+start_point; j++) {
-                        if (i>0 && i<w_[lvl] && j>0 && j<h_[lvl]) {
-                            Mat pointMat_patch = Mat::ones(1, 4, CV_32FC1);                
-                            pointMat_patch.at<float>(0,0) = i;
-                            pointMat_patch.at<float>(0,1) = j;
-                            pointMat_patch.at<float>(0,2) = z;
-
-                            _previous_frame->candidatePoints_[lvl].push_back(pointMat_patch);
-                        }
-                    }
+                    _previous_frame->informationPoints_[lvl].push_back(informationPoint);
+                    _previous_frame->candidatePoints_[lvl].push_back(pointMat_patch);
                 }
             }
         }
+
     }
     // Show points saved in candidatePoints
     // Mat showPoints;
@@ -1087,8 +1168,8 @@ void Tracker::ObtainAllPoints(Frame* _frame) {
 
         factor_lvl = factor / pow(2, lvl);
 
-        for (int y=0; y<h_[lvl]; y++) {
-            for (int x=0; x<w_[lvl]; x++) {
+        for (int y=0; y<h_[lvl]; y+=4) {
+            for (int x=0; x<w_[lvl]; x+=4) {
 
                 if (_frame->depth_available_) {
                     if (_frame->depths_[lvl].at<short>(y,x) > 0) {
@@ -1107,15 +1188,7 @@ void Tracker::ObtainAllPoints(Frame* _frame) {
                         _frame->candidatePoints_[lvl].push_back(pointMat);                       
                         _frame->informationPoints_[lvl].push_back(informationPoint);
 
-                    } else {
-                        // Not valid point
-                        Mat pointMat = Mat::zeros(1, 4, CV_32FC1);
-                        pointMat.at<float>(0,2) = 1;                     
-                        Mat informationPoint = Mat::zeros(1, 4, CV_32FC1);
-
-                        _frame->candidatePoints_[lvl].push_back(pointMat);                       
-                        _frame->informationPoints_[lvl].push_back(informationPoint);  
-                    }
+                    } 
                 // Needs review
                 } else {
                     Mat pointMat = Mat::ones(1, 4, CV_32FC1);
@@ -1129,9 +1202,10 @@ void Tracker::ObtainAllPoints(Frame* _frame) {
                     informationPoint.at<float>(0,1) = _frame->gradientX_[lvl].at<short>(y,x);
                     informationPoint.at<float>(0,2) = _frame->gradientY_[lvl].at<short>(y,x);
                     informationPoint.at<float>(0,3) = 1; // Valid point
-                    
+
                     _frame->candidatePoints_[lvl].push_back(pointMat);
                     _frame->informationPoints_[lvl].push_back(informationPoint);
+
                 }
 
             }
