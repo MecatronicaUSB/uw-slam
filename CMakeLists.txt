@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   image_transport
   cv_bridge
   message_generation
+  tf
 )
 find_package(OpenCV REQUIRED
 NO_MODULE

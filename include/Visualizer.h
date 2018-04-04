@@ -40,6 +40,7 @@
 #include <ros/ros.h>
 #include <visualization_msgs/Marker.h>
 #include <image_transport/image_transport.h>
+#include <tf/transform_broadcaster.h>
 #include <cv_bridge/cv_bridge.h>
 
 // Namespaces
@@ -94,6 +95,9 @@ public:
     
     void AddPointCloudFromRGBD(Frame* frame);
 
+    void GraphXYZ(vector<vector<float> > graph_values_);
+    
+
     // Ground-Truth publishers and markers
     ros::Publisher publisher_gt_pose_;
     ros::Publisher publisher_gt_trajectory_dots_;    
@@ -128,7 +132,27 @@ public:
     // Intrinsic parameters
     float fx_, fy_, invfx_, invfy_, cx_, cy_;
 
+    // Initial system offset point
+    float init_x_;
+    float init_y_;
+    float init_z_;
+    float init_gt_qx_;
+    float init_gt_qy_;
+    float init_gt_qz_;
+    float init_gt_qw_;
+    
+    // Offset of gt
+    float off_gt_x_;
+    float off_gt_y_;
+    float off_gt_z_;
+    float off_gt_qx_;
+    float off_gt_qy_;
+    float off_gt_qz_;
+    float off_gt_qw_;
+    
     bool use_ground_truth_;
+
+    vector<vector<float> > graph_position_;
 };
 
 }

@@ -54,6 +54,7 @@
 #include "opencv2/xfeatures2d/cuda.hpp"
 #include "opencv2/cudaimgproc.hpp"
 #include "opencv2/cudaarithm.hpp"
+#include "opencv2/cudaoptflow.hpp"
 
 // SSE libraries
 #include <wmmintrin.h>
@@ -72,17 +73,18 @@ class Frame;
 
 class RobustMatcher {
 public:
-    RobustMatcher(int detector);
+    RobustMatcher(int detector, int w_, int h_);
     
     void DetectAndTrackFeatures(Frame* _previous_frame, Frame* _current_frame, bool usekeypoints);
-
+    
     int ratioTest(vector<vector<DMatch> > &matches);
 
     void symmetryTest(const vector<vector<DMatch> >& matches1, const vector<vector<DMatch> >& matches2, vector<DMatch>& symMatches);
 
-    Mat ransacTest(const vector<DMatch>& matches, const vector<KeyPoint>& keypoints1, const vector<KeyPoint>& keypoints2, 
-                    vector<DMatch>& outMatches);
-    
+    Mat ransacTest(const vector<DMatch>& matches, const vector<KeyPoint>& keypoints1, const vector<KeyPoint>& keypoints2, vector<DMatch>& outMatches);
+                    
+    void GridFiltering(vector<DMatch> matches, vector<KeyPoint> keypoints, vector<DMatch>& gridmatches);
+
     array<vector<KeyPoint>,2> getGoodKeypoints(vector<DMatch> goodMatches, array< vector< KeyPoint>, 2 > keypoints);
     
     // Matchers available
@@ -90,6 +92,8 @@ public:
     Ptr<cuda::DescriptorMatcher> SURF_matcher_;
     Ptr<cuda::DescriptorMatcher> ORB_matcher_;
 
+    int patch_dim_;
+    int num_x_, num_y_;
     float ratio_ = 0.65f;
     bool refineF_ = true;      // if true will refine the Fundamental matrix
     double distance_ = 3.0;    // min distance to epipolar
@@ -103,11 +107,11 @@ public:
 class Tracker {
 public:
     /**
-     * @brief Construct a new Tracker object.
+     * @brief Construct a new Tracker object. Obtains camera instrinsic matrix and parameters for each pyramid level available.
      * 
      * @param _depth_available 
      */
-    Tracker(bool _depth_available);
+    Tracker(bool _depth_available, int _width, int _height, Mat _K);
 
     /**
      * @brief Tracker destructor.
@@ -115,15 +119,6 @@ public:
      */
     ~Tracker();
 
-    /**
-     * @brief Obtains camera instrinsic matrix and parameters for each pyramid level available.
-     * 
-     * @param _width    Width of images at finest level.
-     * @param _height   Height of images at finest level.
-     * @param _K        Camera intrinsic matrix at finest level.
-     */
-    void InitializePyramid(int _width, int _height, Mat _K);
-    
     void InitializeMasks();
 
     /**

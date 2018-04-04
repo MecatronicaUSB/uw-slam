@@ -124,10 +124,10 @@ int main (int argc, char *argv[]) {
     // Show parser settings and CUDA information
     ShowSettings();
 
-    // Create new System
+    // Create system
     System* uwSystem = new System(argc, argv, start_index);
 
-    // Calibrates system with certain Camera Model (currently only RadTan) 
+    // Calibrates system with certain Camera Model (currently only PinHole) 
     uwSystem->Calibration(calibration_path);
     
     // Initialize SLAM system

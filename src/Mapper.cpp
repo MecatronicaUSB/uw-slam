@@ -72,11 +72,7 @@ Mapper::Mapper(int _width, int _height, Mat _K) {
 };
 
 void Mapper::TriangulateCloudPoints(Frame* _previous_frame, Frame* _current_frame) {
-    // Transform keypoints to Point2f vectors
-    KeyPoint::convert(_previous_frame->keypoints_, _previous_frame->points_);
-    KeyPoint::convert(_current_frame->keypoints_, _current_frame->points_);
     
-
     // Transform 3x4 camera matrix from eigen to Mat
     Mat T1, T2;
     SE3 Identity = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));

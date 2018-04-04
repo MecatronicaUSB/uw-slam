@@ -120,8 +120,7 @@ void System::InitializeSystem(string _images_path, string _ground_truth_dataset,
         CalculateROI();
 
     // Initialize tracker system
-    tracker_ = new Tracker(depth_available_);
-    tracker_->InitializePyramid(w_, h_, K_);
+    tracker_ = new Tracker(depth_available_, w_, h_, K_);
     tracker_->InitializeMasks();
 
     // Initialize map
@@ -194,11 +193,11 @@ void System::CalculateROI() {
 void System::UpdateWorldPose(SE3& _previous_world_pose, SE3 _current_pose) {
     // Scaled movement of camera
     Mat31f t_;
-    t_(0) = 1 * _current_pose.translation().x();
-    t_(1) = 1 * _current_pose.translation().y();
-    t_(2) = 1 * _current_pose.translation().z();
-    
-    _previous_world_pose = SE3(_previous_world_pose.unit_quaternion(), (t_)) * _current_pose;
+    t_(0) = 1 * - _current_pose.translation().x();
+    t_(1) = 1 * - _current_pose.translation().z();
+    t_(2) = 1 *   _current_pose.translation().y();
+
+    previous_world_pose_ = previous_world_pose_ * SE3(_current_pose.unit_quaternion(), (t_));
 }
 
 void System::Tracking() {
@@ -219,18 +218,18 @@ void System::Tracking() {
     
     if (previous_frame_->n_matches_ <= 150)
         usekeypoints = false;
-
+    
+    // tracker_->robust_matcher_->OpticalFlowTracking(previous_frame_, current_frame_);
     tracker_->robust_matcher_->DetectAndTrackFeatures(previous_frame_, current_frame_, usekeypoints);        
 
-    tracker_->ObtainPatchesPoints(previous_frame_);
-    
     //tracker_->ObtainAllPoints(previous_frame_);
     //tracker_->ObtainCandidatePoints(current_frame_);
+    tracker_->ObtainPatchesPoints(previous_frame_);
     
+    //tracker_->EstimatePose(previous_frame_, current_frame_);
     tracker_->FastEstimatePose(previous_frame_, current_frame_);
 
-    //tracker_->EstimatePose(previous_frame_, current_frame_);
-
+    // Change coordinates to correspond RViz coordinates
     UpdateWorldPose(temp_previous_world_pose_, previous_frame_->rigid_transformation_);
     
 }
@@ -244,6 +243,9 @@ void System::Mapping() {
 }
 
 void System::Visualize() {
+
+    // Set current camera frame to visualize
+    visualizer_->previous_world_pose_ = previous_world_pose_;
 
     visualizer_->UpdateMessages(previous_frame_);
 }

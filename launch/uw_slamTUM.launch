@@ -13,4 +13,7 @@
         
     <!-- Rviz visualizer-->
     <node pkg="rviz" type="rviz" name="rviz"/>
+
+    <node pkg="tf" type="static_transform_publisher" name="world_coordinate_frame" 
+        args="0 0 0 0 0 0 world world_coordinate 100" />
 </launch>

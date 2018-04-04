@@ -63,6 +63,28 @@ namespace uw
 
 class Frame;
 
+// A seed is a probabilistic depth estimate for a single pixel
+struct Seed {
+    int batch_counter;
+    int seed_counter;
+    int batch_id;       // Batch id is the id of the keyframe for which the seed was created
+    int id;             // Seed ID, only used for visualization
+
+    float a;            // a of Beta distribution: When high, probability of inlier is large
+    float b;            // b of Beta distribution: When high, probability of outlier is large
+    
+    float mu;           // Mean of normal distribution;
+    float z_range;      // Max range of the possible depth
+    float sigma2;       // Variance of normal distribution
+    Mat patch_cov;      // Patch covariance in reference image
+
+    Seed(Frame* frame, float depth_mean, float depth_min);
+};
+
+// Mapper implements the Bayesian Depth Filter Update proposed in:
+// 
+/// "Video-based, Real-Time Multi View Stereo" by G. Vogiatzis and C. Hernández.
+/// In Image and Vision Computing, 29(7):434-441, 2011.
 class Mapper {
 public:
 
@@ -76,6 +98,10 @@ public:
     SE3 previous_world_pose_;
     
     Mat recent_cloud_points_;
+
+    int max_num_keyframes_;                      // maximum number of keyframes to maintain seeds
+    double sigma_i_sq_;                          // image noise
+    double seed_convergence_sigma2_thresh_;      // threshold on depth uncertainty for convergence
 
     // Width and height of images for each pyramid level available  
     vector<int> w_ = vector<int>(PYRAMID_LEVELS);

@@ -25,7 +25,7 @@ namespace uw
 {
 
 Visualizer::Visualizer(int start_index, int num_images, Mat K, string _ground_truth_dataset, string ground_truth_path) {
-    
+
     use_ground_truth_ = false;
     num_images_ = num_images;
 
@@ -42,12 +42,21 @@ Visualizer::Visualizer(int start_index, int num_images, Mat K, string _ground_tr
     ros::Publisher publisher_camera_pose = nodehandle_camera_pose.advertise<visualization_msgs::Marker>("camera_pose", 50);
     visualization_msgs::Marker camera_pose;
 
+    // Choose starting point of SLAM system
+    init_x_ = 0;
+    init_y_ = 0;
+    init_z_ = 1;
+    init_gt_qx_ = 0;
+    init_gt_qy_ = 0;
+    init_gt_qz_ = 0;
+    init_gt_qw_ = 1;
+    
     // Camera pose marker options
     camera_pose.id = 1;
-    camera_pose.header.frame_id = "/world";           
+    camera_pose.header.frame_id = "world";           
     camera_pose.header.stamp = ros::Time::now();
     camera_pose.ns = "uw_slam";                        
-    camera_pose.type = visualization_msgs::Marker::ARROW;   
+    camera_pose.type = visualization_msgs::Marker::CUBE;   
     camera_pose.action = visualization_msgs::Marker::ADD;
     camera_pose.lifetime = ros::Duration();
     // Dimentions of camera pose marker   
@@ -78,10 +87,10 @@ Visualizer::Visualizer(int start_index, int num_images, Mat K, string _ground_tr
     camera_trajectory_dots.type = visualization_msgs::Marker::SPHERE_LIST;
     camera_trajectory_lines.type = visualization_msgs::Marker::LINE_STRIP;
 
-    camera_trajectory_dots.scale.x = 0.01;
-    camera_trajectory_dots.scale.y = 0.01;
+    camera_trajectory_dots.scale.x = 0.005;
+    camera_trajectory_dots.scale.y = 0.005;
 
-    camera_trajectory_lines.scale.x = 0.01;
+    camera_trajectory_lines.scale.x = 0.005;
 
     // Dots and lines are green
     camera_trajectory_dots.color.b = 1.0f;    
@@ -155,8 +164,8 @@ Visualizer::Visualizer(int start_index, int num_images, Mat K, string _ground_tr
         gt_trajectory_dots.type = visualization_msgs::Marker::SPHERE_LIST;
         gt_trajectory_lines.type = visualization_msgs::Marker::LINE_STRIP;
 
-        gt_trajectory_dots.scale.x = 0.01;
-        gt_trajectory_dots.scale.y = 0.01;
+        gt_trajectory_dots.scale.x = 0.005;
+        gt_trajectory_dots.scale.y = 0.005;
 
         gt_trajectory_lines.scale.x = 0.01;
 
@@ -200,7 +209,7 @@ Visualizer::Visualizer(int start_index, int num_images, Mat K, string _ground_tr
 
             ReadGroundTruthTUM(start_index, ground_truth_path);
             // Camera model changed for TUM dataset
-            camera_pose.type = visualization_msgs::Marker::CUBE; 
+            camera_pose.type = visualization_msgs::Marker::CUBE;
             camera_pose.scale.x = 0.35;                              
             camera_pose.scale.y = 0.025;
             camera_pose.scale.z = 0.2;
@@ -210,13 +219,14 @@ Visualizer::Visualizer(int start_index, int num_images, Mat K, string _ground_tr
             gt_pose.scale.y = 0.2;
             gt_pose.scale.z = 0.025;
             // TUM Convention of quaternion: qx, qy, qz, qw
-            gt_pose.pose.position.x = ground_truth_poses_[ground_truth_index_][0];    
-            gt_pose.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
-            gt_pose.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
-            gt_pose.pose.orientation.x = ground_truth_poses_[ground_truth_index_][3]; 
-            gt_pose.pose.orientation.y = ground_truth_poses_[ground_truth_index_][4];    
-            gt_pose.pose.orientation.z = ground_truth_poses_[ground_truth_index_][5]; 
-            gt_pose.pose.orientation.w = ground_truth_poses_[ground_truth_index_][6]; 
+            off_gt_x_ = ground_truth_poses_[ground_truth_index_][0];   
+            off_gt_y_ = ground_truth_poses_[ground_truth_index_][1];   
+            off_gt_z_ = ground_truth_poses_[ground_truth_index_][2];   
+            
+            off_gt_qx_ = ground_truth_poses_[ground_truth_index_][3]; 
+            off_gt_qy_ = ground_truth_poses_[ground_truth_index_][4];    
+            off_gt_qz_ = ground_truth_poses_[ground_truth_index_][5]; 
+            off_gt_qw_ = ground_truth_poses_[ground_truth_index_][6]; 
 
             // Initialize the camera pose marker in the same place and orientation as the ground truth marker
             // This initialization point depends of the start_index argument in SLAM process 
@@ -237,10 +247,7 @@ Visualizer::Visualizer(int start_index, int num_images, Mat K, string _ground_tr
             camera_pose.pose.orientation.z = 0;
             camera_pose.pose.orientation.w = 1;
 
-            Quaternion quat_init(0,0,0,1);
-            
-            //previous_pose_ = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
-            previous_world_pose_ = SE3(quat_init, SE3::Point(0, -1, 0));
+
         }
 
         // Saving ground truth markers configuration
@@ -285,84 +292,140 @@ Visualizer::Visualizer(int start_index, int num_images, Mat K, string _ground_tr
     point_cloud_ = point_cloud;
     publisher_point_cloud_ = publisher_point_cloud;
 
-    geometry_msgs::Point p3D;
+    graph_position_ = vector<vector<float> >(6);
+    
 
-    point_cloud_.points.push_back(p3D);   
 };
 
 Visualizer::~Visualizer() {};
 
 void Visualizer::UpdateMessages(Frame* _previous_frame){
     // Rate (Hz) of publishing messages
-    ros::Rate r(1000);
+    ros::Rate r(2000);
 
     // Update image message
     sensor_msgs::ImagePtr current_frame = cv_bridge::CvImage(std_msgs::Header(), "bgr8", _previous_frame->image_to_send).toImageMsg();
 
-    // Scaled movement of camera
-    Mat31f t_TUM;
-    t_TUM(0) =  _previous_frame->rigid_transformation_.translation().x();
-    t_TUM(1) =  _previous_frame->rigid_transformation_.translation().y();
-    t_TUM(2) =  _previous_frame->rigid_transformation_.translation().z();
+    //
+    //SE3 final_pose = previous_world_pose_ * _previous_frame->rigid_transformation_;
     
-    SE3 current_pose = SE3(_previous_frame->rigid_transformation_.unit_quaternion(), (t_TUM));
+    Mat31f t = previous_world_pose_.translation();
+    Quaternion quaternion = previous_world_pose_.unit_quaternion();
 
-    SE3 final_pose = previous_world_pose_ * current_pose;
+    float x = t(0) + init_x_;
+    float y = t(1) + init_y_;
+    float z = t(2) + init_z_;
+    float qx = quaternion.x();
+    float qy = quaternion.y();
+    float qz = quaternion.z();
+    float qw = quaternion.w();
     
-    Mat31f t = final_pose.translation();
-    Quaternion quaternion = final_pose.unit_quaternion();
-
     camera_pose_.pose.position.x = - t(0);  
     camera_pose_.pose.position.y = - t(2);
     camera_pose_.pose.position.z = - t(1);
     camera_pose_.pose.orientation.x = quaternion.x();
     camera_pose_.pose.orientation.y = quaternion.y();    
-    camera_pose_.pose.orientation.z = -quaternion.z(); 
+    camera_pose_.pose.orientation.z = quaternion.z(); 
     camera_pose_.pose.orientation.w = quaternion.w();
-    previous_world_pose_ = final_pose;
+
+    static tf::TransformBroadcaster br;
+    tf::Transform transform;
+    transform.setOrigin(tf::Vector3(x,y,z));
+    tf::Quaternion q;
+    q.setX(qx);
+    q.setY(qy);
+    q.setZ(qz);
+    q.setW(qw);
+    transform.setRotation(q);
+    
+    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", "camera"));
+
+    //previous_world_pose_ = final_pose;
     
 
     geometry_msgs::Point p;
-    p.x = camera_pose_.pose.position.x;
-    p.y = camera_pose_.pose.position.y;
-    p.z = camera_pose_.pose.position.z;
+    p.x = x;
+    p.y = y;
+    p.z = z;
     camera_trajectory_dots_.points.push_back(p);        
     camera_trajectory_lines_.points.push_back(p);
 
     // Add Point-Cloud
-    // AddPointCloudFromRGBD(_previous_frame);
-    //AddPointCloud(_previous_frame);
+    //AddPointCloudFromRGBD(_previous_frame);
+    AddPointCloud(_previous_frame);
+
+
 
     // Update ground truth marker position
-    if (use_ground_truth_) {
-        // EUROC Conventiobn: x, y, z, qw, qx, qy, qz
+    if (use_ground_truth_ && ground_truth_index_ < num_ground_truth_poses_) {
+        float x_gt, y_gt, z_gt;
+        float qx_gt, qy_gt, qz_gt, qw_gt;
+  
+        // EUROC Convention: x, y, z, qw, qx, qy, qz (changed quaternion order)
         if (ground_truth_dataset_ == "EUROC") {
-            gt_pose_.pose.position.x = ground_truth_poses_[ground_truth_index_][0];
-            gt_pose_.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
-            gt_pose_.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
-            gt_pose_.pose.orientation.x = ground_truth_poses_[ground_truth_index_][4];           
-            gt_pose_.pose.orientation.y = ground_truth_poses_[ground_truth_index_][5];        
-            gt_pose_.pose.orientation.z = ground_truth_poses_[ground_truth_index_][6];      
-            gt_pose_.pose.orientation.w = ground_truth_poses_[ground_truth_index_][3];
+            x_gt = -off_gt_x_ + ground_truth_poses_[ground_truth_index_][0] + init_x_;
+            y_gt = -off_gt_y_ + ground_truth_poses_[ground_truth_index_][1] + init_y_;
+            z_gt = -off_gt_z_ + ground_truth_poses_[ground_truth_index_][2] + init_z_;
+            qx_gt = -off_gt_qx_ + ground_truth_poses_[ground_truth_index_][4];
+            qy_gt = -off_gt_qy_ + ground_truth_poses_[ground_truth_index_][5];
+            qz_gt = -off_gt_qz_ + ground_truth_poses_[ground_truth_index_][6];
+            qw_gt = -off_gt_qw_ + ground_truth_poses_[ground_truth_index_][3];
+            
         }
-        // TUM Convention: x, y, z, qx, qy, qz, qw (changed translation)
+        // TUM Convention: x, y, z, qx, qy, qz, qw 
         if (ground_truth_dataset_ == "TUM") {
-            gt_pose_.pose.position.x = ground_truth_poses_[ground_truth_index_][0];
-            gt_pose_.pose.position.y = ground_truth_poses_[ground_truth_index_][1];
-            gt_pose_.pose.position.z = ground_truth_poses_[ground_truth_index_][2];
-            gt_pose_.pose.orientation.x = ground_truth_poses_[ground_truth_index_][3];           
-            gt_pose_.pose.orientation.y = ground_truth_poses_[ground_truth_index_][4];        
-            gt_pose_.pose.orientation.z = ground_truth_poses_[ground_truth_index_][5];      
-            gt_pose_.pose.orientation.w = ground_truth_poses_[ground_truth_index_][6];
+            x_gt = off_gt_y_ - ground_truth_poses_[ground_truth_index_][1] + init_x_;
+            y_gt = off_gt_x_ - ground_truth_poses_[ground_truth_index_][0] + init_y_;
+            z_gt = -off_gt_z_ + ground_truth_poses_[ground_truth_index_][2] + init_z_;
+            // qx_gt = -off_gt_qx_ + ground_truth_poses_[ground_truth_index_][3];
+            // qy_gt = -off_gt_qy_ + ground_truth_poses_[ground_truth_index_][4];
+            // qz_gt = -off_gt_qz_ + ground_truth_poses_[ground_truth_index_][5];
+            // qw_gt = -off_gt_qw_ + ground_truth_poses_[ground_truth_index_][6];
+            qx_gt = 0;
+            qy_gt = 0;
+            qz_gt = 0;
+            qw_gt = 1;
         }
+        // Send gt position
+        gt_pose_.pose.position.x = x_gt;
+        gt_pose_.pose.position.y = y_gt;
+        gt_pose_.pose.position.z = z_gt;
+        gt_pose_.pose.orientation.x = qx_gt;     
+        gt_pose_.pose.orientation.y = qy_gt;       
+        gt_pose_.pose.orientation.z = qz_gt; 
+        gt_pose_.pose.orientation.w = qw_gt;
+
+        tf::Transform transform_gt;
+        transform_gt.setOrigin(tf::Vector3(x_gt,y_gt,z_gt));
+        tf::Quaternion q_gt;
+        q_gt.setX(qx_gt);
+        q_gt.setY(qy_gt);
+        q_gt.setZ(qz_gt);
+        q_gt.setW(qw_gt);
+        transform_gt.setRotation(q_gt);
+        br.sendTransform(tf::StampedTransform(transform_gt, ros::Time::now(), "world", "gt"));
         
+        //
         geometry_msgs::Point gt_p;
-        gt_p.x = gt_pose_.pose.position.x;
-        gt_p.y = gt_pose_.pose.position.y;
-        gt_p.z = gt_pose_.pose.position.z;
+        gt_p.x = x_gt;
+        gt_p.y = y_gt;
+        gt_p.z = z_gt;
         gt_trajectory_dots_.points.push_back(gt_p);        
         gt_trajectory_lines_.points.push_back(gt_p);
+
         ground_truth_index_ += ground_truth_step_;
+
+        graph_position_[0].push_back(x);
+        graph_position_[1].push_back(x_gt);
+        graph_position_[2].push_back(y);
+        graph_position_[3].push_back(y_gt);        
+        graph_position_[4].push_back(z);
+        graph_position_[5].push_back(z_gt);
+
+        if (graph_position_[0].size() > 500) {
+            GraphXYZ(graph_position_);
+        }
+        
     }
 
     // Wait for Rviz to start sending messages
@@ -399,12 +462,14 @@ void Visualizer::AddPointCloud(Frame* frame) {
     int num_cloud_points = frame->map_.cols;
     Mat points_3D = frame->map_.clone();
 
+    Mat31f t = previous_world_pose_.translation();
+
     for (int i=0; i< points_3D.cols; i++) {
         geometry_msgs::Point p3D;
 
-        p3D.x = points_3D.at<float>(0,i) / points_3D.at<float>(3,i);
-        p3D.y = points_3D.at<float>(1,i) / points_3D.at<float>(3,i);
-        p3D.z = points_3D.at<float>(2,i) / points_3D.at<float>(3,i);
+        p3D.x = -points_3D.at<float>(0,i) / points_3D.at<float>(3,i) - t(0);
+        p3D.y = -points_3D.at<float>(2,i) / points_3D.at<float>(3,i) - t(2);
+        p3D.z = -points_3D.at<float>(1,i) / points_3D.at<float>(3,i) - t(1);
 
         point_cloud_.points.push_back(p3D);    
     }
@@ -426,11 +491,11 @@ void Visualizer::AddPointCloudFromRGBD(Frame* frame) {
     points_3D.col(1) = points_3D.col(1).mul(points_3D.col(2));
 
 
-    for (int i=0; i< points_3D.rows; i=i+100) {
+    for (int i=0; i< points_3D.rows; i++) {
         geometry_msgs::Point p3D;
 
         p3D.x = -points_3D.at<float>(i,0) - t(0);
-        p3D.y = -points_3D.at<float>(i,2) - t(2);
+        p3D.y =  points_3D.at<float>(i,2) + t(2);
         p3D.z = -points_3D.at<float>(i,1) - t(1);
 
         point_cloud_.points.push_back(p3D);    
@@ -465,7 +530,7 @@ void Visualizer::ReadGroundTruthTUM(int start_index, string groundtruth_path) {
     file.close();
     num_ground_truth_poses_ = ground_truth_poses_.size();
     ground_truth_step_ = num_ground_truth_poses_ / num_images_ ;
-    ground_truth_index_ = start_index * ground_truth_step_;  // + 600 is a temporarly fix for syncronous video and pose of ground truth (for EUROC V1_02_medium)
+    ground_truth_index_ = start_index * ground_truth_step_ + 100;  // + 100 is a temporarly fix for syncronous video and pose of ground truth
 };
 
 void Visualizer::ReadGroundTruthEUROC(int start_index, string groundtruth_path) {
@@ -495,5 +560,90 @@ void Visualizer::ReadGroundTruthEUROC(int start_index, string groundtruth_path) 
     ground_truth_step_ = num_ground_truth_poses_ / num_images_ ;
     ground_truth_index_ = start_index * ground_truth_step_ + 600;  // + 600 is a temporarly fix for syncronous video and pose of ground truth (for EUROC V1_02_medium)
 };
-                                               
+
+template <typename T>
+string to_string_with_precision(const T a_value, const int n = 6) {
+    std::ostringstream out;
+    out << std::setprecision(n) << a_value;
+    return out.str();
+};
+
+void Visualizer::GraphXYZ(vector<vector<float> > graph_values_) {
+
+    int desiredPrecision = 3;
+    int factor = pow(10, (int)desiredPrecision);
+    // Graph X - Ground Truth X
+
+    cv::Mat graphX(1480,1580, CV_8UC3, cv::Scalar(255,255,255));
+
+    // Obtain max and min values for both x and gt_x
+    auto max_x1 = *max_element(graph_values_[0].begin(), graph_values_[0].end());
+    auto min_x1 = *min_element(graph_values_[0].begin(), graph_values_[0].end());
+    auto max_x2 = *max_element(graph_values_[1].begin(), graph_values_[1].end());
+    auto min_x2 = *min_element(graph_values_[1].begin(), graph_values_[1].end());
+
+    float max, min;
+    int num_values = graph_values_[0].size();
+
+    if (max_x1 > max_x2) {
+        max = max_x1;
+    } else {
+        max = max_x2;
+    }
+    if (min_x1 < min_x2) {
+        min = min_x1;
+    } else {
+        min = min_x2;
+    }
+    
+    if (abs(max)<0.000001) {
+        max = 0.0;
+    }
+    if (abs(min)<0.000001) {
+        min = 0.0;
+    }
+
+    float label_step_y = abs((max - min) / 4);
+    int label_step_x = round(num_values / 4);
+
+    int step_x = round((1406-145) / num_values);
+    float step_y = abs(max - min) / 1280;
+    
+    for (int i=0; i<graph_values_[0].size(); i++) {
+        float x = graph_values_[0][i];
+        Point pt;
+        pt.x = 145 + step_x * i;
+
+        float x_aux = max;
+        for (int j=0; j<1280; j++) {
+            pt.y = 100 + j;
+            if (x_aux < x)
+                break;
+            x_aux -= step_y;
+        }
+        
+        circle(graphX, pt, 2, Scalar(255,0,0), -1, 6, 0);
+    }
+    // y-axis labels
+    cv::rectangle(graphX,cv::Point(130,1400),cv::Point(1450,80),cvScalar(0,0,0),1);
+    cv::putText(graphX, to_string_with_precision(min + 4*label_step_y,2), cv::Point(10,100), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+    cv::putText(graphX, to_string_with_precision(min + 3*label_step_y,2), cv::Point(10,420), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+    cv::putText(graphX, to_string_with_precision(min + 2*label_step_y,2), cv::Point(10,740), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+    cv::putText(graphX, to_string_with_precision(min + label_step_y,2), cv::Point(10,1060), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+    cv::putText(graphX, to_string_with_precision(min,2), cv::Point(10,1380), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+    // x-axis labels
+    cv::putText(graphX, std::to_string(0), cv::Point(152-7*1,1430), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+    cv::putText(graphX, std::to_string(label_step_x), cv::Point(467-7*2,1430), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+    cv::putText(graphX, std::to_string(2*label_step_x), cv::Point(787-7*3,1430), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+    cv::putText(graphX, std::to_string(3*label_step_x), cv::Point(1107-7*3,1430), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+    cv::putText(graphX, std::to_string(4*label_step_x), cv::Point(1427-7*3,1430), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+
+    Mat show;
+    resize(graphX, show, Size(), 0.5, 0.5);
+    imshow("Graph X vs GT_X", show);
+    waitKey(0);
+};
+
+
+
 }

@@ -32,12 +32,15 @@ class LocalParameterizationSE3;
 
 class RobustMatcher;
 
-RobustMatcher::RobustMatcher(int detector) {
-
+RobustMatcher::RobustMatcher(int detector, int w_, int h_) {
     // Matchers
     ORB_matcher_ = cv::cuda::DescriptorMatcher::createBFMatcher(NORM_HAMMING);
     SURF_matcher_ = cv::cuda::DescriptorMatcher::createBFMatcher();    
-
+    
+    patch_dim_ = 32;
+    num_x_ = w_ / patch_dim_;
+    num_y_ = h_ / patch_dim_;
+    
     if (detector == 0){
         isSURF_ = false;
         isORB_  = true;
@@ -122,7 +125,7 @@ Mat RobustMatcher::ransacTest(const vector<DMatch>& matches, const vector<KeyPoi
     }
     // Compute F matrix using RANSAC
     std::vector<uchar> inliers(points1.size(),0);
-    if (points1.size()>0&&points2.size()>0){
+    if (points1.size()>0&&points2.size()>0) {
         cv::Mat fundemental= findFundamentalMat(
             cv::Mat(points1),cv::Mat(points2), // matching points
             inliers,       // match status (inlier or outlier)
@@ -147,12 +150,10 @@ Mat RobustMatcher::ransacTest(const vector<DMatch>& matches, const vector<KeyPoi
             // for final F computation
             points1.clear();
             points2.clear();
-            for (std::vector<cv::DMatch>::
-                    const_iterator it= outMatches.begin();
-                it!= outMatches.end(); ++it) {
+            for (std::vector<cv::DMatch>::const_iterator it = outMatches.begin(); it!= outMatches.end(); ++it) {
                 // Get the position of left keypoints
-                float x= keypoints1[it->queryIdx].pt.x;
-                float y= keypoints1[it->queryIdx].pt.y;
+                float x = keypoints1[it->queryIdx].pt.x;
+                float y = keypoints1[it->queryIdx].pt.y;
                 points1.push_back(cv::Point2f(x,y));
                 // Get the position of right keypoints
                 x= keypoints2[it->trainIdx].pt.x;
@@ -160,7 +161,7 @@ Mat RobustMatcher::ransacTest(const vector<DMatch>& matches, const vector<KeyPoi
                 points2.push_back(cv::Point2f(x,y));
             }
             // Compute 8-point F from all accepted matches
-            if (points1.size()>0&&points2.size()>0){
+            if (points1.size()>0 && points2.size()>0){
                 fundemental= cv::findFundamentalMat(
                 cv::Mat(points1),cv::Mat(points2), // matches
                 CV_FM_8POINT); // 8-point method
@@ -168,6 +169,43 @@ Mat RobustMatcher::ransacTest(const vector<DMatch>& matches, const vector<KeyPoi
         }
     }
     return fundemental;
+}
+
+void RobustMatcher::GridFiltering(vector<DMatch> matches, vector<KeyPoint> keypoints, vector<DMatch>& outmatches) {
+    
+    int best_score = 100;
+    int index = 0, m = 0;
+    int best_distance = 100;
+    DMatch best_match;
+    
+    // Iterate through each cells in the image
+    for (int i=0; i<num_x_; i++) {
+        for (int j=0; j<num_y_; j++) {
+            
+            best_distance = 100;
+            // Checks for each of the matches
+            for (DMatch match : matches) {
+                // Check if feature match is inside the current cell
+                if (keypoints[match.queryIdx].pt.x >= patch_dim_ * i && keypoints[match.queryIdx].pt.x < patch_dim_ * (i+1) &&
+                    keypoints[match.queryIdx].pt.y >= patch_dim_ * j && keypoints[match.queryIdx].pt.y < patch_dim_ * (j+1)) {
+                    
+                    // Finds the best match
+                    if (match.distance < best_distance) {
+                        best_distance = match.distance;
+                        best_match = match;
+                    }
+                    
+                    // Erase match, to improve search of matches
+                    matches.erase(matches.begin() + m);
+                }
+                m++;
+            }
+        // Check if no matches were found
+        if (best_distance != 100)
+            outmatches.push_back(best_match);
+
+        }
+    }
 }
 
 void RobustMatcher::DetectAndTrackFeatures(Frame* _previous_frame, Frame* _current_frame, bool usekeypoints) {
@@ -216,9 +254,14 @@ void RobustMatcher::DetectAndTrackFeatures(Frame* _previous_frame, Frame* _curre
         orb_->detectAndCompute(previous_frameGPU, cuda::GpuMat(), keypoints[0], descriptorsGPU[0], usekeypoints);
         orb_->detectAndCompute(current_frameGPU, cuda::GpuMat(), keypoints[1], descriptorsGPU[1]);
 
+        Mat descriptors1, descriptors2;
+        descriptorsGPU[0].download(descriptors1);
+        descriptorsGPU[1].download(descriptors2);
+       
         ORB_matcher_->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches1, 2);
         ORB_matcher_->knnMatch(descriptorsGPU[1], descriptorsGPU[0], matches2, 2);
     }
+
 
     // Remove matches for which NN ratio is > than threshold
     // clean image 1 -> image 2 matches
@@ -229,20 +272,26 @@ void RobustMatcher::DetectAndTrackFeatures(Frame* _previous_frame, Frame* _curre
     // Remove non-symmetrical matches
     vector<DMatch> symMatches;
     symmetryTest(matches1, matches2, symMatches);
-
+    
     // Validate matches using RANSAC
-    vector< DMatch> goodMatches;    
-    Mat fundamental = ransacTest(symMatches, keypoints[0], keypoints[1], goodMatches);
+    vector<DMatch> matches;    
+    Mat fundamental = ransacTest(symMatches, keypoints[0], keypoints[1], matches);
+
+    // Filter matches through image grid (Patches of 32 x 32 pixels)
+    vector<DMatch> goodMatches;   
+    GridFiltering(matches, keypoints[0], goodMatches);
 
     // Obtain good keypoints from goodMatches
     array<vector<KeyPoint>,2> goodKeypoints;
     goodKeypoints = getGoodKeypoints(goodMatches, keypoints);
 
     _previous_frame->n_matches_ = goodMatches.size();
-    _current_frame->n_matches_ = goodMatches.size();
+    _current_frame->n_matches_  = goodMatches.size();
     
-    _previous_frame->keypoints_ = goodKeypoints[0];    
+    _previous_frame->keypoints_ = goodKeypoints[0];
     _current_frame->keypoints_  = goodKeypoints[1];
+    KeyPoint::convert(goodKeypoints[0], _previous_frame->points_);
+    KeyPoint::convert(goodKeypoints[1], _current_frame->points_);
 
     // Show results
     // Mat img_matches;
@@ -268,34 +317,17 @@ array<vector<KeyPoint>,2> RobustMatcher::getGoodKeypoints(vector<DMatch> goodMat
     return goodKeypoints;
 }
 
-Tracker::Tracker(bool _depth_available) {
-    robust_matcher_ = new RobustMatcher(0);
+// TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com)
+// 02-20-2018 - Review: Obtaining the precomputed invK (for each pyramid level) is necessary?
+Tracker::Tracker(bool _depth_available, int _width, int _height, Mat _K) {
     depth_available_ = _depth_available;
     for (Mat K: K_)
         K = Mat(3,3,CV_32FC1, Scalar(0.f));
-};
-
-Tracker::~Tracker() {
-    w_.clear();
-    h_.clear();
-    fx_.clear();
-    fy_.clear();
-    cx_.clear();
-    cy_.clear();
-    invfx_.clear();
-    invfy_.clear();
-    invcx_.clear();
-    invcy_.clear();
-
-    K_.clear();
-};
-
-// TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com)
-// 02-20-2018 - Review: Obtaining the precomputed invK (for each pyramid level) is necessary?
-void Tracker::InitializePyramid(int _width, int _height, Mat _K) {
+    
     w_[0] = _width;
     h_[0] = _height;
     K_[0] = _K;
+
     // invK_[0] = _K.inv();
 
     fx_[0] = _K.at<float>(0,0);
@@ -335,7 +367,25 @@ void Tracker::InitializePyramid(int _width, int _height, Mat _K) {
         // invcx_[lvl] = invK_[lvl].at<float>(0,2);
         // invcy_[lvl] = invK_[lvl].at<float>(1,2);
     }
-}
+
+    robust_matcher_ = new RobustMatcher(0, w_[0], h_[0]);
+    
+};
+
+Tracker::~Tracker() {
+    w_.clear();
+    h_.clear();
+    fx_.clear();
+    fy_.clear();
+    cx_.clear();
+    cy_.clear();
+    invfx_.clear();
+    invfy_.clear();
+    invcx_.clear();
+    invcy_.clear();
+
+    K_.clear();
+};
 
 void Tracker::InitializeMasks() {
 
@@ -361,14 +411,14 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     // Gauss-Newton Optimization Options
     float epsilon = 0.001;
     float intial_factor = 10;
-    int max_iterations = 4;
+    int max_iterations = 6;
     float error_threshold = 0.005;
     int first_pyramid_lvl = PYRAMID_LEVELS-1;
-    int last_pyramid_lvl = 0;
+    int last_pyramid_lvl = 1;
     
-    float xy_factor = 0.15;
-    float z_factor = 0.0005;
-    float angle_factor = 0.00006;
+    float xy_factor = 1.0;
+    float z_factor = 1.0;
+    float angle_factor = 1.0;
     
     // Variables initialization
     float error         = 0.0;
@@ -398,12 +448,11 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         Mat image2 = _current_frame->images_[lvl].clone();
 
         // Obtain points and depth of initial frame 
-        Mat candidatePoints1  = _previous_frame->candidatePoints_[lvl].clone();
-        Mat candidatePoints2  = _current_frame->candidatePoints_[lvl].clone();    
+        Mat candidatePoints1  = _previous_frame->candidatePoints_[lvl].clone();  
         
         // Obtain gradients           
-        Mat gradientX1 = Mat::zeros(image1.size(), CV_16SC1);
-        Mat gradientY1 = Mat::zeros(image1.size(), CV_16SC1);
+        Mat gradientX1 = Mat::zeros(image1.size(), CV_32FC1);
+        Mat gradientY1 = Mat::zeros(image1.size(), CV_32FC1);
         gradientX1 = _previous_frame->gradientX_[lvl].clone();
         gradientY1 = _previous_frame->gradientY_[lvl].clone();
 
@@ -473,8 +522,8 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
                         Residual.at<float>(0,0) = intensity2 - intensity1;
                         
-                        Jl.at<float>(0,0) = gradientX1.at<short>(y1,x1);
-                        Jl.at<float>(0,1) = gradientY1.at<short>(y1,x1);
+                        Jl.at<float>(0,0) = gradientX1.at<float>(y1,x1);
+                        Jl.at<float>(0,1) = gradientY1.at<float>(y1,x1);
 
                         Jacobian_row = Jl * Jw;
                         // cout << "Residual: " << Residual.at<float>(0,0) << endl;
@@ -572,7 +621,6 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
             // Update new pose with computed delta
             current_pose = current_pose * SE3::exp(deltaVector);
-            
         }
 
         // Scale current_pose estimation to next lvl
@@ -585,11 +633,17 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             quaternion.y() = quaternion.y() * 2;
             quaternion.z() = quaternion.z() * 2;
             
-            current_pose = SE3(quaternion, t);
+            current_pose = SE3(quaternion, t); 
         }
         
         //current_pose = SE3(current_pose.unit_quaternion() * 2, current_pose.translation() * 2);
     }
+    Mat31f t_;
+    t_(0) = 84 * current_pose.translation().x();
+    t_(1) = 84 * current_pose.translation().y();
+    t_(2) = 84 * current_pose.translation().z();
+    
+    current_pose = SE3(current_pose.unit_quaternion(), (t_));
 
     _previous_frame->rigid_transformation_ = current_pose;
 
@@ -601,13 +655,13 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     // Gauss-Newton Optimization Options
     float epsilon = 0.001;
     float intial_factor = 10;
-    int max_iterations = 50;
+    int max_iterations = 10;
     float error_threshold = 0.005;
     int first_pyramid_lvl = 0;
     int last_pyramid_lvl = 0;
     
     float xy_factor = 1.0;
-    float z_factor = 1.0;
+    float z_factor  = 0.008;
     float angle_factor = 1.0;
     
     // Variables initialization
@@ -624,8 +678,7 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     SE3 current_pose = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
 
     // Sparse to Fine iteration
-    // Create for() WORKED WITH LVL 2
-    for (int lvl = first_pyramid_lvl; lvl>=last_pyramid_lvl; lvl--) {
+    for (int lvl=first_pyramid_lvl; lvl>=last_pyramid_lvl; lvl--) {
         //lvl = 0;
         // Initialize error   
         error = 0.0;
@@ -640,7 +693,6 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         Mat candidatePoints1  = _previous_frame->candidatePoints_[lvl].clone();
         Mat informationPoints1 = _previous_frame->informationPoints_[lvl].clone();
 
-        cout << candidatePoints1 << endl;
         // Obtain gradients           
         Mat gradientX1 = Mat::zeros(image1.size(), CV_16SC1);
         Mat gradientY1 = Mat::zeros(image1.size(), CV_16SC1);
@@ -657,7 +709,10 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         __m128 cy = _mm_set1_ps(cy_[lvl]);
         __m128 invfx = _mm_set1_ps(invfx_[lvl]);
         __m128 invfy = _mm_set1_ps(invfy_[lvl]);
-
+        __m128 f_xy = _mm_set1_ps(xy_factor);
+        __m128 f_z = _mm_set1_ps(z_factor);
+        __m128 f_a = _mm_set1_ps(angle_factor);
+        
         // Optimization iteration
         for (int k=0; k<max_iterations; k++) {
             
@@ -665,70 +720,6 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             SE3 deltaSE3;
             Mat warpedPoints = Mat(candidatePoints1.size(), CV_32FC1);
             warpedPoints = WarpFunction(candidatePoints1, current_pose, lvl);
-        
-            Mat Jacobians;
-            Mat Residuals;
-            int num_valid = 0;
-            for (int i=0; i<candidatePoints1.rows; i++) {
-                Mat Residual = Mat(1,1,CV_32FC1);        
-                Mat Jacobian_row = Mat::zeros(1,6,CV_32FC1);
-                Mat Jw = Mat::zeros(2,6,CV_32FC1);
-                Mat Jl = Mat::zeros(1,2,CV_32FC1);
-                
-                // Point in frame 1            
-                float x1 = candidatePoints1.at<float>(i,0);
-                float y1 = candidatePoints1.at<float>(i,1);
-                float z1 = candidatePoints1.at<float>(i,2);
-                // Points of warped frame
-                float x2 = warpedPoints.at<float>(i,0);
-                float y2 = warpedPoints.at<float>(i,1);
-                float z2 = warpedPoints.at<float>(i,2);
-
-                float inv_z2 = 1 / z2;
-
-                // Check if warpedPoints are out of boundaries
-                if (y2>0 && y2<image2.rows && x2>0 && x2<image2.cols) {
-                    if (z2!=0) {
-                        if (inv_z2<0) 
-                            inv_z2 = 0;
-                        num_valid++;
-                        Jw.at<float>(0,0) = fx_[lvl] * inv_z2 * xy_factor;
-                        Jw.at<float>(0,1) = 0.0;
-                        Jw.at<float>(0,2) = -(fx_[lvl] * x2 * inv_z2 * inv_z2) * z_factor;
-                        Jw.at<float>(0,3) = -(fx_[lvl] * x2 * y2 * inv_z2 * inv_z2) * angle_factor;
-                        Jw.at<float>(0,4) = (fx_[lvl] * (1 + x2 * x2 * inv_z2 * inv_z2)) * angle_factor;   
-                        Jw.at<float>(0,5) = - fx_[lvl] * y2 * inv_z2 * angle_factor;
-
-                        Jw.at<float>(1,0) = 0.0;
-                        Jw.at<float>(1,1) = fy_[lvl] * inv_z2 * xy_factor;
-                        Jw.at<float>(1,2) = -(fy_[lvl] * y2 * inv_z2 * inv_z2) * z_factor;
-                        Jw.at<float>(1,3) = -(fy_[lvl] * (1 + y2 * y2 * inv_z2 * inv_z2)) * angle_factor;
-                        Jw.at<float>(1,4) = fy_[lvl] * x2 * y2 * inv_z2 * inv_z2 * angle_factor;
-                        Jw.at<float>(1,5) = fy_[lvl] * x2 * inv_z2 * angle_factor;
-
-                    
-                        // Intensities
-                        int intensity1 = image1.at<uchar>(y1,x1);
-                        int intensity2 = image2.at<uchar>(round(y2),round(x2));
-
-                        Residual.at<float>(0,0) = intensity2 - intensity1;
-                        
-                        Jl.at<float>(0,0) = gradientX1.at<short>(y1,x1);
-                        Jl.at<float>(0,1) = gradientY1.at<short>(y1,x1);
-
-                        Jacobian_row = Jl * Jw;
-                        // cout << "Normal results: " << endl;
-                        // cout << x1 << " " << y1 << " " << intensity1 << endl;
-                        // cout << "Jl: " << Jl << endl;                
-                        // cout << "Jw: " << Jw << endl;                                
-                        // cout << "Jacobian: " << Jacobian_row << endl;
-                        // cout << endl;
-                        
-                        Jacobians.push_back(Jacobian_row);
-                        Residuals.push_back(Residual);
-                    }
-                }
-            }
 
             // SSE Warp Function Optimization
             // Obtain values for current pose
@@ -747,8 +738,7 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             
             int i = 0;
             int is = 0;
-            int num_points = candidatePoints1.rows;            
-            cout << num_points << endl;
+            int num_points = candidatePoints1.rows;
 
             float* x_Result = (float*) _mm_malloc(num_points * sizeof(float), 16);
             float* y_Result = (float*) _mm_malloc(num_points * sizeof(float), 16);
@@ -760,6 +750,9 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             float* J4 = (float*) _mm_malloc(num_points * sizeof(float), 16);
             float* J5 = (float*) _mm_malloc(num_points * sizeof(float), 16);
             float* J6 = (float*) _mm_malloc(num_points * sizeof(float), 16);
+
+            float* Res = (float*) _mm_malloc(num_points * sizeof(float), 16);
+            
             
             __m128* x_ResultSSE = (__m128*) x_Result;
             __m128* y_ResultSSE = (__m128*) y_Result;
@@ -772,17 +765,19 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             __m128* J5_SSE = (__m128*) J5;
             __m128* J6_SSE = (__m128*) J6;
 
-            cout << "fx: " << fx_[lvl] << endl;
-            cout << "fy: " << fy_[lvl] << endl;
-            cout << "invfx: " << invfx_[lvl] << endl;
-            cout << "invfy: " << invfy_[lvl] << endl;  
-            cout << "cx: " << cx_[lvl] << endl; 
-            cout << "cy: " << cy_[lvl] << endl; 
-            cout << "Current pose: " << endl;
-            cout << current_pose.matrix() << endl;
+            __m128* Res_SSE = (__m128*) Res;
+
+            // cout << "fx: " << fx_[lvl] << endl;
+            // cout << "fy: " << fy_[lvl] << endl;
+            // cout << "invfx: " << invfx_[lvl] << endl;
+            // cout << "invfy: " << invfy_[lvl] << endl;  
+            // cout << "cx: " << cx_[lvl] << endl; 
+            // cout << "cy: " << cy_[lvl] << endl; 
+            // cout << "Current pose: " << endl;
+            // cout << current_pose.matrix() << endl;
 
             __m128 x, y, z;
-            __m128 i_1, gX, gY;
+            __m128 i_1, i_2, gX, gY;
             __m128 x_, y_, z_;
             __m128 x_w, y_w, z_w;            
             __m128 j1, j2, j31, j32, j3, j41, j42, j4, j51, j52, j5, j61, j62, j6;
@@ -790,17 +785,17 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             bool show = true;
             int num_actual = 0;
             for ( auto it = candidatePoints1.begin<float>(), end_it = candidatePoints1.end<float>(), 
-                    inf = informationPoints1.begin<float>(), end_inf = informationPoints1.end<float>(); it!= end_it, inf!=end_inf; 
+                    inf = informationPoints1.begin<float>(), end_inf = informationPoints1.end<float>(); it+5!= end_it, inf+5!=end_inf; 
                     it+=16, inf+=16) {
-                float x1 = *it, y1 = *(it+1), z1 = *(it+2);
-                float x2 = *(it+4), y2 = *(it+5), z2 = *(it+6);             
-                float x3 = *(it+8), y3 = *(it+9), z3 = *(it+10);             
-                float x4 = *(it+12), y4 = *(it+13), z4 = *(it+14);
+                // float x1 = *it, y1 = *(it+1), z1 = *(it+2);
+                // float x2 = *(it+4), y2 = *(it+5), z2 = *(it+6);             
+                // float x3 = *(it+8), y3 = *(it+9), z3 = *(it+10);             
+                // float x4 = *(it+12), y4 = *(it+13), z4 = *(it+14);
 
-                float i1 = *(inf+12), gX1 = *(inf+13), gY1 = *(inf+14);
-                float i2 = *(inf+8), gX2 = *(inf+9), gY2 = *(inf+10);             
-                float i3 = *(inf+4), gX3 = *(inf+5), gY3 = *(inf+6);             
-                float i4 = *inf, gX4 = *(inf+1), gY4 = *(inf+2);      
+                // float i1 = *(inf+12), gX1 = *(inf+13), gY1 = *(inf+14);
+                // float i2 = *(inf+8), gX2 = *(inf+9), gY2 = *(inf+10);             
+                // float i3 = *(inf+4), gX3 = *(inf+5), gY3 = *(inf+6);             
+                // float i4 = *inf, gX4 = *(inf+1), gY4 = *(inf+2);      
 
                 x = _mm_set_ps(*(it+12), *(it+8), *(it+4), *it);
                 y = _mm_set_ps(*(it+13), *(it+9), *(it+5), *(it+1));
@@ -838,27 +833,43 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                 // y_w = _mm_add_ps(_mm_mul_ps(_mm_mul_ps(y_w,fy), zRecip), cy);  
                 y_w = _mm_add_ps(_mm_mul_ps(_mm_mul_ps(y_w,fy), z_inv), cy);   
 
+                // Saving x_w and y_w values
+                x_ResultSSE[i] = x_w;
+                y_ResultSSE[i] = y_w;                
+                z_ResultSSE[i] = z_w;
+
+                // Obtaining intensities of warped points
+                float in2_1 = image2.at<uchar>(round(y_Result[0+is]),round(x_Result[0+is]));
+                float in2_2 = image2.at<uchar>(round(y_Result[1+is]),round(x_Result[1+is]));
+                float in2_3 = image2.at<uchar>(round(y_Result[2+is]),round(x_Result[2+is]));
+                float in2_4 = image2.at<uchar>(round(y_Result[3+is]),round(x_Result[3+is]));
+            
+                //i_2 = _mm_set_ps(in2_1, in2_2, in2_3, in2_4);
+                i_2 = _mm_set_ps(in2_4, in2_3, in2_2, in2_1);
+                
+                // Compute residuals
+                __m128 res = _mm_sub_ps(i_2, i_1);
+                Res_SSE[i] = res;
+
                 // Computing Jacobians
                 __m128 z_inv2 = _mm_mul_ps(z_inv, z_inv);
                 j1 = _mm_mul_ps(_mm_mul_ps(fx, z_inv), gX);
                 j2 = _mm_mul_ps(_mm_mul_ps(fy, z_inv), gY);
                 j31 = _mm_xor_ps(_mm_mul_ps(_mm_mul_ps(_mm_mul_ps(fx, x_w), z_inv2), gX), _mm_set1_ps(-0.0)); // xor changes signed
                 j32 = _mm_xor_ps(_mm_mul_ps(_mm_mul_ps(_mm_mul_ps(fy, y_w), z_inv2), gY), _mm_set1_ps(-0.0)); // xor changes signed
-                j3 = _mm_add_ps(j31, j32);
+                j3 = _mm_mul_ps(_mm_add_ps(j31, j32), f_z);
                 j41 = _mm_xor_ps(_mm_mul_ps(_mm_mul_ps(_mm_mul_ps(_mm_mul_ps(fx, x_w), z_inv2), y_w), gX), _mm_set1_ps(-0.0)); // xor changes signed                
                 j42 = _mm_xor_ps(_mm_mul_ps(_mm_mul_ps(_mm_add_ps(_mm_mul_ps(_mm_mul_ps(y_w, y_w), z_inv2), _mm_set1_ps(1.0f)), fy), gY), _mm_set1_ps(-0.0));
-                j4 = _mm_add_ps(j41, j42);
+                j4 = _mm_mul_ps(_mm_add_ps(j41, j42), f_a);
                 j51 = _mm_mul_ps(_mm_mul_ps(_mm_add_ps(_mm_mul_ps(_mm_mul_ps(x_w, x_w), z_inv2), _mm_set1_ps(1.0f)), fx), gX);
                 j52 = _mm_mul_ps(_mm_mul_ps(_mm_mul_ps(_mm_mul_ps(fy, x_w), z_inv2), y_w), gY); 
-                j5 = _mm_add_ps(j51, j52);
+                j5 = _mm_mul_ps(_mm_add_ps(j51, j52), f_a);
                 j61 = _mm_xor_ps(_mm_mul_ps(_mm_mul_ps(_mm_mul_ps(fx, z_inv), gX), y_w), _mm_set1_ps(-0.0));
                 j62 = _mm_mul_ps(_mm_mul_ps(_mm_mul_ps(fy, z_inv), gY), x_w);
-                j6 = _mm_add_ps(j61, j62);
+                j6 = _mm_mul_ps(_mm_add_ps(j61, j62), f_a);
 
                 __m128 value = _mm_set1_ps(2);
-                x_ResultSSE[i] = x_w;
-                y_ResultSSE[i] = y_w;
-                z_ResultSSE[i] = z_w;
+
                 J1_SSE[i] = j1;
                 J2_SSE[i] = j2;
                 J3_SSE[i] = j3;
@@ -868,65 +879,74 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                 
                 //if(show) {
             
-                    cout << x1 << " " << y1 << " " << z1 << " | " << i1 << " " << gX1 << " " << gY1 << endl;
-                    cout << x_Result[0+is] << " " << y_Result[0+is] << " " << z_Result[0+is] << endl;
-                    cout << J1[0+is] << " " << J2[0+is] << " " << J3[0+is] << " " << J4[0+is] << " " << J5[0+is] << " " << J6[0+is] << endl;
-                    cout << Jacobians.row(num_actual) << endl;
-
-                    cout << x2 << " " << y2 << " " << z3 << " | " << i2 << " " << gX2 << " " << gY2 << endl;
-                    cout << x_Result[1+is] << " " << y_Result[1+is] << " " << z_Result[1+is] << endl;  
-                    cout << J1[1+is] << " " << J2[1+is] << " " << J3[1+is] << " " << J4[1+is] << " " << J5[1+is] << " " << J6[1+is] << endl;
-                    cout << Jacobians.row(num_actual+1) << endl;
-
-                    cout << x3 << " " << y3 << " " << z3 << " | " << i3 << " " << gX3 << " " << gY3 << endl;
-                    cout << x_Result[2+is] << " " << y_Result[2+is] << " " << z_Result[2+is] << endl;
-                    cout << J1[2+is] << " " << J2[2+is] << " " << J3[2+is] << " " << J4[2+is] << " " << J5[2+is] << " " << J6[2+is] << endl;
-                    cout << Jacobians.row(num_actual+2) << endl;
+                    // cout << x1 << " " << y1 << " " << z1 << " | " << i1 << " " << gX1 << " " << gY1 << endl;
+                    // cout << x_Result[0+is] << " " << y_Result[0+is] << " " << z_Result[0+is] << endl;
+                    // cout << J1[0+is] << " " << J2[0+is] << " " << J3[0+is] << " " << J4[0+is] << " " << J5[0+is] << " " << J6[0+is] << endl;
+                    // cout << Jacobians.row(num_actual) << endl;
+                    // cout << Res[0+is] << endl;
+                    // cout << Residuals.row(num_actual) << endl;
                     
-                    cout << x4 << " " << y4 << " " << z4 << " | " << i4 << " " << gX4 << " " << gY4 << endl;;
-                    cout << x_Result[3+is] << " " << y_Result[3+is] << " " << z_Result[3+is] << endl;
-                    cout << J1[3+is] << " " << J2[3+is] << " " << J3[3+is] << " " << J4[3+is] << " " << J5[3+is] << " " << J6[3+is] << endl;
-                    cout << Jacobians.row(num_actual+3) << endl;
-                    
-                    show = false;
+                    // cout << x2 << " " << y2 << " " << z3 << " | " << i2 << " " << gX2 << " " << gY2 << endl;
+                    // cout << x_Result[1+is] << " " << y_Result[1+is] << " " << z_Result[1+is] << endl;  
+                    // cout << J1[1+is] << " " << J2[1+is] << " " << J3[1+is] << " " << J4[1+is] << " " << J5[1+is] << " " << J6[1+is] << endl;
+                    // cout << Jacobians.row(num_actual+1) << endl;
+                    // cout << Res[1+is] << endl;
+                    // cout << Residuals.row(num_actual+1) << endl;
+
+                    // cout << x3 << " " << y3 << " " << z3 << " | " << i3 << " " << gX3 << " " << gY3 << endl;
+                    // cout << x_Result[2+is] << " " << y_Result[2+is] << " " << z_Result[2+is] << endl;
+                    // cout << J1[2+is] << " " << J2[2+is] << " " << J3[2+is] << " " << J4[2+is] << " " << J5[2+is] << " " << J6[2+is] << endl;
+                    // cout << Jacobians.row(num_actual+2) << endl;
+                    // cout << Res[2+is] << endl;
+                    // cout << Residuals.row(num_actual+2) << endl;
+
+                    // cout << x4 << " " << y4 << " " << z4 << " | " << i4 << " " << gX4 << " " << gY4 << endl;;
+                    // cout << x_Result[3+is] << " " << y_Result[3+is] << " " << z_Result[3+is] << endl;
+                    // cout << J1[3+is] << " " << J2[3+is] << " " << J3[3+is] << " " << J4[3+is] << " " << J5[3+is] << " " << J6[3+is] << endl;
+                    // cout << Jacobians.row(num_actual+3) << endl;
+                    // cout << Res[3+is] << endl;
+                    // cout << Residuals.row(num_actual+3) << endl;
+                    // show = false;
                 //}
 
                 num_actual+=4;
                 is+=4;
                 i++;
             }
-            cout << num_points << " " << num_actual << endl;
+            // cout << num_points << " " << num_actual << endl;
             vector<float> prueba_J1 {J1, J1+num_points};
-            Mat Jacobians2 = Mat::zeros(num_points, 1, CV_32FC1);
-            memcpy(Jacobians2.data, prueba_J1.data(), prueba_J1.size() *sizeof(float));
+            vector<float> prueba_J2 {J2, J2+num_points};
+            vector<float> prueba_J3 {J3, J3+num_points};
+            vector<float> prueba_J4 {J4, J4+num_points};
+            vector<float> prueba_J5 {J5, J5+num_points};
+            vector<float> prueba_J6 {J6, J6+num_points};
 
+            vector<float> resid {Res, Res+num_points};
+
+            vector<Mat> Jacobianrows = vector<Mat>(6);
+            Mat Residuals = Mat(resid);
+            Jacobianrows[0] = Mat(prueba_J1);
+            Jacobianrows[1] = Mat(prueba_J2);
+            Jacobianrows[2] = Mat(prueba_J3);
+            Jacobianrows[3] = Mat(prueba_J4);
+            Jacobianrows[4] = Mat(prueba_J5);
+            Jacobianrows[5] = Mat(prueba_J6);
             
 
+            Mat Jacobians = Mat(num_points, 6, CV_32FC1);
+            hconcat(Jacobianrows, Jacobians);
+
+            // Freeing memory
             _mm_free(x_Result);
             _mm_free(y_Result);
             _mm_free(z_Result);
-            
-        
-            
-            Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
-            Mat validPixels = ObtainImageTransformed(image1, candidatePoints1, warpedPoints, imageWarped);
-            Mat image2_filtered = image2.mul(validPixels);
-
-            vector<uchar> image2_aux;
-            image2_aux.assign((uchar*)image2.datastart, (uchar*)image2.dataend);
-            Mat intensities2_uchar = Mat(image2.size(), CV_32FC1);
-            intensities2_uchar = Mat(image2_aux);
-            
-
-            // Computation of Jacobian and Residuals
-            Mat Jw1 = Mat::zeros(warpedPoints.rows, 6, CV_32FC1);
-            Mat Jw2 = Mat::zeros(warpedPoints.rows, 6, CV_32FC1);
-
-           
-
-
-            
-            
+            _mm_free(J1);
+            _mm_free(J2);
+            _mm_free(J3);
+            _mm_free(J4);
+            _mm_free(J5);
+            _mm_free(J6);
+            _mm_free(Res);
 
             // Computation of Weights (Identity or Tukey function)
             Mat W = IdentityWeights(Residuals.rows);
@@ -943,16 +963,17 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
             // Break if error increases
             if (error >= last_error || k == max_iterations-1 || abs(error - last_error) < epsilon) {
-                cout << "Pyramid level: " << lvl << endl;
-                cout << "Number of iterations: " << k << endl;
-                cout << "Initial-Final Error: " << initial_error << " - " << last_error << endl << endl;
+                // cout << "Pyramid level: " << lvl << endl;
+                // cout << "Number of iterations: " << k << endl;
+                // cout << "Error: " << error << endl;                
+                // cout << "Initial-Final Error: " << initial_error << " - " << last_error << endl << endl;
 
-                if (lvl == last_pyramid_lvl) {
-                    //DebugShowJacobians(Jacobians, warpedPoints, w_[lvl], h_[lvl]);
-                    Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
-                    ObtainImageTransformed(image1, candidatePoints1, warpedPoints, imageWarped);             
-                    DebugShowWarpedPerspective(image1, image2, imageWarped, lvl);
-                }
+                // if (lvl == last_pyramid_lvl) {
+                //     //DebugShowJacobians(Jacobians, warpedPoints, w_[lvl], h_[lvl]);
+                //     Mat imageWarped = Mat::zeros(image1.size(), CV_8UC1);
+                //     ObtainImageTransformed(image1, candidatePoints1, warpedPoints, imageWarped);             
+                //     DebugShowWarpedPerspective(image1, image2, imageWarped, lvl);
+                // }
 
                 // Reset delta
                 deltaMat = Mat::zeros(6,1,CV_32FC1);
@@ -993,11 +1014,11 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                 Jacobians.row(i) = wi * Jacobians.row(i);
             }
 
-            Residuals = Residuals.mul(50);  // Workaround to make delta updates larger
+            Residuals = Residuals.mul(1);  // Workaround to make delta updates larger
             Mat A = Jacobians.t() * Jacobians;                    
             Mat b = -Jacobians.t() * Residuals.mul(W);
-            cout << A << endl;
-            cout << b << endl;
+            // cout << A << endl;
+            // cout << b << endl;
             
             //cout << b << endl;
             deltaMat = A.inv() * b;
@@ -1011,7 +1032,7 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
             // Update new pose with computed delta
             current_pose = current_pose * SE3::exp(deltaVector);
-            cout << current_pose.matrix() << endl;
+            //cout << current_pose.matrix() << endl;
             
         }
 
@@ -1030,7 +1051,12 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         
         //current_pose = SE3(current_pose.unit_quaternion() * 2, current_pose.translation() * 2);
     }
-
+    Mat31f t_;
+    t_(0) = 84 * current_pose.translation().x();
+    t_(1) = 84 * current_pose.translation().y();
+    t_(2) = 84 * current_pose.translation().z();
+    
+    current_pose = SE3(current_pose.unit_quaternion(), (t_));
     _previous_frame->rigid_transformation_ = current_pose;
 
 }
@@ -1041,14 +1067,14 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 void Tracker::ApplyGradient(Frame* _frame) {
 
     for (int lvl = 0; lvl<PYRAMID_LEVELS; lvl++) {
-        Mat gradientX = Mat(_frame->images_[lvl].size(), CV_16SC1); 
-        Mat gradientY = Mat(_frame->images_[lvl].size(), CV_16SC1);
+        Mat gradientX = Mat(_frame->images_[lvl].size(), CV_32FC1); 
+        Mat gradientY = Mat(_frame->images_[lvl].size(), CV_32FC1);
 
-        Scharr(_frame->images_[lvl], _frame->gradientX_[lvl], CV_16S, 1, 0, 3, 0, BORDER_DEFAULT);
-        Scharr(_frame->images_[lvl], _frame->gradientY_[lvl], CV_16S, 0, 1, 3, 0, BORDER_DEFAULT);
+        Scharr(_frame->images_[lvl], _frame->gradientX_[lvl], CV_32F, 1, 0, 3, 0, BORDER_DEFAULT);
+        Scharr(_frame->images_[lvl], _frame->gradientY_[lvl], CV_32F, 0, 1, 3, 0, BORDER_DEFAULT);
         
-        Scharr(_frame->images_[lvl], gradientX, CV_16S, 1, 0, 3, 0, BORDER_DEFAULT);
-        Scharr(_frame->images_[lvl], gradientY, CV_16S, 0, 1, 3, 0, BORDER_DEFAULT);
+        Scharr(_frame->images_[lvl], gradientX, CV_32F, 1, 0, 3, 0, BORDER_DEFAULT);
+        Scharr(_frame->images_[lvl], gradientY, CV_32F, 0, 1, 3, 0, BORDER_DEFAULT);
 
         convertScaleAbs(gradientX, gradientX, 1.0, 0.0);
         convertScaleAbs(gradientY, gradientY, 1.0, 0.0);
@@ -1102,8 +1128,8 @@ void Tracker::ObtainPatchesPoints(Frame* _previous_frame) {
     int lvl = 0;
     factor_lvl = 1 / pow(2, lvl);
     // Obtain gradients           
-    Mat gradientX1 = Mat::zeros(_previous_frame->images_[lvl].size(), CV_16SC1);
-    Mat gradientY1 = Mat::zeros(_previous_frame->images_[lvl].size(), CV_16SC1);
+    Mat gradientX1 = Mat::zeros(_previous_frame->images_[lvl].size(), CV_32FC1);
+    Mat gradientY1 = Mat::zeros(_previous_frame->images_[lvl].size(), CV_32FC1);
     gradientX1 = _previous_frame->gradientX_[lvl].clone();
     gradientY1 = _previous_frame->gradientY_[lvl].clone();
 
@@ -1131,8 +1157,8 @@ void Tracker::ObtainPatchesPoints(Frame* _previous_frame) {
                     pointMat_patch.at<float>(0,2) = z;
 
                     informationPoint.at<float>(0,0) = _previous_frame->images_[lvl].at<uchar>(j,i);
-                    informationPoint.at<float>(0,1) = gradientX1.at<short>(j,i);
-                    informationPoint.at<float>(0,2) = gradientY1.at<short>(j,i);
+                    informationPoint.at<float>(0,1) = gradientX1.at<float>(j,i);
+                    informationPoint.at<float>(0,2) = gradientY1.at<float>(j,i);
                     informationPoint.at<float>(0,3) = 1; // Valid point
 
 
@@ -1161,15 +1187,16 @@ void Tracker::ObtainPatchesPoints(Frame* _previous_frame) {
 
 void Tracker::ObtainAllPoints(Frame* _frame) {
     // Factor of TUM depth images
-    float factor = 0.0002, factor_lvl;
+    float factor = 0.0002, factor_depth;
+    float factor_lvl;
     float depth_initialization = 1;
 
     for (int lvl=0; lvl< PYRAMID_LEVELS; lvl++) {
+        factor_lvl = 1 / pow(2, lvl);
+        factor_depth = factor * factor_lvl;
 
-        factor_lvl = factor / pow(2, lvl);
-
-        for (int y=0; y<h_[lvl]; y+=4) {
-            for (int x=0; x<w_[lvl]; x+=4) {
+        for (int y=0; y<h_[lvl]; y++) {
+            for (int x=0; x<w_[lvl]; x++) {
 
                 if (_frame->depth_available_) {
                     if (_frame->depths_[lvl].at<short>(y,x) > 0) {
@@ -1178,17 +1205,17 @@ void Tracker::ObtainAllPoints(Frame* _frame) {
                                         
                         pointMat.at<float>(0,0) = x;
                         pointMat.at<float>(0,1) = y;
-                        pointMat.at<float>(0,2) = _frame->depths_[lvl].at<short>(y,x) * factor_lvl;
+                        pointMat.at<float>(0,2) = _frame->depths_[lvl].at<short>(y,x) * factor_depth;
 
                         informationPoint.at<float>(0,0) = _frame->images_[lvl].at<uchar>(y,x);
-                        informationPoint.at<float>(0,1) = _frame->gradientX_[lvl].at<short>(y,x);
-                        informationPoint.at<float>(0,2) = _frame->gradientY_[lvl].at<short>(y,x);
+                        informationPoint.at<float>(0,1) = _frame->gradientX_[lvl].at<float>(y,x);
+                        informationPoint.at<float>(0,2) = _frame->gradientY_[lvl].at<float>(y,x);
                         informationPoint.at<float>(0,3) = 1; // Valid point
 
                         _frame->candidatePoints_[lvl].push_back(pointMat);                       
                         _frame->informationPoints_[lvl].push_back(informationPoint);
 
-                    } 
+                    }
                 // Needs review
                 } else {
                     Mat pointMat = Mat::ones(1, 4, CV_32FC1);
@@ -1196,11 +1223,11 @@ void Tracker::ObtainAllPoints(Frame* _frame) {
                                 
                     pointMat.at<float>(0,0) = x;
                     pointMat.at<float>(0,1) = y;
-                    pointMat.at<float>(0,2) = depth_initialization;
+                    pointMat.at<float>(0,2) = depth_initialization * factor_lvl;
 
                     informationPoint.at<float>(0,0) = _frame->images_[lvl].at<uchar>(y,x);
-                    informationPoint.at<float>(0,1) = _frame->gradientX_[lvl].at<short>(y,x);
-                    informationPoint.at<float>(0,2) = _frame->gradientY_[lvl].at<short>(y,x);
+                    informationPoint.at<float>(0,1) = _frame->gradientX_[lvl].at<float>(y,x);
+                    informationPoint.at<float>(0,2) = _frame->gradientY_[lvl].at<float>(y,x);
                     informationPoint.at<float>(0,3) = 1; // Valid point
 
                     _frame->candidatePoints_[lvl].push_back(pointMat);
