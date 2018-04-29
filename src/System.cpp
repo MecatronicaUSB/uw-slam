@@ -216,15 +216,15 @@ void System::Tracking() {
         
     tracker_->ApplyGradient(previous_frame_);
     
-    if (previous_frame_->n_matches_ <= 150)
-        usekeypoints = false;
+    // if (previous_frame_->n_matches_ <= 150)
+    //     usekeypoints = false;
     
     // tracker_->robust_matcher_->OpticalFlowTracking(previous_frame_, current_frame_);
-    tracker_->robust_matcher_->DetectAndTrackFeatures(previous_frame_, current_frame_, usekeypoints);        
+    //tracker_->robust_matcher_->DetectAndTrackFeatures(previous_frame_, current_frame_, usekeypoints);        
 
-    //tracker_->ObtainAllPoints(previous_frame_);
+    tracker_->ObtainAllPoints(previous_frame_);
     //tracker_->ObtainCandidatePoints(current_frame_);
-    tracker_->ObtainPatchesPoints(previous_frame_);
+    //tracker_->ObtainPatchesPoints(previous_frame_);
     
     //tracker_->EstimatePose(previous_frame_, current_frame_);
     tracker_->FastEstimatePose(previous_frame_, current_frame_);

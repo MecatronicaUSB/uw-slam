@@ -422,7 +422,7 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
         graph_position_[4].push_back(z);
         graph_position_[5].push_back(z_gt);
 
-        if (graph_position_[0].size() > 500) {
+        if (graph_position_[0].size() == 500) {
             GraphXYZ(graph_position_);
         }
         
@@ -569,79 +569,107 @@ string to_string_with_precision(const T a_value, const int n = 6) {
 };
 
 void Visualizer::GraphXYZ(vector<vector<float> > graph_values_) {
-
-    int desiredPrecision = 3;
-    int factor = pow(10, (int)desiredPrecision);
-    // Graph X - Ground Truth X
-
-    cv::Mat graphX(1480,1580, CV_8UC3, cv::Scalar(255,255,255));
-
-    // Obtain max and min values for both x and gt_x
-    auto max_x1 = *max_element(graph_values_[0].begin(), graph_values_[0].end());
-    auto min_x1 = *min_element(graph_values_[0].begin(), graph_values_[0].end());
-    auto max_x2 = *max_element(graph_values_[1].begin(), graph_values_[1].end());
-    auto min_x2 = *min_element(graph_values_[1].begin(), graph_values_[1].end());
-
-    float max, min;
-    int num_values = graph_values_[0].size();
-
-    if (max_x1 > max_x2) {
-        max = max_x1;
-    } else {
-        max = max_x2;
-    }
-    if (min_x1 < min_x2) {
-        min = min_x1;
-    } else {
-        min = min_x2;
-    }
+    string graph_names[3];
+    graph_names[0] = "Gráfica X vs GT X.jpg";
+    graph_names[1] = "Gráfica Y vs GT Y.jpg";
+    graph_names[2] = "Gráfica Z vs GT Z.jpg";
     
-    if (abs(max)<0.000001) {
-        max = 0.0;
-    }
-    if (abs(min)<0.000001) {
-        min = 0.0;
-    }
+    // Obtain graph of X, Y and Z movement compared to ground truth position
+    for (int j=0; j<6; j+=2) {
+        // Graph X - Ground Truth X
+        Mat graphX(1480,1580, CV_8UC3, cv::Scalar(255,255,255));
 
-    float label_step_y = abs((max - min) / 4);
-    int label_step_x = round(num_values / 4);
+        // Obtain max and min values for both x and gt_x
+        auto max_x1 = *max_element(graph_values_[j].begin(), graph_values_[j].end());
+        auto min_x1 = *min_element(graph_values_[j].begin(), graph_values_[j].end());
+        auto max_x2 = *max_element(graph_values_[j+1].begin(), graph_values_[j+1].end());
+        auto min_x2 = *min_element(graph_values_[j+1].begin(), graph_values_[j+1].end());
 
-    int step_x = round((1406-145) / num_values);
-    float step_y = abs(max - min) / 1280;
-    
-    for (int i=0; i<graph_values_[0].size(); i++) {
-        float x = graph_values_[0][i];
-        Point pt;
-        pt.x = 145 + step_x * i;
+        float max, min;
+        int num_values = graph_values_[j].size();
 
-        float x_aux = max;
-        for (int j=0; j<1280; j++) {
-            pt.y = 100 + j;
-            if (x_aux < x)
-                break;
-            x_aux -= step_y;
+        if (max_x1 > max_x2) {
+            max = max_x1;
+        } else {
+            max = max_x2;
+        }
+        if (min_x1 < min_x2) {
+            min = min_x1;
+        } else {
+            min = min_x2;
         }
         
-        circle(graphX, pt, 2, Scalar(255,0,0), -1, 6, 0);
-    }
-    // y-axis labels
-    cv::rectangle(graphX,cv::Point(130,1400),cv::Point(1450,80),cvScalar(0,0,0),1);
-    cv::putText(graphX, to_string_with_precision(min + 4*label_step_y,2), cv::Point(10,100), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
-    cv::putText(graphX, to_string_with_precision(min + 3*label_step_y,2), cv::Point(10,420), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
-    cv::putText(graphX, to_string_with_precision(min + 2*label_step_y,2), cv::Point(10,740), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
-    cv::putText(graphX, to_string_with_precision(min + label_step_y,2), cv::Point(10,1060), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
-    cv::putText(graphX, to_string_with_precision(min,2), cv::Point(10,1380), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
-    // x-axis labels
-    cv::putText(graphX, std::to_string(0), cv::Point(152-7*1,1430), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
-    cv::putText(graphX, std::to_string(label_step_x), cv::Point(467-7*2,1430), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
-    cv::putText(graphX, std::to_string(2*label_step_x), cv::Point(787-7*3,1430), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
-    cv::putText(graphX, std::to_string(3*label_step_x), cv::Point(1107-7*3,1430), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
-    cv::putText(graphX, std::to_string(4*label_step_x), cv::Point(1427-7*3,1430), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+        if (abs(max)<0.000001) {
+            max = 0.0;
+        }
+        if (abs(min)<0.000001) {
+            min = 0.0;
+        }
 
-    Mat show;
-    resize(graphX, show, Size(), 0.5, 0.5);
-    imshow("Graph X vs GT_X", show);
-    waitKey(0);
+        float label_step_y = abs((max - min) / 4);
+        int label_step_x = round(num_values / 4);
+
+        float step_x = (float)(1430-145) / (num_values-1);
+        float step_y = abs(max - min) / 1280;
+
+        circle(graphX, Point(1430,1380), 5, Scalar(0,255,0), -1, 6, 0);
+        
+        Point prev_pt, curr_pt;
+        for (int i=0; i<graph_values_[j].size(); i++) {
+            float x = graph_values_[j][i];
+            curr_pt.x = round(145 + step_x * i);
+
+            float x_aux = max;
+            for (int j=0; j<1280; j++) {
+                curr_pt.y = 100 + j;
+                if (x_aux < x)
+                    break;
+                x_aux -= step_y;
+            }
+
+            circle(graphX, curr_pt, 2, Scalar(255,0,0), -1, 6, 0);
+            if (i!=0)
+                line(graphX, prev_pt, curr_pt, Scalar(255,0,0), 1, 8, 0);
+            prev_pt = curr_pt;
+        }
+
+        for (int i=0; i<graph_values_[j+1].size(); i++) {
+            float x = graph_values_[j+1][i];
+            curr_pt.x = round(145 + step_x * i);
+
+            float x_aux = max;
+            for (int j=0; j<1280; j++) {
+                curr_pt.y = 100 + j;
+                if (x_aux < x)
+                    break;
+                x_aux -= step_y;
+            }
+
+            circle(graphX, curr_pt, 2, Scalar(0,255,0), -1, 6, 0);
+            if (i!=0)
+                line(graphX, prev_pt, curr_pt, Scalar(0,255,0), 1, 8, 0);
+            prev_pt = curr_pt;
+        }
+        // y-axis labels
+        cv::rectangle(graphX,cv::Point(130,1400),cv::Point(1450,80),cvScalar(0,0,0),1);
+        cv::putText(graphX, to_string_with_precision(min + 4*label_step_y,2), cv::Point(10,100), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+        cv::putText(graphX, to_string_with_precision(min + 3*label_step_y,2), cv::Point(10,420), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+        cv::putText(graphX, to_string_with_precision(min + 2*label_step_y,2), cv::Point(10,740), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+        cv::putText(graphX, to_string_with_precision(min + label_step_y,2), cv::Point(10,1060), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+        cv::putText(graphX, to_string_with_precision(min,2), cv::Point(10,1380), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+        // x-axis labels
+        cv::putText(graphX, std::to_string(0), cv::Point(152-7*1,1430), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+        cv::putText(graphX, std::to_string(label_step_x), cv::Point(467-7*2,1430), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+        cv::putText(graphX, std::to_string(2*label_step_x), cv::Point(787-7*3,1430), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+        cv::putText(graphX, std::to_string(3*label_step_x), cv::Point(1107-7*3,1430), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+        cv::putText(graphX, std::to_string(4*label_step_x), cv::Point(1427-7*3,1430), cv::FONT_HERSHEY_PLAIN, 1.5, cvScalar(0,0,0), 2.0);
+
+        Mat show;
+        resize(graphX, show, Size(), 0.5, 0.5);
+        imshow(graph_names[j/2], show);
+        waitKey(0);
+        imwrite(graph_names[j/2], show);
+    }
 };
 
 

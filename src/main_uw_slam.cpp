@@ -47,6 +47,8 @@ string ground_truth_path;
 string depth_path;
 cuda::DeviceInfo device_info;
 
+double t;   // Timing monitor
+
 void ShowSettings() {
     cout << "CUDA enabled devices detected: " << device_info.name() << endl;
     cout << "Directory of calibration xml file: " << calibration_path << endl;
@@ -136,6 +138,9 @@ int main (int argc, char *argv[]) {
     // Start SLAM process
     // Read images one by one from directory provided
     uwSystem->AddFrame(start_index);
+
+    // Start counting
+    t = (double) getTickCount();
     for (int i=start_index+1; i<uwSystem->num_valid_images_; i++) {
         // Add next frame
         uwSystem->AddFrame(i);
@@ -154,7 +159,14 @@ int main (int argc, char *argv[]) {
             uwSystem->FreeFrames();
         }
     }
+    
     cout << "Dataset ended..." << endl;
+
+    // Stop timing
+    t = 1000 * ((double) getTickCount() - t) / getTickFrequency();
+    cout << endl << "System runtime: " << t << " ms" << endl;
+    t = (double) getTickCount();
+
     // Delete system
     uwSystem->~System();
     delete uwSystem;

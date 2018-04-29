@@ -91,6 +91,7 @@ public:
     
     int idFrame_;
     int n_matches_;
+    vector<int> valid_points_ = vector<int>(4);
     Frame* previous_frame_;
     Frame* next_frame_;    
     Mat map_;

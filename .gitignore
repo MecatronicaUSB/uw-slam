@@ -3,4 +3,5 @@
 /src/feature_detector.cpp
 build
 .vscode
+*.jpg
 /thirdparty/Ceres/

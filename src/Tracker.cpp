@@ -414,7 +414,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     int max_iterations = 6;
     float error_threshold = 0.005;
     int first_pyramid_lvl = PYRAMID_LEVELS-1;
-    int last_pyramid_lvl = 1;
+    int last_pyramid_lvl = 0;
     
     float xy_factor = 1.0;
     float z_factor = 1.0;
@@ -605,7 +605,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                 Jacobians.row(i) = wi * Jacobians.row(i);
             }
 
-            Residuals = Residuals.mul(1);  // Workaround to make delta updates larger
+            Residuals = Residuals.mul(10);  // Workaround to make delta updates larger
             Mat A = Jacobians.t() * Jacobians;                    
             Mat b = -Jacobians.t() * Residuals.mul(W);
 
@@ -639,9 +639,9 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         //current_pose = SE3(current_pose.unit_quaternion() * 2, current_pose.translation() * 2);
     }
     Mat31f t_;
-    t_(0) = 84 * current_pose.translation().x();
-    t_(1) = 84 * current_pose.translation().y();
-    t_(2) = 84 * current_pose.translation().z();
+    t_(0) = 1 * current_pose.translation().x();
+    t_(1) = 1 * current_pose.translation().y();
+    t_(2) = 1 * current_pose.translation().z();
     
     current_pose = SE3(current_pose.unit_quaternion(), (t_));
 
@@ -657,7 +657,7 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     float intial_factor = 10;
     int max_iterations = 10;
     float error_threshold = 0.005;
-    int first_pyramid_lvl = 0;
+    int first_pyramid_lvl = PYRAMID_LEVELS-1;
     int last_pyramid_lvl = 0;
     
     float xy_factor = 1.0;
@@ -685,6 +685,7 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         last_error = 50000.0;
         float factor = intial_factor * (lvl + 1);
 
+
         // Obtain image 1 and 2
         Mat image1 = _previous_frame->images_[lvl].clone();
         Mat image2 = _current_frame->images_[lvl].clone();
@@ -692,6 +693,7 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         // Obtain points and depth of initial frame 
         Mat candidatePoints1  = _previous_frame->candidatePoints_[lvl].clone();
         Mat informationPoints1 = _previous_frame->informationPoints_[lvl].clone();
+        int valid_points = _previous_frame->valid_points_[lvl];
 
         // Obtain gradients           
         Mat gradientX1 = Mat::zeros(image1.size(), CV_16SC1);
@@ -738,20 +740,19 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             
             int i = 0;
             int is = 0;
-            int num_points = candidatePoints1.rows;
 
-            float* x_Result = (float*) _mm_malloc(num_points * sizeof(float), 16);
-            float* y_Result = (float*) _mm_malloc(num_points * sizeof(float), 16);
-            float* z_Result = (float*) _mm_malloc(num_points * sizeof(float), 16);
+            float* x_Result = (float*) _mm_malloc(valid_points * sizeof(float), 16);
+            float* y_Result = (float*) _mm_malloc(valid_points * sizeof(float), 16);
+            float* z_Result = (float*) _mm_malloc(valid_points * sizeof(float), 16);
             
-            float* J1 = (float*) _mm_malloc(num_points * sizeof(float), 16);
-            float* J2 = (float*) _mm_malloc(num_points * sizeof(float), 16);
-            float* J3 = (float*) _mm_malloc(num_points * sizeof(float), 16);
-            float* J4 = (float*) _mm_malloc(num_points * sizeof(float), 16);
-            float* J5 = (float*) _mm_malloc(num_points * sizeof(float), 16);
-            float* J6 = (float*) _mm_malloc(num_points * sizeof(float), 16);
+            float* J1 = (float*) _mm_malloc(valid_points * sizeof(float), 16);
+            float* J2 = (float*) _mm_malloc(valid_points * sizeof(float), 16);
+            float* J3 = (float*) _mm_malloc(valid_points * sizeof(float), 16);
+            float* J4 = (float*) _mm_malloc(valid_points * sizeof(float), 16);
+            float* J5 = (float*) _mm_malloc(valid_points * sizeof(float), 16);
+            float* J6 = (float*) _mm_malloc(valid_points * sizeof(float), 16);
 
-            float* Res = (float*) _mm_malloc(num_points * sizeof(float), 16);
+            float* Res = (float*) _mm_malloc(valid_points * sizeof(float), 16);
             
             
             __m128* x_ResultSSE = (__m128*) x_Result;
@@ -787,6 +788,9 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             for ( auto it = candidatePoints1.begin<float>(), end_it = candidatePoints1.end<float>(), 
                     inf = informationPoints1.begin<float>(), end_inf = informationPoints1.end<float>(); it+5!= end_it, inf+5!=end_inf; 
                     it+=16, inf+=16) {
+
+                if (num_actual == valid_points)
+                    break;
                 // float x1 = *it, y1 = *(it+1), z1 = *(it+2);
                 // float x2 = *(it+4), y2 = *(it+5), z2 = *(it+6);             
                 // float x3 = *(it+8), y3 = *(it+9), z3 = *(it+10);             
@@ -914,14 +918,14 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                 i++;
             }
             // cout << num_points << " " << num_actual << endl;
-            vector<float> prueba_J1 {J1, J1+num_points};
-            vector<float> prueba_J2 {J2, J2+num_points};
-            vector<float> prueba_J3 {J3, J3+num_points};
-            vector<float> prueba_J4 {J4, J4+num_points};
-            vector<float> prueba_J5 {J5, J5+num_points};
-            vector<float> prueba_J6 {J6, J6+num_points};
+            vector<float> prueba_J1 {J1, J1+valid_points};
+            vector<float> prueba_J2 {J2, J2+valid_points};
+            vector<float> prueba_J3 {J3, J3+valid_points};
+            vector<float> prueba_J4 {J4, J4+valid_points};
+            vector<float> prueba_J5 {J5, J5+valid_points};
+            vector<float> prueba_J6 {J6, J6+valid_points};
 
-            vector<float> resid {Res, Res+num_points};
+            vector<float> resid {Res, Res+valid_points};
 
             vector<Mat> Jacobianrows = vector<Mat>(6);
             Mat Residuals = Mat(resid);
@@ -933,7 +937,7 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             Jacobianrows[5] = Mat(prueba_J6);
             
 
-            Mat Jacobians = Mat(num_points, 6, CV_32FC1);
+            Mat Jacobians = Mat(valid_points, 6, CV_32FC1);
             hconcat(Jacobianrows, Jacobians);
 
             // Freeing memory
@@ -1236,8 +1240,21 @@ void Tracker::ObtainAllPoints(Frame* _frame) {
                 }
 
             }
-        } 
+        }
+        // Checking number of points found. SSE instructions needs that the points are a multiple of 4
+        if (_frame->candidatePoints_[lvl].rows >= 4) {
+            int valid_points = _frame->candidatePoints_[lvl].rows;
+            for (int i=0; i<4; i++) {
+                if (valid_points % 4 == 0) {
+                    break;
+                } else {
+                    valid_points -= 1;
+                }
+            }
+            _frame->valid_points_[lvl] = valid_points;  
+        }
     }
+
     _frame->obtained_candidatePoints_ = true;
 }
 
