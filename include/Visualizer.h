@@ -95,9 +95,12 @@ public:
     
     void AddPointCloudFromRGBD(Frame* frame);
 
+    void SaveGraph(vector<float> estimated_values, vector<float> gt_values);
+
     void GraphXYZ(vector<vector<float> > graph_values_);
     
-
+    void SaveGraph(vector<float> estimated_values, vector<float> gt_values, string filename);
+    
     // Ground-Truth publishers and markers
     ros::Publisher publisher_gt_pose_;
     ros::Publisher publisher_gt_trajectory_dots_;    

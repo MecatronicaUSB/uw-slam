@@ -422,8 +422,11 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
         graph_position_[4].push_back(z);
         graph_position_[5].push_back(z_gt);
 
-        if(graph_position_[0].size() == 4500)
-            GraphXYZ(graph_position_);
+        if(graph_position_[0].size() == 1000) {
+            SaveGraph(graph_position_[0], graph_position_[1], "X.txt");
+            //GraphXYZ(graph_position_);
+        }
+
     }
 
     // Wait for Rviz to start sending messages
@@ -564,6 +567,22 @@ string to_string_with_precision(const T a_value, const int n = 6) {
     std::ostringstream out;
     out << std::setprecision(n) << a_value;
     return out.str();
+};
+
+void Visualizer::SaveGraph(vector<float> estimated_values, vector<float> gt_values, string filename) {
+    int num_values = estimated_values.size();
+
+    std::ofstream output(filename);
+
+    for (int i=0; i<num_values; i++) {
+        float e_v = estimated_values[i];
+        float gt_v = gt_values[i];
+        output << i << " ";
+        output << fixed << setprecision(4) << e_v << " ";
+        output << fixed << setprecision(4) << gt_v << endl;
+    }
+
+    output.close();
 };
 
 void Visualizer::GraphXYZ(vector<vector<float> > graph_values_) {

@@ -5,3 +5,5 @@ build
 .vscode
 *.jpg
 /thirdparty/Ceres/
+/graph/*
+*.txt
