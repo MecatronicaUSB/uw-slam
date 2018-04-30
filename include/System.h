@@ -157,6 +157,12 @@ public:
      */
     void Mapping();
 
+    void printHistogram(int histogram[256], std::string filename, cv::Scalar color);
+    
+    void getHistogram(Mat img, int *histogram);
+    
+    void imgChannelStretch(Mat imgOriginal, Mat imgStretched, int lowerPercentile, int higherPercentile);
+    
     void Visualize();
     
     /**

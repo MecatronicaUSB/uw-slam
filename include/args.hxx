@@ -3660,6 +3660,7 @@ namespace args
 args::ArgumentParser parser("Underwater Simultaneous Localization and Mapping.", "Author: Fabio Morales. GitHub: @fmoralesh");
 args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
 args::ValueFlag<int> start_i(parser, "start index", "Start in certain frame of the dataset (Default: 0)", {'s', "start"});
+args::ValueFlag<int> end_i(parser, "end index", "Finish in certain frame of the dataset (Default: num_images)", {'e', "end"});
 args::ValueFlag<std::string> dir_dataset(parser, "images path", "Directory of images files", {'d', "directory"});
 args::ValueFlag<std::string> ground_truth_EUROC(parser, "groundtruth path", "Directory of ground truth poses (EUROC dataset)", {"EUROC"});
 args::ValueFlag<std::string> ground_truth_TUM(parser, "groundtruth path", "Directory of ground truth poses (TUM dataset)", {"TUM"});

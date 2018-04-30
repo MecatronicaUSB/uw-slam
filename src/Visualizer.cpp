@@ -422,10 +422,8 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
         graph_position_[4].push_back(z);
         graph_position_[5].push_back(z_gt);
 
-        if (graph_position_[0].size() == 500) {
+        if(graph_position_[0].size() == 4500)
             GraphXYZ(graph_position_);
-        }
-        
     }
 
     // Wait for Rviz to start sending messages
@@ -666,8 +664,8 @@ void Visualizer::GraphXYZ(vector<vector<float> > graph_values_) {
 
         Mat show;
         resize(graphX, show, Size(), 0.5, 0.5);
-        imshow(graph_names[j/2], show);
-        waitKey(0);
+        // imshow(graph_names[j/2], show);
+        // waitKey(0);
         imwrite(graph_names[j/2], show);
     }
 };

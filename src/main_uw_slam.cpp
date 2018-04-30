@@ -40,6 +40,7 @@ using namespace std;
 using namespace cv::cuda;
 
 int start_index;
+int end_index;
 string images_path;
 string calibration_path;
 string ground_truth_dataset;
@@ -135,13 +136,19 @@ int main (int argc, char *argv[]) {
     // Initialize SLAM system
     uwSystem->InitializeSystem(images_path, ground_truth_dataset, ground_truth_path, depth_path);
     
+    // Checking if there is an end index input. If not, all images available are used
+    if (end_i) {
+        end_index = args::get(end_i);
+    } else {
+        end_index = uwSystem->num_valid_images_;
+    }
+
+    // Start time counting
+    t = (double) getTickCount();
     // Start SLAM process
     // Read images one by one from directory provided
     uwSystem->AddFrame(start_index);
-
-    // Start counting
-    t = (double) getTickCount();
-    for (int i=start_index+1; i<uwSystem->num_valid_images_; i++) {
+    for (int i=start_index+1; i<end_index; i++) {
         // Add next frame
         uwSystem->AddFrame(i);
 
@@ -159,7 +166,7 @@ int main (int argc, char *argv[]) {
             uwSystem->FreeFrames();
         }
     }
-    
+
     cout << "Dataset ended..." << endl;
 
     // Stop timing

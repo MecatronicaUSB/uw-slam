@@ -605,7 +605,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                 Jacobians.row(i) = wi * Jacobians.row(i);
             }
 
-            Residuals = Residuals.mul(10);  // Workaround to make delta updates larger
+            Residuals = Residuals.mul(1);  // Workaround to make delta updates larger
             Mat A = Jacobians.t() * Jacobians;                    
             Mat b = -Jacobians.t() * Residuals.mul(W);
 
@@ -653,15 +653,15 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 // Gauss-Newton using Foward Compositional Algorithm "Fast"
 void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     // Gauss-Newton Optimization Options
-    float epsilon = 0.001;
+    float epsilon = 1;
     float intial_factor = 10;
-    int max_iterations = 10;
+    int max_iterations = 7;
     float error_threshold = 0.005;
-    int first_pyramid_lvl = PYRAMID_LEVELS-1;
+    int first_pyramid_lvl = 0;
     int last_pyramid_lvl = 0;
     
     float xy_factor = 1.0;
-    float z_factor  = 0.008;
+    float z_factor  = 1.0;
     float angle_factor = 1.0;
     
     // Variables initialization
@@ -967,10 +967,10 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
             // Break if error increases
             if (error >= last_error || k == max_iterations-1 || abs(error - last_error) < epsilon) {
-                // cout << "Pyramid level: " << lvl << endl;
-                // cout << "Number of iterations: " << k << endl;
-                // cout << "Error: " << error << endl;                
-                // cout << "Initial-Final Error: " << initial_error << " - " << last_error << endl << endl;
+                cout << "Pyramid level: " << lvl << endl;
+                cout << "Number of iterations: " << k << endl;
+                cout << "Error: " << error << endl;                
+                cout << "Initial-Final Error: " << initial_error << " - " << last_error << endl << endl;
 
                 // if (lvl == last_pyramid_lvl) {
                 //     //DebugShowJacobians(Jacobians, warpedPoints, w_[lvl], h_[lvl]);
@@ -1056,9 +1056,9 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         //current_pose = SE3(current_pose.unit_quaternion() * 2, current_pose.translation() * 2);
     }
     Mat31f t_;
-    t_(0) = 84 * current_pose.translation().x();
-    t_(1) = 84 * current_pose.translation().y();
-    t_(2) = 84 * current_pose.translation().z();
+    t_(0) = 80 * current_pose.translation().x();
+    t_(1) = 80 * current_pose.translation().y();
+    t_(2) = 80 * current_pose.translation().z();
     
     current_pose = SE3(current_pose.unit_quaternion(), (t_));
     _previous_frame->rigid_transformation_ = current_pose;
@@ -1137,7 +1137,7 @@ void Tracker::ObtainPatchesPoints(Frame* _previous_frame) {
     gradientX1 = _previous_frame->gradientX_[lvl].clone();
     gradientY1 = _previous_frame->gradientY_[lvl].clone();
 
-    for (int i=0; i< min(num_max_keypoints, 200); i++) {
+    for (int i=0; i< min(num_max_keypoints, 500); i++) {
 
         float x = goodKeypoints[i].pt.x;
         float y = goodKeypoints[i].pt.y;
@@ -1173,6 +1173,8 @@ void Tracker::ObtainPatchesPoints(Frame* _previous_frame) {
         }
 
     }
+
+    _previous_frame->valid_points_[0] = _previous_frame->candidatePoints_[lvl].rows;
     // Show points saved in candidatePoints
     // Mat showPoints;
     // cvtColor(_previous_frame->images_[lvl], showPoints, CV_GRAY2RGB);
