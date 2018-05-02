@@ -96,9 +96,7 @@ public:
     Frame* next_frame_;    
     Mat map_;
     SE3 rigid_transformation_;
-    
-    bool obtained_gradients_;
-    bool obtained_candidatePoints_; 
+
     bool depth_available_;           
     bool isKeyFrame_;
 };
@@ -142,7 +140,7 @@ public:
      */
     void InitializeSystem(string _images_path, string _ground_truth_dataset, string _ground_truth_path, string _depth_path);
 
-    void UpdateWorldPose(SE3& _previous_world_pose, SE3 _current_pose);
+    void UpdateWorldPose(SE3& _previous_world_pose, SE3& _current_pose);
 
     /**
      * @brief Starts tracking thread of the next frame. 
@@ -233,8 +231,7 @@ public:
     
     string ground_truth_dataset_;    
     string ground_truth_path_;
-
-    SE3 temp_previous_world_pose_;    
+ 
     SE3 previous_world_pose_;
 
     Mat K_;

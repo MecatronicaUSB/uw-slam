@@ -653,7 +653,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 // Gauss-Newton using Foward Compositional Algorithm "Fast"
 void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     // Gauss-Newton Optimization Options
-    float epsilon = 1;
+    float epsilon = 0.001;
     float intial_factor = 10;
     int max_iterations = 7;
     float error_threshold = 0.005;
@@ -661,7 +661,7 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     int last_pyramid_lvl = 0;
     
     float xy_factor = 1.0;
-    float z_factor  = 1.0;
+    float z_factor  = 0.008;
     float angle_factor = 1.0;
     
     // Variables initialization
@@ -928,13 +928,14 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             vector<float> resid {Res, Res+valid_points};
 
             vector<Mat> Jacobianrows = vector<Mat>(6);
-            Mat Residuals = Mat(resid);
-            Jacobianrows[0] = Mat(prueba_J1);
-            Jacobianrows[1] = Mat(prueba_J2);
-            Jacobianrows[2] = Mat(prueba_J3);
-            Jacobianrows[3] = Mat(prueba_J4);
-            Jacobianrows[4] = Mat(prueba_J5);
-            Jacobianrows[5] = Mat(prueba_J6);
+            Mat Residuals = Mat(resid.size(),1, CV_32FC1);
+            Residuals = Mat(resid);
+            Jacobianrows[0] = Mat(prueba_J1, CV_32FC1);
+            Jacobianrows[1] = Mat(prueba_J2, CV_32FC1);
+            Jacobianrows[2] = Mat(prueba_J3, CV_32FC1);
+            Jacobianrows[3] = Mat(prueba_J4, CV_32FC1);
+            Jacobianrows[4] = Mat(prueba_J5, CV_32FC1);
+            Jacobianrows[5] = Mat(prueba_J6, CV_32FC1);
             
 
             Mat Jacobians = Mat(valid_points, 6, CV_32FC1);
@@ -966,7 +967,7 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                 initial_error = error;
 
             // Break if error increases
-            if (error >= last_error || k == max_iterations-1 || abs(error - last_error) < epsilon) {
+            if (error >= last_error || k == max_iterations-1 || abs((error - last_error)/last_error) < epsilon) {
                 cout << "Pyramid level: " << lvl << endl;
                 cout << "Number of iterations: " << k << endl;
                 cout << "Error: " << error << endl;                
@@ -1018,9 +1019,8 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                 Jacobians.row(i) = wi * Jacobians.row(i);
             }
 
-            Residuals = Residuals.mul(1);  // Workaround to make delta updates larger
             Mat A = Jacobians.t() * Jacobians;                    
-            Mat b = -Jacobians.t() * Residuals.mul(W);
+            Mat b = -Jacobians.t() * Residuals.mul(W * 50);  // Workaround to make delta updates larger
             // cout << A << endl;
             // cout << b << endl;
             
@@ -1056,9 +1056,9 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         //current_pose = SE3(current_pose.unit_quaternion() * 2, current_pose.translation() * 2);
     }
     Mat31f t_;
-    t_(0) = 80 * current_pose.translation().x();
-    t_(1) = 80 * current_pose.translation().y();
-    t_(2) = 80 * current_pose.translation().z();
+    t_(0) = 1 * current_pose.translation().x();
+    t_(1) = 1 * current_pose.translation().y();
+    t_(2) = 1 * current_pose.translation().z();
     
     current_pose = SE3(current_pose.unit_quaternion(), (t_));
     _previous_frame->rigid_transformation_ = current_pose;
@@ -1116,7 +1116,6 @@ void Tracker::ApplyGradient(Frame* _frame) {
 
     // }
 
-    _frame->obtained_gradients_ = true;   
 }
 
 void Tracker::ObtainPatchesPoints(Frame* _previous_frame) {
@@ -1257,7 +1256,6 @@ void Tracker::ObtainAllPoints(Frame* _frame) {
         }
     }
 
-    _frame->obtained_candidatePoints_ = true;
 }
 
 // TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com)
@@ -1345,7 +1343,7 @@ void Tracker::ObtainCandidatePoints(Frame* _frame) {
         // frame->candidatePoints_[lvl] = frame->candidatePoints_[lvl-1] * 0.5;
         // DebugShowCandidatePoints(_frame->gradient_[lvl], _frame->candidatePoints_[lvl]);
     }
-    _frame->obtained_candidatePoints_ = true;
+ 
 }
 
 Mat Tracker::WarpFunctionOpenCV(Mat _points2warp, SE3 _rigid_transformation, int _lvl) {

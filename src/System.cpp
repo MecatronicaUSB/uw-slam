@@ -37,7 +37,6 @@ System::System(int argc, char *argv[], int _start_index) {
     num_valid_images_ = 0;
 
     previous_world_pose_ = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
-    temp_previous_world_pose_ = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
 }
 
 System::~System() {
@@ -58,8 +57,6 @@ Frame::Frame(void) {
     rigid_transformation_ = SE3();
     idFrame_    = 0;
     n_matches_  = 0;
-    obtained_gradients_ = false;
-    obtained_candidatePoints_ = false;
     depth_available_ = false;
     
     isKeyFrame_ = false;
@@ -291,64 +288,60 @@ void System::CalculateROI() {
     h_ = p2.y - p1.y;
 }
 
-void System::UpdateWorldPose(SE3& _previous_world_pose, SE3 _current_pose) {
+void System::UpdateWorldPose(SE3& _previous_world_pose, SE3& _current_pose) {
     // Scaled movement of camera
     Mat31f t_;
-    t_(0) = 1 * - _current_pose.translation().x();
-    t_(1) = 1 * - _current_pose.translation().z();
-    t_(2) = 1 *   _current_pose.translation().y();
+    // t_(0) = 1 * - _current_pose.translation().x();
+    // t_(1) = 1 * - _current_pose.translation().z();
+    // t_(2) = 1 *   _current_pose.translation().y();
 
-    previous_world_pose_ = previous_world_pose_ * SE3(_current_pose.unit_quaternion(), (t_));
+    // _previous_world_pose = _previous_world_pose * SE3(_current_pose.unit_quaternion(), (t_));
+    _previous_world_pose = _previous_world_pose * _current_pose;    
+    // _current_pose = _previous_world_pose;
 }
 
 void System::Tracking() {
 
     bool usekeypoints = true;
 
-    if (not previous_frame_->obtained_gradients_){
-        //tracker_->ApplyGradient(previous_frame_);
-    }
-     
-    if (not previous_frame_->obtained_candidatePoints_) {
-        //tracker_->ObtainCandidatePoints(previous_frame_);
-        //tracker_->ObtainAllPoints(previous_frame_);
-        //tracker_->ObtainFeaturesPoints(previous_frame_, current_frame_);
-    }
-        
     tracker_->ApplyGradient(previous_frame_);
     
-    if (previous_frame_->n_matches_ <= 500)
+    if (previous_frame_->n_matches_ <= 150)
         usekeypoints = false;
     
-    //tracker_->robust_matcher_->OpticalFlowTracking(previous_frame_, current_frame_);
-    tracker_->robust_matcher_->DetectAndTrackFeatures(previous_frame_, current_frame_, usekeypoints);        
 
-    //tracker_->ObtainAllPoints(previous_frame_);
+    // tracker_->robust_matcher_->DetectAndTrackFeatures(previous_frame_, current_frame_, usekeypoints);        
+    // tracker_->ObtainPatchesPoints(previous_frame_);
+
+    tracker_->ObtainAllPoints(previous_frame_);
+
     //tracker_->ObtainCandidatePoints(current_frame_);
-    tracker_->ObtainPatchesPoints(previous_frame_);
-    
+
     //tracker_->EstimatePose(previous_frame_, current_frame_);
     tracker_->FastEstimatePose(previous_frame_, current_frame_);
 
+    // cout << previous_world_pose_.matrix3x4() << endl;
     // Change coordinates to correspond RViz coordinates
-    UpdateWorldPose(temp_previous_world_pose_, previous_frame_->rigid_transformation_);
+    // UpdateWorldPose(previous_world_pose_, previous_frame_->rigid_transformation_);
+    
+    // cout << previous_world_pose_.matrix3x4() << endl;
     
 }
 
 void System::Mapping() {
-    // Update world pose with new one
-    mapper_->previous_world_pose_ = temp_previous_world_pose_;
+    // Update world pose of the camera
+    mapper_->previous_world_pose_ = previous_world_pose_;
     
     mapper_->TriangulateCloudPoints(previous_frame_, current_frame_);
-
 }
 
 void System::Visualize() {
-
-    // Set current camera frame to visualize
+    // Update world pose of the camera
     visualizer_->previous_world_pose_ = previous_world_pose_;
 
     visualizer_->UpdateMessages(previous_frame_);
+
+    UpdateWorldPose(previous_world_pose_, previous_frame_->rigid_transformation_);
 }
 
 

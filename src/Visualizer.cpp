@@ -37,20 +37,20 @@ Visualizer::Visualizer(int start_index, int num_images, Mat K, string _ground_tr
     invfx_ = 1 / fx_;
     invfy_ = 1 / fy_; 
     
+    // Initial offset
+    init_x_ = 0;
+    init_y_ = 0;
+    init_z_ = 1;
+    init_gt_qx_ = 0;
+    init_gt_qy_ = 0; 
+    init_gt_qz_ = 0;
+    init_gt_qw_ = 1;
+
     // Camera pose marker initialization
     ros::NodeHandle nodehandle_camera_pose;
     ros::Publisher publisher_camera_pose = nodehandle_camera_pose.advertise<visualization_msgs::Marker>("camera_pose", 50);
     visualization_msgs::Marker camera_pose;
 
-    // Choose starting point of SLAM system
-    init_x_ = 0;
-    init_y_ = 0;
-    init_z_ = 1;
-    init_gt_qx_ = 0;
-    init_gt_qy_ = 0;
-    init_gt_qz_ = 0;
-    init_gt_qw_ = 1;
-    
     // Camera pose marker options
     camera_pose.id = 1;
     camera_pose.header.frame_id = "world";           
@@ -112,8 +112,9 @@ Visualizer::Visualizer(int start_index, int num_images, Mat K, string _ground_tr
 
     point_cloud.type = visualization_msgs::Marker::SPHERE_LIST;
 
-    point_cloud.scale.x = 0.01;
-    point_cloud.scale.y = 0.01;
+    // Size of points
+    point_cloud.scale.x = 0.007;
+    point_cloud.scale.y = 0.007;
 
     // Point-Cloud color
     point_cloud.color.b = 0.8f;    
@@ -306,27 +307,26 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
     // Update image message
     sensor_msgs::ImagePtr current_frame = cv_bridge::CvImage(std_msgs::Header(), "bgr8", _previous_frame->image_to_send).toImageMsg();
 
-    //
-    //SE3 final_pose = previous_world_pose_ * _previous_frame->rigid_transformation_;
+    SE3 final_pose = previous_world_pose_ * _previous_frame->rigid_transformation_;
     
-    Mat31f t = previous_world_pose_.translation();
-    Quaternion quaternion = previous_world_pose_.unit_quaternion();
+    Mat31f t = final_pose.translation();
+    Quaternion quaternion = final_pose.unit_quaternion();
 
-    float x = t(0) + init_x_;
-    float y = t(1) + init_y_;
-    float z = t(2) + init_z_;
+    float x = -t(0) + init_x_;
+    float y = -t(2) + init_y_;
+    float z =  t(1) + init_z_;
     float qx = quaternion.x();
     float qy = quaternion.y();
     float qz = quaternion.z();
     float qw = quaternion.w();
     
-    camera_pose_.pose.position.x = - t(0);  
-    camera_pose_.pose.position.y = - t(2);
-    camera_pose_.pose.position.z = - t(1);
-    camera_pose_.pose.orientation.x = quaternion.x();
-    camera_pose_.pose.orientation.y = quaternion.y();    
-    camera_pose_.pose.orientation.z = quaternion.z(); 
-    camera_pose_.pose.orientation.w = quaternion.w();
+    // camera_pose_.pose.position.x = - x;  
+    // camera_pose_.pose.position.y = - z;
+    // camera_pose_.pose.position.z = y;
+    // camera_pose_.pose.orientation.x = qx;
+    // camera_pose_.pose.orientation.y = qy;    
+    // camera_pose_.pose.orientation.z = qz; 
+    // camera_pose_.pose.orientation.w = qw;
 
     static tf::TransformBroadcaster br;
     tf::Transform transform;
@@ -342,7 +342,6 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
 
     //previous_world_pose_ = final_pose;
     
-
     geometry_msgs::Point p;
     p.x = x;
     p.y = y;
@@ -351,10 +350,8 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
     camera_trajectory_lines_.points.push_back(p);
 
     // Add Point-Cloud
-    //AddPointCloudFromRGBD(_previous_frame);
-    AddPointCloud(_previous_frame);
-
-
+    AddPointCloudFromRGBD(_previous_frame);
+    //AddPointCloud(_previous_frame);
 
     // Update ground truth marker position
     if (use_ground_truth_ && ground_truth_index_ < num_ground_truth_poses_) {
@@ -375,7 +372,7 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
         // TUM Convention: x, y, z, qx, qy, qz, qw 
         if (ground_truth_dataset_ == "TUM") {
             x_gt = off_gt_y_ - ground_truth_poses_[ground_truth_index_][1] + init_x_;
-            y_gt = off_gt_x_ - ground_truth_poses_[ground_truth_index_][0] + init_y_;
+            y_gt = -off_gt_x_ + ground_truth_poses_[ground_truth_index_][0] + init_y_;
             z_gt = -off_gt_z_ + ground_truth_poses_[ground_truth_index_][2] + init_z_;
             // qx_gt = -off_gt_qx_ + ground_truth_poses_[ground_truth_index_][3];
             // qy_gt = -off_gt_qy_ + ground_truth_poses_[ground_truth_index_][4];
@@ -422,8 +419,11 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
         graph_position_[4].push_back(z);
         graph_position_[5].push_back(z_gt);
 
-        if(graph_position_[0].size() == 1000) {
-            SaveGraph(graph_position_[0], graph_position_[1], "X.txt");
+        if(graph_position_[0].size() == 3600) {
+            SaveGraph(graph_position_[0], graph_position_[1], "./graph/X.txt");
+            SaveGraph(graph_position_[2], graph_position_[3], "./graph/Y.txt");
+            SaveGraph(graph_position_[4], graph_position_[5], "./graph/Z.txt");
+            
             //GraphXYZ(graph_position_);
         }
 
@@ -463,16 +463,18 @@ void Visualizer::AddPointCloud(Frame* frame) {
     int num_cloud_points = frame->map_.cols;
     Mat points_3D = frame->map_.clone();
 
-    Mat31f t = previous_world_pose_.translation();
+    SE3 final_pose = previous_world_pose_ * frame->rigid_transformation_;
+    Mat31f t = final_pose.translation();
 
-    for (int i=0; i< points_3D.cols; i++) {
+    for (int i=0; i<points_3D.cols; i++) {
         geometry_msgs::Point p3D;
 
-        p3D.x = -points_3D.at<float>(0,i) / points_3D.at<float>(3,i) - t(0);
-        p3D.y = -points_3D.at<float>(2,i) / points_3D.at<float>(3,i) - t(2);
-        p3D.z = -points_3D.at<float>(1,i) / points_3D.at<float>(3,i) - t(1);
+        p3D.x = (points_3D.at<float>(0,i)/points_3D.at<float>(3,i)) + init_x_;
+        p3D.y = (points_3D.at<float>(2,i)/points_3D.at<float>(3,i)) + init_y_;
+        p3D.z = -(points_3D.at<float>(1,i)/points_3D.at<float>(3,i)) + init_z_;
 
-        point_cloud_.points.push_back(p3D);    
+        // cout << p3D.x <<  " " << p3D.y << " " << p3D.z << endl;
+        point_cloud_.points.push_back(p3D); 
     }
 };
 
@@ -480,7 +482,9 @@ void Visualizer::AddPointCloudFromRGBD(Frame* frame) {
     int num_cloud_points = frame->candidatePoints_[0].rows;
     Mat points_3D = frame->candidatePoints_[0].clone();
 
-    Mat31f t = previous_world_pose_.translation();
+    SE3 final_pose = previous_world_pose_ * frame->rigid_transformation_;
+
+    Mat31f t = final_pose.translation();
 
     // 2D -> 3D
     // X  = (x - cx) * Z / fx 
@@ -492,12 +496,12 @@ void Visualizer::AddPointCloudFromRGBD(Frame* frame) {
     points_3D.col(1) = points_3D.col(1).mul(points_3D.col(2));
 
 
-    for (int i=0; i< points_3D.rows; i++) {
+    for (int i=0; i< points_3D.rows; i+=20) {
         geometry_msgs::Point p3D;
 
-        p3D.x = -points_3D.at<float>(i,0) - t(0);
-        p3D.y =  points_3D.at<float>(i,2) + t(2);
-        p3D.z = -points_3D.at<float>(i,1) - t(1);
+        p3D.x =  -points_3D.at<float>(i,0) + init_x_;
+        p3D.y =  points_3D.at<float>(i,2) + init_y_;
+        p3D.z = -points_3D.at<float>(i,1) + init_z_;
 
         point_cloud_.points.push_back(p3D);    
     }

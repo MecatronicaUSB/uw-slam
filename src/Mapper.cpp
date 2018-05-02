@@ -74,12 +74,19 @@ Mapper::Mapper(int _width, int _height, Mat _K) {
 void Mapper::TriangulateCloudPoints(Frame* _previous_frame, Frame* _current_frame) {
     
     // Transform 3x4 camera matrix from eigen to Mat
-    Mat T1, T2;
-    SE3 Identity = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
-    eigen2cv(Identity.matrix3x4(), T1);
-    eigen2cv(previous_world_pose_.matrix3x4(), T2);    
-    //eigen2cv(_previous_frame->rigid_transformation_.matrix3x4(), T2);
+    Mat T1 = Mat(3,4, CV_32FC1);
+    Mat T2 = Mat(3,4, CV_32FC1);
     
+    // cout << "World pose:" << endl;
+    // cout << previous_world_pose_.matrix3x4() << endl;
+    eigen2cv(previous_world_pose_.matrix3x4(), T1);
+
+    SE3 transformation = previous_world_pose_ * _previous_frame->rigid_transformation_;
+    // cout << "Next transformation:" << endl;
+    // cout << transformation.matrix3x4() << endl;
+    eigen2cv(transformation.matrix3x4(), T2);    
+    //eigen2cv(_previous_frame->rigid_transformation_.matrix3x4(), T2);
+
     // Obtain projection matrices for the two perspectives  
     // P = K * [Rotation | translation]
     Mat P1 = K_[0] * T1;
@@ -88,6 +95,7 @@ void Mapper::TriangulateCloudPoints(Frame* _previous_frame, Frame* _current_fram
     // Compute depth of 3D points using triangulation
     triangulatePoints(P1, P2, _previous_frame->points_, _current_frame->points_, _previous_frame->map_);
     
+    //cout << _previous_frame->map_ << endl;
 };
 
 void Mapper::AddPointCloudFromRGBD(Frame* frame) {
