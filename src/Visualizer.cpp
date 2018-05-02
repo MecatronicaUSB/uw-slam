@@ -469,9 +469,9 @@ void Visualizer::AddPointCloud(Frame* frame) {
     for (int i=0; i<points_3D.cols; i++) {
         geometry_msgs::Point p3D;
 
-        p3D.x = (points_3D.at<float>(0,i)/points_3D.at<float>(3,i)) + init_x_;
-        p3D.y = (points_3D.at<float>(2,i)/points_3D.at<float>(3,i)) + init_y_;
-        p3D.z = -(points_3D.at<float>(1,i)/points_3D.at<float>(3,i)) + init_z_;
+        p3D.x = -t(0) + (points_3D.at<float>(0,i)/points_3D.at<float>(3,i)) + init_x_;
+        p3D.y = -t(2) + (points_3D.at<float>(2,i)/points_3D.at<float>(3,i)) + init_y_;
+        p3D.z = t(1) -(points_3D.at<float>(1,i)/points_3D.at<float>(3,i)) + init_z_;
 
         // cout << p3D.x <<  " " << p3D.y << " " << p3D.z << endl;
         point_cloud_.points.push_back(p3D); 
@@ -496,12 +496,12 @@ void Visualizer::AddPointCloudFromRGBD(Frame* frame) {
     points_3D.col(1) = points_3D.col(1).mul(points_3D.col(2));
 
 
-    for (int i=0; i< points_3D.rows; i+=20) {
+    for (int i=0; i< points_3D.rows; i++) {
         geometry_msgs::Point p3D;
 
-        p3D.x =  -points_3D.at<float>(i,0) + init_x_;
-        p3D.y =  points_3D.at<float>(i,2) + init_y_;
-        p3D.z = -points_3D.at<float>(i,1) + init_z_;
+        p3D.x = -t(0) + points_3D.at<float>(i,0) + init_x_;
+        p3D.y = -t(2) + points_3D.at<float>(i,2) + init_y_;
+        p3D.z = t(1) -points_3D.at<float>(i,1) + init_z_;
 
         point_cloud_.points.push_back(p3D);    
     }

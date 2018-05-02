@@ -1191,6 +1191,9 @@ void Tracker::ObtainPatchesPoints(Frame* _previous_frame) {
 }
 
 void Tracker::ObtainAllPoints(Frame* _frame) {
+    // Regulates density of all points 
+    int step = 10;
+
     // Factor of TUM depth images
     float factor = 0.0002, factor_depth;
     float factor_lvl;
@@ -1200,8 +1203,8 @@ void Tracker::ObtainAllPoints(Frame* _frame) {
         factor_lvl = 1 / pow(2, lvl);
         factor_depth = factor * factor_lvl;
 
-        for (int y=0; y<h_[lvl]; y++) {
-            for (int x=0; x<w_[lvl]; x++) {
+        for (int y=0; y<h_[lvl]; y+=step) {
+            for (int x=0; x<w_[lvl]; x+=step) {
 
                 if (_frame->depth_available_) {
                     if (_frame->depths_[lvl].at<short>(y,x) > 0) {
