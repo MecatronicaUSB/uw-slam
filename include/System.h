@@ -74,7 +74,6 @@ public:
      */
     ~Frame();
 
-
     int id;
     Mat image_to_send;
     vector<Mat> images_    = vector<Mat>(PYRAMID_LEVELS);
@@ -241,6 +240,8 @@ public:
     bool initialized_;
     bool distortion_valid_;
     bool depth_available_;
+
+    double mean_n_keypoints_;
 };
 
 }

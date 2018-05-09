@@ -261,7 +261,28 @@ void RobustMatcher::DetectAndTrackFeatures(Frame* _previous_frame, Frame* _curre
         ORB_matcher_->knnMatch(descriptorsGPU[0], descriptorsGPU[1], matches1, 2);
         ORB_matcher_->knnMatch(descriptorsGPU[1], descriptorsGPU[0], matches2, 2);
     }
+    // Mat keypointsDetected1;
+    // drawKeypoints(Mat(previous_frameGPU), keypoints[0], keypointsDetected1, Scalar(0,255,0));
+    // imshow("Keypoints1", keypointsDetected1);
+    // imwrite("Keypoints1.jpg",keypointsDetected1);
 
+    // Mat keypointsDetected2;
+    // drawKeypoints(Mat(current_frameGPU), keypoints[1], keypointsDetected2, Scalar(0,255,0));
+    // imshow("Keypoints2", keypointsDetected2);
+    // imwrite("Keypoints2.jpg",keypointsDetected2);
+
+    vector<DMatch> test_debug;
+    for (std::vector<std::vector<cv::DMatch> >::const_iterator it = matches1.begin(); it != matches1.end(); ++it) {
+        DMatch m = (*it)[0];
+        test_debug.push_back(m);       // save good matches here                           
+    }
+    
+    // Mat before_image;
+    // drawMatches(Mat(previous_frameGPU), keypoints[0], Mat(current_frameGPU), keypoints[1], 
+    //             test_debug, before_image, Scalar::all(-1), Scalar::all(-1), 
+    //             vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+    // imshow("Resultado antes de filtrado", before_image);
+    // imwrite("MatchesAntes.jpg",before_image);
 
     // Remove matches for which NN ratio is > than threshold
     // clean image 1 -> image 2 matches
@@ -276,6 +297,13 @@ void RobustMatcher::DetectAndTrackFeatures(Frame* _previous_frame, Frame* _curre
     // Validate matches using RANSAC
     vector<DMatch> matches;    
     Mat fundamental = ransacTest(symMatches, keypoints[0], keypoints[1], matches);
+
+    // Mat after_image;
+    // drawMatches(Mat(previous_frameGPU), keypoints[0], Mat(current_frameGPU), keypoints[1], 
+    //             matches, after_image, Scalar::all(-1), Scalar::all(-1), 
+    //             vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+    // imshow("Resultado despues de filtrado", after_image);
+    // imwrite("MatchesDespues.jpg",after_image);
 
     // Filter matches through image grid (Patches of 32 x 32 pixels)
     vector<DMatch> goodMatches;   
@@ -298,9 +326,8 @@ void RobustMatcher::DetectAndTrackFeatures(Frame* _previous_frame, Frame* _curre
     // drawMatches(Mat(previous_frameGPU), keypoints[0], Mat(current_frameGPU), keypoints[1], 
     //             goodMatches, img_matches, Scalar::all(-1), Scalar::all(-1), 
     //             vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-    // imshow("ORB", img_matches);
-    // cout << goodMatches.size() << endl;
-    
+    // imshow("Final", img_matches);
+    // imwrite("FiltradoRecuadros.jpg",img_matches);    
     // waitKey(0);     
 
 }
@@ -369,7 +396,7 @@ Tracker::Tracker(bool _depth_available, int _width, int _height, Mat _K) {
     }
 
     robust_matcher_ = new RobustMatcher(0, w_[0], h_[0]);
-    
+    covariance_values_ = vector<vector<float> >(6);
 };
 
 Tracker::~Tracker() {
@@ -413,11 +440,11 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     float intial_factor = 10;
     int max_iterations = 6;
     float error_threshold = 0.005;
-    int first_pyramid_lvl = PYRAMID_LEVELS-1;
+    int first_pyramid_lvl = 0;
     int last_pyramid_lvl = 0;
     
     float xy_factor = 1.0;
-    float z_factor = 1.0;
+    float z_factor = 0.008;
     float angle_factor = 1.0;
     
     // Variables initialization
@@ -429,6 +456,9 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     Mat deltaMat = Mat::zeros(6,1,CV_32FC1);
     Sophus::Vector<float, SE3::DoF> deltaVector;
     
+    Mat Covariance_Matrix = Mat(6,6,CV_32FC1);
+    Mat A = Mat(6,6,CV_32FC1);
+    Mat b = Mat(1,6,CV_32FC1);
     for (int i=0; i<6; i++)
         deltaVector(i) = 0;
 
@@ -538,7 +568,7 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                 }
             }
             // cout << "Valid points found: " << num_valid << endl;
-            // DebugShowJacobians(Jacobians, warpedPoints, w_[lvl], h_[lvl]);
+            //DebugShowJacobians(Jacobians, warpedPoints, w_[lvl], h_[lvl]);
 
             // Computation of Weights (Identity or Tukey function)
             Mat W = IdentityWeights(Residuals.rows);
@@ -605,9 +635,9 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
                 Jacobians.row(i) = wi * Jacobians.row(i);
             }
 
-            Residuals = Residuals.mul(1);  // Workaround to make delta updates larger
-            Mat A = Jacobians.t() * Jacobians;                    
-            Mat b = -Jacobians.t() * Residuals.mul(W);
+            Residuals = Residuals.mul(50);  // Workaround to make delta updates larger
+            A = Jacobians.t() * Jacobians;                    
+            b = -Jacobians.t() * Residuals.mul(W);
 
             //cout << b << endl;
             deltaMat = A.inv() * b;
@@ -638,6 +668,16 @@ void Tracker::EstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         
         //current_pose = SE3(current_pose.unit_quaternion() * 2, current_pose.translation() * 2);
     }
+    // Saves covariance matrix for last solution
+    // Debug purposes - Covariance matrix
+    Covariance_Matrix = A.inv();
+    for (int i=0; i<6; i++) {
+        covariance_values_[i].push_back(Covariance_Matrix.at<float>(i,i));
+    }
+    if (covariance_values_[0].size() == 3600) {
+        SaveCovarianceMatrix(covariance_values_, "./graph/Variance.txt");
+    }
+
     Mat31f t_;
     t_(0) = 1 * current_pose.translation().x();
     t_(1) = 1 * current_pose.translation().y();
@@ -655,13 +695,13 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     // Gauss-Newton Optimization Options
     float epsilon = 0.001;
     float intial_factor = 10;
-    int max_iterations = 7;
+    int max_iterations = 6;
     float error_threshold = 0.005;
     int first_pyramid_lvl = 0;
     int last_pyramid_lvl = 0;
     
     float xy_factor = 1.0;
-    float z_factor  = 0.008;
+    float z_factor  = 0.08;
     float angle_factor = 1.0;
     
     // Variables initialization
@@ -675,8 +715,16 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
     for (int i=0; i<6; i++)
         deltaVector(i) = 0;
 
+    // Solution iterator
     SE3 current_pose = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
 
+    // Equations system matrices
+    Mat A = Mat(6,6,CV_32FC1);
+    Mat b = Mat(1,6,CV_32FC1);
+
+    // Covariance matrix
+    Mat Covariance_Matrix = Mat(6,6,CV_32FC1);
+    
     // Sparse to Fine iteration
     for (int lvl=first_pyramid_lvl; lvl>=last_pyramid_lvl; lvl--) {
         //lvl = 0;
@@ -954,8 +1002,10 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
             _mm_free(Res);
 
             // Computation of Weights (Identity or Tukey function)
-            Mat W = IdentityWeights(Residuals.rows);
-            //Mat W = TukeyFunctionWeights(Residuals);
+            Mat W = Mat(1,Residuals.rows, CV_32FC1);
+            
+            W = IdentityWeights(Residuals.rows);
+            //W = TukeyFunctionWeights(Residuals);
 
             // Computation of error
             float inv_num_residuals = 1.0 / Residuals.rows;
@@ -1014,28 +1064,26 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
 
             // Computation of new delta (Kerl-way)            
             // Multiplication of W to Jacobian
+            Mat JacobiansW = Mat(Jacobians.size(), CV_32FC1);
             for (int i=0; i<Jacobians.rows; i++) {
                 float wi = W.at<float>(i,0);
-                Jacobians.row(i) = wi * Jacobians.row(i);
+                JacobiansW.row(i) = wi * Jacobians.row(i);
             }
+            
+            A = Jacobians.t() * JacobiansW;                    
+            b = -Jacobians.t() * Residuals.mul(W * 50);  // Workaround to make delta updates larger
 
-            Mat A = Jacobians.t() * Jacobians;                    
-            Mat b = -Jacobians.t() * Residuals.mul(W * 50);  // Workaround to make delta updates larger
-            // cout << A << endl;
-            // cout << b << endl;
-            
-            //cout << b << endl;
+            // Compute delta increment
             deltaMat = A.inv() * b;
-            //cout << A.inv() << endl;
-            //cout << A << endl;
-            
 
             // Convert info from eigen to cv
             for (int i=0; i<6; i++)
                 deltaVector(i) = deltaMat.at<float>(i,0);
 
             // Update new pose with computed delta
-            current_pose = current_pose * SE3::exp(deltaVector);
+            //current_pose = current_pose * SE3::exp(deltaVector);
+            current_pose = SE3::exp(deltaVector) * current_pose;
+            
             //cout << current_pose.matrix() << endl;
             
         }
@@ -1055,6 +1103,17 @@ void Tracker::FastEstimatePose(Frame* _previous_frame, Frame* _current_frame) {
         
         //current_pose = SE3(current_pose.unit_quaternion() * 2, current_pose.translation() * 2);
     }
+
+    // Saves covariance matrix for last solution
+    // Debug purposes - Covariance matrix
+    Covariance_Matrix = A.inv();
+    for (int i=0; i<6; i++) {
+        covariance_values_[i].push_back(Covariance_Matrix.at<float>(i,i));
+    }
+    if (covariance_values_[0].size() == 3600) {
+        SaveCovarianceMatrix(covariance_values_, "./graph/Variance.txt");
+    }
+    
     Mat31f t_;
     t_(0) = 1 * current_pose.translation().x();
     t_(1) = 1 * current_pose.translation().y();
@@ -1198,7 +1257,7 @@ void Tracker::ObtainAllPoints(Frame* _frame) {
     float factor = 0.0002, factor_depth;
     float factor_lvl;
     float depth_initialization = 1;
-
+    //_frame->depth_available_ = false;
     for (int lvl=0; lvl< PYRAMID_LEVELS; lvl++) {
         factor_lvl = 1 / pow(2, lvl);
         factor_depth = factor * factor_lvl;
@@ -1516,7 +1575,12 @@ void Tracker::DebugShowJacobians(Mat Jacobians, Mat points, int width, int heigh
     imshow("Jacobian for w1", image_jacobians[3]);
     imshow("Jacobian for w2", image_jacobians[4]);
     imshow("Jacobian for w3", image_jacobians[5]);
-    
+    imwrite("v1_Jacobian.jpg", image_jacobians[0]);
+    imwrite("v2_Jacobian.jpg", image_jacobians[1]);
+    imwrite("v3_Jacobian.jpg", image_jacobians[2]);
+    imwrite("w1_Jacobian.jpg", image_jacobians[3]);
+    imwrite("w2_Jacobian.jpg", image_jacobians[4]);
+    imwrite("w3_Jacobian.jpg", image_jacobians[5]);
     waitKey(0);
 }
 
@@ -1642,6 +1706,32 @@ void Tracker::DebugShowResidual(Mat _image1, Mat _image2, Mat _candidatePoints, 
     imshow("", showResidual);
     waitKey(0);
 }
+
+void Tracker::SaveCovarianceMatrix(vector<vector<float> > covariance_values, string filename) {
+    int num_values = covariance_values[0].size();
+
+    std::ofstream output(filename);
+
+    for (int i=0; i<num_values; i++) {
+        float c1 = covariance_values[0][i];
+        float c2 = covariance_values[1][i];
+        float c3 = covariance_values[2][i];
+        float c4 = covariance_values[3][i];
+        float c5 = covariance_values[4][i];
+        float c6 = covariance_values[5][i];
+        
+        output << i << " ";
+        output << fixed << setprecision(25) << c1 << " ";
+        output << fixed << setprecision(25) << c2 << " ";
+        output << fixed << setprecision(25) << c3 << " ";
+        output << fixed << setprecision(25) << c4 << " ";
+        output << fixed << setprecision(25) << c5 << " ";
+        output << fixed << setprecision(25) << c6 << endl;
+    }
+
+    output.close();
+};
+
 
 void Tracker::DebugShowWarpedPerspective(Mat _image1, Mat _image2, Mat _imageWarped, int _lvl) {
     int lvl = _lvl + 1;

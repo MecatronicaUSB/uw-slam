@@ -74,14 +74,14 @@ Mapper::Mapper(int _width, int _height, Mat _K) {
 void Mapper::TriangulateCloudPoints(Frame* _previous_frame, Frame* _current_frame) {
     
     // Transform 3x4 camera matrix from eigen to Mat
-    Mat T1 = Mat(3,4, CV_32FC1);
+    Mat T1 = Mat::eye(3,4, CV_32FC1);
     Mat T2 = Mat(3,4, CV_32FC1);
     
     // cout << "World pose:" << endl;
     // cout << previous_world_pose_.matrix3x4() << endl;
-    eigen2cv(previous_world_pose_.matrix3x4(), T1);
+    //eigen2cv(previous_world_pose_.matrix3x4(), T1);
 
-    SE3 transformation = previous_world_pose_ * _previous_frame->rigid_transformation_;
+    SE3 transformation = _previous_frame->rigid_transformation_;
     // cout << "Next transformation:" << endl;
     // cout << transformation.matrix3x4() << endl;
     eigen2cv(transformation.matrix3x4(), T2);    
@@ -89,8 +89,11 @@ void Mapper::TriangulateCloudPoints(Frame* _previous_frame, Frame* _current_fram
 
     // Obtain projection matrices for the two perspectives  
     // P = K * [Rotation | translation]
-    Mat P1 = K_[0] * T1;
-    Mat P2 = K_[0] * T2;
+    Mat P1 = Mat(3,3,CV_32FC1);
+    Mat P2 = Mat(3,3,CV_32FC1);
+    
+    P1 = K_[0] * T1;
+    P2 = K_[0] * T2;
 
     // Compute depth of 3D points using triangulation
     triangulatePoints(P1, P2, _previous_frame->points_, _current_frame->points_, _previous_frame->map_);

@@ -35,6 +35,7 @@ System::System(int argc, char *argv[], int _start_index) {
     num_frames_     = 0;
     num_keyframes_  = 0;
     num_valid_images_ = 0;
+    mean_n_keypoints_ = 0;
 
     previous_world_pose_ = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(0.0, 0.0, 0.0));
 }
@@ -209,7 +210,7 @@ void System::imgChannelStretch(cv::Mat imgOriginal, cv::Mat imgStretched, int lo
 	getHistogram(imgOriginal, histogram);
 
     // Show histogram (debug purposes)
-    printHistogram(histogram, "Original.jpg", Scalar(255,0,0));
+    //printHistogram(histogram, "Original.jpg", Scalar(255,0,0));
 	// Computing the percentiles. We force invalid values as initial values (just in case)
 	int channelLowerPercentile = -1, channelHigherPercentile = -1;
 	int height = imgOriginal.size().height;
@@ -237,9 +238,9 @@ void System::imgChannelStretch(cv::Mat imgOriginal, cv::Mat imgStretched, int lo
 	imgStretched *= m;
 
 
-    int histogramFinal[256];
-	getHistogram(imgStretched, histogramFinal);
-    printHistogram(histogramFinal, "Final.jpg", Scalar(255,0,0));
+    //int histogramFinal[256];
+	//getHistogram(imgStretched, histogramFinal);
+    //printHistogram(histogramFinal, "Final.jpg", Scalar(255,0,0));
     
 }
 
@@ -297,28 +298,32 @@ void System::UpdateWorldPose(SE3& _previous_world_pose, SE3& _current_pose) {
 
     // _previous_world_pose = _previous_world_pose * SE3(_current_pose.unit_quaternion(), (t_));
     _previous_world_pose = _previous_world_pose * _current_pose;    
-    // _current_pose = _previous_world_pose;
 }
 
 void System::Tracking() {
+
+    mean_n_keypoints_ += previous_frame_->n_matches_;
 
     bool usekeypoints = true;
 
     tracker_->ApplyGradient(previous_frame_);
     
-    if (previous_frame_->n_matches_ <= 150)
+    if (previous_frame_->n_matches_ <= 200)
         usekeypoints = false;
     
 
-    // tracker_->robust_matcher_->DetectAndTrackFeatures(previous_frame_, current_frame_, usekeypoints);        
-    // tracker_->ObtainPatchesPoints(previous_frame_);
+    tracker_->robust_matcher_->DetectAndTrackFeatures(previous_frame_, current_frame_, usekeypoints);  
 
-    tracker_->ObtainAllPoints(previous_frame_);
+    if (previous_frame_->n_matches_ > 20){      
+        tracker_->ObtainPatchesPoints(previous_frame_);
 
-    //tracker_->ObtainCandidatePoints(current_frame_);
+        //tracker_->ObtainAllPoints(previous_frame_);
 
-    //tracker_->EstimatePose(previous_frame_, current_frame_);
-    tracker_->FastEstimatePose(previous_frame_, current_frame_);
+        //tracker_->ObtainCandidatePoints(current_frame_);
+
+        //tracker_->EstimatePose(previous_frame_, current_frame_);
+        tracker_->FastEstimatePose(previous_frame_, current_frame_);
+    }
 
     // cout << previous_world_pose_.matrix3x4() << endl;
     // Change coordinates to correspond RViz coordinates
@@ -332,7 +337,9 @@ void System::Mapping() {
     // Update world pose of the camera
     mapper_->previous_world_pose_ = previous_world_pose_;
     
-    mapper_->TriangulateCloudPoints(previous_frame_, current_frame_);
+    if (previous_frame_->n_matches_ > 10){  
+        mapper_->TriangulateCloudPoints(previous_frame_, current_frame_);
+    }
 }
 
 void System::Visualize() {
@@ -342,14 +349,18 @@ void System::Visualize() {
     visualizer_->UpdateMessages(previous_frame_);
 
     UpdateWorldPose(previous_world_pose_, previous_frame_->rigid_transformation_);
+    
 }
-
 
 void System::AddFrame(int _id) {
     Frame* newFrame   = new Frame();
     newFrame->idFrame_ = _id;
 
     newFrame->images_[0] = imread(images_list_[_id], CV_LOAD_IMAGE_GRAYSCALE);
+    // Resizing for ScottReef Dataset
+    // Mat image_aux;
+    // image_aux = imread(images_list_[_id], CV_LOAD_IMAGE_GRAYSCALE);
+    // resize(image_aux, newFrame->images_[0], Size(), 0.5, 0.5);
     
     cvtColor(newFrame->images_[0], newFrame->image_to_send, COLOR_GRAY2BGR);
     

@@ -91,7 +91,9 @@ public:
 
     void ReadGroundTruthTUM(int start_index, string groundtruth_path);
 
-    void AddPointCloud(Frame* frame);
+    void ReadGroundTruthGIRONA(int start_index, string groundtruth_path);
+    
+    void AddPointCloud(Frame* frame, float x, float y, float z);
     
     void AddPointCloudFromRGBD(Frame* frame);
 
@@ -100,6 +102,8 @@ public:
     void GraphXYZ(vector<vector<float> > graph_values_);
     
     void SaveGraph(vector<float> estimated_values, vector<float> gt_values, string filename);
+    
+    bool CheckDistance(geometry_msgs::Point p3D, float x, float y, float z);
     
     // Ground-Truth publishers and markers
     ros::Publisher publisher_gt_pose_;
@@ -120,6 +124,9 @@ public:
     // Point-Cloud publisher and marker   
     ros::Publisher publisher_point_cloud_;
     visualization_msgs::Marker point_cloud_;
+    // RGB-D publisher and marker
+    ros::Publisher publisher_rgbd_;
+    visualization_msgs::Marker rgbd_;
 
     image_transport::Publisher publisher_current_frame_;
 

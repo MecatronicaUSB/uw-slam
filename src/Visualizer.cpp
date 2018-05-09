@@ -113,15 +113,38 @@ Visualizer::Visualizer(int start_index, int num_images, Mat K, string _ground_tr
     point_cloud.type = visualization_msgs::Marker::SPHERE_LIST;
 
     // Size of points
-    point_cloud.scale.x = 0.007;
-    point_cloud.scale.y = 0.007;
+    point_cloud.scale.x = 0.015;
+    point_cloud.scale.y = 0.015;
 
     // Point-Cloud color
-    point_cloud.color.b = 0.8f;    
-    point_cloud.color.g = 0.8f;    
-    point_cloud.color.r = 0.8f;    
-    point_cloud.color.a = 0.5f;
+    point_cloud.color.r = 0.0f;    
+    point_cloud.color.g = 1.0f;    
+    point_cloud.color.b = 1.0f;    
+    point_cloud.color.a = 1.0f;
 
+    // RGB-D initialization
+    ros::NodeHandle nodehandle_rgbd;
+    ros::Publisher publisher_rgbd = nodehandle_rgbd.advertise<visualization_msgs::Marker>("rgbd", 50);
+    visualization_msgs::Marker rgbd;
+
+    rgbd.header.frame_id = "/world";
+    rgbd.header.stamp = ros::Time::now();
+    rgbd.ns = "rgbd";
+    rgbd.action = visualization_msgs::Marker::ADD;
+    rgbd.pose.orientation.w = 1.0;
+    rgbd.id = 4;
+
+    rgbd.type = visualization_msgs::Marker::SPHERE_LIST;
+
+    // Size of points
+    rgbd.scale.x = 0.009;
+    rgbd.scale.y = 0.009;
+
+    // Point-Cloud color
+    rgbd.color.b = 0.2f;    
+    rgbd.color.g = 1.0f;    
+    rgbd.color.r = 1.0f;    
+    rgbd.color.a = 1.0f;
 
     // If ground truth is used
     if (not (ground_truth_path == "")) {
@@ -248,7 +271,49 @@ Visualizer::Visualizer(int start_index, int num_images, Mat K, string _ground_tr
             camera_pose.pose.orientation.z = 0;
             camera_pose.pose.orientation.w = 1;
 
+        }
 
+        if (ground_truth_dataset_ == "GIRONA") {
+            
+            ReadGroundTruthGIRONA(start_index, ground_truth_path);
+            // Camera model changed for TUM dataset
+            camera_pose.type = visualization_msgs::Marker::CUBE;
+            camera_pose.scale.x = 0.35;                              
+            camera_pose.scale.y = 0.025;
+            camera_pose.scale.z = 0.2;
+            // Dimentions of ground truth marker               
+            gt_pose.type = visualization_msgs::Marker::CUBE;                         
+            gt_pose.scale.x = 0.35;                             
+            gt_pose.scale.y = 0.2;
+            gt_pose.scale.z = 0.025;
+            // TUM Convention of quaternion: qx, qy, qz, qw
+            off_gt_x_ = ground_truth_poses_[ground_truth_index_][0];   
+            off_gt_y_ = ground_truth_poses_[ground_truth_index_][1];   
+            off_gt_z_ = ground_truth_poses_[ground_truth_index_][2];   
+            
+            off_gt_qx_ = ground_truth_poses_[ground_truth_index_][3]; 
+            off_gt_qy_ = ground_truth_poses_[ground_truth_index_][4];    
+            off_gt_qz_ = ground_truth_poses_[ground_truth_index_][5]; 
+            off_gt_qw_ = ground_truth_poses_[ground_truth_index_][6]; 
+
+            // Initialize the camera pose marker in the same place and orientation as the ground truth marker
+            // This initialization point depends of the start_index argument in SLAM process 
+            double tx = ground_truth_poses_[ground_truth_index_][0];  
+            double ty = ground_truth_poses_[ground_truth_index_][1];
+            double tz = ground_truth_poses_[ground_truth_index_][2];
+            double qx = ground_truth_poses_[ground_truth_index_][3];
+            double qy = ground_truth_poses_[ground_truth_index_][4];    
+            double qz = ground_truth_poses_[ground_truth_index_][5]; 
+            double qw = ground_truth_poses_[ground_truth_index_][6];
+
+            // Initialization with Ground Truth            
+            camera_pose.pose.position.x = 0; 
+            camera_pose.pose.position.y = 0;
+            camera_pose.pose.position.z = 0;
+            camera_pose.pose.orientation.x = 0;
+            camera_pose.pose.orientation.y = 0;    
+            camera_pose.pose.orientation.z = 0;
+            camera_pose.pose.orientation.w = 1;
         }
 
         // Saving ground truth markers configuration
@@ -293,6 +358,8 @@ Visualizer::Visualizer(int start_index, int num_images, Mat K, string _ground_tr
     point_cloud_ = point_cloud;
     publisher_point_cloud_ = publisher_point_cloud;
 
+    rgbd_ = rgbd;
+    publisher_rgbd_ = publisher_rgbd;
     graph_position_ = vector<vector<float> >(6);
     
 
@@ -338,7 +405,7 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
     q.setW(qw);
     transform.setRotation(q);
     
-    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", "camera"));
+    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", "estimation"));
 
     //previous_world_pose_ = final_pose;
     
@@ -351,7 +418,7 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
 
     // Add Point-Cloud
     AddPointCloudFromRGBD(_previous_frame);
-    //AddPointCloud(_previous_frame);
+    AddPointCloud(_previous_frame, x, y, z);
 
     // Update ground truth marker position
     if (use_ground_truth_ && ground_truth_index_ < num_ground_truth_poses_) {
@@ -369,8 +436,8 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
             qw_gt = -off_gt_qw_ + ground_truth_poses_[ground_truth_index_][3];
             
         }
-        // TUM Convention: x, y, z, qx, qy, qz, qw 
-        if (ground_truth_dataset_ == "TUM") {
+        // TUM/GIRONA Convention: x, y, z, qx, qy, qz, qw 
+        if (ground_truth_dataset_ == "TUM" || ground_truth_dataset_ == "GIRONA") {
             x_gt = off_gt_y_ - ground_truth_poses_[ground_truth_index_][1] + init_x_;
             y_gt = -off_gt_x_ + ground_truth_poses_[ground_truth_index_][0] + init_y_;
             z_gt = -off_gt_z_ + ground_truth_poses_[ground_truth_index_][2] + init_z_;
@@ -383,6 +450,7 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
             qz_gt = 0;
             qw_gt = 1;
         }
+
         // Send gt position
         gt_pose_.pose.position.x = x_gt;
         gt_pose_.pose.position.y = y_gt;
@@ -402,7 +470,6 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
         transform_gt.setRotation(q_gt);
         br.sendTransform(tf::StampedTransform(transform_gt, ros::Time::now(), "world", "gt"));
         
-        //
         geometry_msgs::Point gt_p;
         gt_p.x = x_gt;
         gt_p.y = y_gt;
@@ -427,6 +494,21 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
             //GraphXYZ(graph_position_);
         }
 
+        // Only for graphing purposes - Resets current previous_world_pose_ to the groundtruth position
+        // int reset_step = 200;
+        // if(graph_position_[0].size() % reset_step == 0) {
+        //     Eigen:Quaternion q;
+        //     q.x() = qx_gt;
+        //     q.y() = qy_gt;
+        //     q.z() = qz_gt;
+        //     q.w() = qw_gt;
+        //     float x_gt2 = x_gt - init_x_;
+        //     float y_gt2 = y_gt - init_y_;
+        //     float z_gt2 = z_gt - init_z_;
+            
+        //     _previous_world_pose = SE3(SO3::exp(SE3::Point(0.0, 0.0, 0.0)), SE3::Point(-x_gt2, z_gt2, -y_gt2));
+        //     _previous_world_pose.setQuaternion(q);
+        // }
     }
 
     // Wait for Rviz to start sending messages
@@ -446,7 +528,10 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
     publisher_camera_trajectory_dots_.publish(camera_trajectory_dots_);
     publisher_camera_trajectory_lines_.publish(camera_trajectory_lines_);
     publisher_point_cloud_.publish(point_cloud_);
+    publisher_rgbd_.publish(rgbd_);
+    
     point_cloud_.points.clear();
+    rgbd_.points.clear();
 
     if (use_ground_truth_) {
         publisher_gt_pose_.publish(gt_pose_);
@@ -459,22 +544,35 @@ void Visualizer::UpdateMessages(Frame* _previous_frame){
 
 };
 
-void Visualizer::AddPointCloud(Frame* frame) {
+void Visualizer::AddPointCloud(Frame* frame, float x, float y, float z) {
     int num_cloud_points = frame->map_.cols;
     Mat points_3D = frame->map_.clone();
 
-    SE3 final_pose = previous_world_pose_ * frame->rigid_transformation_;
-    Mat31f t = final_pose.translation();
-
+    // geometry_msgs::Point p3D;
+    // p3D.x = x + 0;
+    // p3D.y = y + 0.35;
+    // p3D.z = z + 1;
+    // point_cloud_.points.push_back(p3D); 
+    
     for (int i=0; i<points_3D.cols; i++) {
         geometry_msgs::Point p3D;
 
-        p3D.x = -t(0) + (points_3D.at<float>(0,i)/points_3D.at<float>(3,i)) + init_x_;
-        p3D.y = -t(2) + (points_3D.at<float>(2,i)/points_3D.at<float>(3,i)) + init_y_;
-        p3D.z = t(1) -(points_3D.at<float>(1,i)/points_3D.at<float>(3,i)) + init_z_;
+        p3D.x = x + (points_3D.at<float>(0,i)/points_3D.at<float>(3,i));
+        p3D.y = y + (points_3D.at<float>(2,i)/points_3D.at<float>(3,i));
+        p3D.z = z - (points_3D.at<float>(1,i)/points_3D.at<float>(3,i));
 
-        // cout << p3D.x <<  " " << p3D.y << " " << p3D.z << endl;
-        point_cloud_.points.push_back(p3D); 
+        if (CheckDistance(p3D, x, y, z)){
+            point_cloud_.points.push_back(p3D); 
+        }
+    }
+};
+bool Visualizer::CheckDistance(geometry_msgs::Point p3D, float x, float y, float z){
+    float euclidean =sqrt((p3D.x - x)*(p3D.x + x) + (p3D.y - y)*(p3D.y - y) + (p3D.z - z)*(p3D.z - z));
+
+    if (euclidean > 1.2 && p3D.y > y) {
+        return true;
+    } else {
+        return false;
     }
 };
 
@@ -503,7 +601,7 @@ void Visualizer::AddPointCloudFromRGBD(Frame* frame) {
         p3D.y = -t(2) + points_3D.at<float>(i,2) + init_y_;
         p3D.z = t(1) -points_3D.at<float>(i,1) + init_z_;
 
-        point_cloud_.points.push_back(p3D);    
+        rgbd_.points.push_back(p3D);    
     }
 };
 
@@ -536,6 +634,37 @@ void Visualizer::ReadGroundTruthTUM(int start_index, string groundtruth_path) {
     num_ground_truth_poses_ = ground_truth_poses_.size();
     ground_truth_step_ = num_ground_truth_poses_ / num_images_ ;
     ground_truth_index_ = start_index * ground_truth_step_ + 100;  // + 100 is a temporarly fix for syncronous video and pose of ground truth
+};
+
+void Visualizer::ReadGroundTruthGIRONA(int start_index, string groundtruth_path) {
+    string delimiter = ",";
+    string line = "";
+    ifstream file(groundtruth_path);
+    if (!file.is_open()) {
+        cerr << "Could not read file " << groundtruth_path << "\n";
+        cerr << "Exiting.." << endl;
+        return;
+    }
+    getline(file, line); 
+    getline(file, line);               
+    while (getline(file, line)) {
+        vector<double> timestamp_values;
+        stringstream iss(line);
+        string val;
+        getline(iss, val, ',');
+        getline(iss, val, ',');
+        getline(iss, val, ',');        
+        for (int i=0; i<7; i++) {
+            string val;
+            getline(iss, val, ',');       
+            timestamp_values.push_back(stod(val));
+        }
+        ground_truth_poses_.push_back(timestamp_values);
+    }
+    file.close();
+    num_ground_truth_poses_ = ground_truth_poses_.size();
+    ground_truth_step_ = num_ground_truth_poses_ / num_images_ ;
+    ground_truth_index_ = start_index * ground_truth_step_;  // + 100 is a temporarly fix for syncronous video and pose of ground truth
 };
 
 void Visualizer::ReadGroundTruthEUROC(int start_index, string groundtruth_path) {
@@ -581,9 +710,11 @@ void Visualizer::SaveGraph(vector<float> estimated_values, vector<float> gt_valu
     for (int i=0; i<num_values; i++) {
         float e_v = estimated_values[i];
         float gt_v = gt_values[i];
+        float error = abs(e_v - gt_v);
         output << i << " ";
         output << fixed << setprecision(4) << e_v << " ";
-        output << fixed << setprecision(4) << gt_v << endl;
+        output << fixed << setprecision(4) << gt_v << " ";
+        output << fixed << setprecision(4) << error << endl;
     }
 
     output.close();

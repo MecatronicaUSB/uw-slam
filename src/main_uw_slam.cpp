@@ -108,6 +108,9 @@ int main (int argc, char *argv[]) {
         } else {
             depth_path = ""; 
         }
+    } else if (ground_truth_Girona) {        
+        ground_truth_dataset = "GIRONA";
+        ground_truth_path = args::get(ground_truth_Girona);
     } else {
         depth_path = "";
         ground_truth_dataset = "";
@@ -156,8 +159,8 @@ int main (int argc, char *argv[]) {
         uwSystem->Tracking();
 
         // Mapping thread
-        //uwSystem->Mapping();
-
+        uwSystem->Mapping();
+    
         // Visualizer thread
         uwSystem->Visualize();
         
@@ -169,6 +172,8 @@ int main (int argc, char *argv[]) {
 
     cout << "Dataset ended..." << endl;
 
+    // Keypoint mean
+    cout << "Mean number of keypoints per image: " << uwSystem->mean_n_keypoints_ / 3600 << endl;
     // Stop timing
     t = 1000 * ((double) getTickCount() - t) / getTickFrequency();
     cout << endl << "System runtime: " << t << " ms" << endl;

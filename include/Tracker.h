@@ -297,6 +297,8 @@ public:
      */
     bool PixelIsBackground(Mat _intputImage, int y, int x);
 
+    void SaveCovarianceMatrix(vector<vector<float> > covariance_values, string filename);
+
 
     // TODO(GitHub:fmoralesh, fabmoraleshidalgo@gmail.com)
     // 03-05-2018 - Review: Ceres usage in UW-SLAM ?
@@ -533,6 +535,8 @@ public:
     vector<Mat> K_ = vector<Mat>(PYRAMID_LEVELS);
 
     bool depth_available_;
+
+    vector<vector<float> > covariance_values_;
 };
 
 
