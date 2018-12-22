@@ -122,7 +122,7 @@ public:
     int num_images_, num_ground_truth_poses_;
     int ground_truth_step_;
     int ground_truth_index_;
-
+    std::ofstream outputFile;
     // Intrinsic parameters
     float fx_, fy_, invfx_, invfy_, cx_, cy_;
 

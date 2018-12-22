@@ -774,7 +774,8 @@ void Tracker::EstimatePoseFeatures(Frame* _previous_frame, Frame* _current_frame
             Mat ResidualsW = Residuals.mul(W);
             Mat errorMat =  inv_num_residuals * Residuals.t() * ResidualsW;
             error = errorMat.at<float>(0,0);
-   
+                    cout << "lvl = "<< lvl<<"Error it "<< k<< " ="<<error
+                 << "    Last Error it "<< " ="<<last_error<<endl;
             if (k==0)
                 initial_error = error;
 
@@ -1213,6 +1214,30 @@ void Tracker::ObtainPatchesPoints(Frame* _previous_frame) {
                     }
                 }
             }
+        }
+        else{
+            float x = goodKeypoints[i].pt.x;
+            float y = goodKeypoints[i].pt.y;
+
+            circle(_previous_frame->image_to_send, Point(x,y), 2, Scalar(0,255,0), -1, 6, 0);
+
+            
+
+                float z = 1;
+
+                for (int i=x-start_point; i<=x+start_point; i++) {
+                    for (int j=y-start_point; j<=y+start_point; j++) {
+                        if (i>0 && i<w_[lvl] && j>0 && j<h_[lvl]) {
+                            Mat pointMat_patch = Mat::ones(1, 4, CV_32FC1);                
+                            pointMat_patch.at<float>(0,0) = i;
+                            pointMat_patch.at<float>(0,1) = j;
+                            pointMat_patch.at<float>(0,2) = z;
+
+                            _previous_frame->candidatePoints_[lvl].push_back(pointMat_patch);
+                        }
+                    }
+                }
+
         }
     }
     // Show points saved in candidatePoints

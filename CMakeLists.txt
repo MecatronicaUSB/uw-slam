@@ -3,6 +3,9 @@ project(uw_slam)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
  add_compile_options(-std=c++11)
+# Opencv Library (local)
+set(OpenCV_INCLUDE_DIRS /usr/local/)
+set(OpenCV_LIBS /usr/local/lib/libopencv_core.so)
 
 # Required libraries
 find_package(catkin REQUIRED COMPONENTS

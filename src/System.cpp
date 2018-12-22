@@ -138,6 +138,7 @@ void System::InitializeSystem(string _images_path, string _ground_truth_dataset,
             num_valid_images_ = images_list_.size();
     } else {
         num_valid_images_ = images_list_.size();
+cout << "depth no avaliable"<<endl;
     }
 
     initialized_ = true;
@@ -214,8 +215,8 @@ void System::Tracking() {
     //tracker_->ObtainAllPoints(current_frame_);
     //tracker_->ObtainCandidatePoints(current_frame_);
     
-    //tracker_->FastEstimatePose(previous_frame_, current_frame_);
-    tracker_->EstimatePoseFeatures(previous_frame_, current_frame_);
+    tracker_->FastEstimatePose(previous_frame_, current_frame_);
+    //tracker_->EstimatePoseFeatures(previous_frame_, current_frame_);
     //tracker_->EstimatePose(previous_frame_, current_frame_);
     
 

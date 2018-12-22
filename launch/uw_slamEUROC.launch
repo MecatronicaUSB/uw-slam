@@ -2,9 +2,9 @@
 <launch>
     <!-- UW-SLAM main thread-->
     <node pkg="uw_slam" type="main_uw_slam" name="main"  
-        args="-d /home/fabiomorales/Documents/datasets/EUROC/V1_02_medium/mav0/cam0/data/
-              -c /home/fabiomorales/catkin_ws/src/uw-slam/calibration/calibrationEUROC.xml
-              --EUROC /home/fabiomorales/Documents/datasets/EUROC/V1_02_medium/mav0/vicon0/data.csv   
+        args="-d /home/lujano/Documents/V1_01_easy/mav0/cam0/data/
+              -c /home/lujano/catkin_ws/src/uw-slam/calibration/calibrationEUROC.xml
+              --EUROC /home/lujano/Documents/V1_01_easy/mav0/vicon0/data.csv   
               -s 210
               "
         clear_params="true" 

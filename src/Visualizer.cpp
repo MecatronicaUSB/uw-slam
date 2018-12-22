@@ -287,7 +287,8 @@ Visualizer::Visualizer(int start_index, int num_images, Mat K, string _ground_tr
 
     geometry_msgs::Point p3D;
 
-    point_cloud_.points.push_back(p3D);   
+    point_cloud_.points.push_back(p3D);  
+    outputFile.open("/home/lujano/Documents/outputUWSlam.csv", std::ofstream::out | std::ofstream::trunc);
 };
 
 Visualizer::~Visualizer() {};
@@ -301,6 +302,8 @@ void Visualizer::UpdateMessages(Frame* frame){
 
     // Corrected movement of camera
     Mat31f t_TUM;
+    
+
     t_TUM(0) = 40 * frame->rigid_transformation_.translation().x();
     t_TUM(1) = 40 * frame->rigid_transformation_.translation().y();
     t_TUM(2) = 40 * frame->rigid_transformation_.translation().z();
@@ -312,9 +315,9 @@ void Visualizer::UpdateMessages(Frame* frame){
     Mat31f t = final_pose.translation();
     Quaternion quaternion = final_pose.unit_quaternion();
 
-    camera_pose_.pose.position.x = - t(0);  
-    camera_pose_.pose.position.y = - t(2);
-    camera_pose_.pose.position.z = - t(1);
+    camera_pose_.pose.position.x = -t(2);  
+    camera_pose_.pose.position.y = -t(0);
+    camera_pose_.pose.position.z = -t(1);
     camera_pose_.pose.orientation.x = quaternion.x();
     camera_pose_.pose.orientation.y = quaternion.y();    
     camera_pose_.pose.orientation.z = quaternion.z(); 
@@ -331,6 +334,7 @@ void Visualizer::UpdateMessages(Frame* frame){
 
     // Point-Cloud add
     // AddPointCloudFromRGBD(frame);
+    Point3d gtTranslation;
 
     // Update ground truth marker position
     if (use_ground_truth_) {
@@ -364,6 +368,10 @@ void Visualizer::UpdateMessages(Frame* frame){
         ground_truth_index_ += ground_truth_step_;
     }
 
+    gtTranslation.x = ground_truth_poses_[ground_truth_index_][0]-ground_truth_poses_[ground_truth_index_-1][0];
+    gtTranslation.y = ground_truth_poses_[ground_truth_index_][1]-ground_truth_poses_[ground_truth_index_-1][1];
+    gtTranslation.z = ground_truth_poses_[ground_truth_index_][2]-ground_truth_poses_[ground_truth_index_-1][2];
+
     // Wait for Rviz to start sending messages
     while (publisher_camera_pose_.getNumSubscribers() < 1 && publisher_current_frame_.getNumSubscribers() < 1) {
         if (!ros::ok()) {
@@ -374,6 +382,23 @@ void Visualizer::UpdateMessages(Frame* frame){
         ROS_WARN_ONCE("Please open RVIZ to continue...");
         sleep(1);
     }
+
+    outputFile <<  camera_pose_.pose.position.x<<","
+    <<camera_pose_.pose.position.y<<","
+    <<camera_pose_.pose.position.z<<","
+    <<camera_pose_.pose.orientation.x<<","
+    <<camera_pose_.pose.orientation.y<<","
+    <<camera_pose_.pose.orientation.z <<","
+    <<camera_pose_.pose.orientation.w<<","
+    <<gt_pose_.pose.position.x <<","
+    <<gt_pose_.pose.position.y<<","
+    <<gt_pose_.pose.position.z <<","
+    <<gt_pose_.pose.orientation.x<<","
+    <<gt_pose_.pose.orientation.y<<","
+    <<gt_pose_.pose.orientation.z <<","
+    <<gt_pose_.pose.orientation.w
+    <<endl;
+
 
     // Send messages
     publisher_current_frame_.publish(current_frame);

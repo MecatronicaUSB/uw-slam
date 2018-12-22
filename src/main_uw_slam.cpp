@@ -140,6 +140,7 @@ int main (int argc, char *argv[]) {
         uwSystem->AddFrame(i);
         uwSystem->Tracking();
         uwSystem->visualizer_->UpdateMessages(uwSystem->previous_frame_);
+
         
         // Delete oldest frame (keeping 10 frames)
         if (uwSystem->num_frames_> 10) {
